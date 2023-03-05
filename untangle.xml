@@ -4,7 +4,7 @@
     <include file="val_husky.xml"/>
     <include file="rope.xml"/>
     <equality>
-        <connect body1="drive10" body2="B_first" name="right" anchor="0 0 0.181"/>
-        <connect body1="drive50" body2="B_last" name="left" anchor="0 0 0.181"/>
+        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181"/>
+        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.181"/>
     </equality>
 </mujoco>
