@@ -1,0 +1,3 @@
+[submodule "dependencies/mujoco"]
+	path = dependencies/mujoco
+	url = git@github.com:deepmind/mujoco.git
