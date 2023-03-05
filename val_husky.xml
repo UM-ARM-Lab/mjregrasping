@@ -1,0 +1,382 @@
+<mujoco model="val">
+    <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
+    <default>
+        <geom solref="0.002 1"/>
+    </default>
+    <size njmax="500" nconmax="100"/>
+    <asset>
+        <mesh name="base_link" file="base_link.stl"/>
+        <mesh name="wheel" file="wheel.stl"/>
+        <mesh name="top_plate" file="top_plate.stl"/>
+        <mesh name="ark_lidar" file="ark_lidar.stl"/>
+        <mesh name="PEDESTAL_ASSEMBLY" file="PEDESTAL_ASSEMBLY.stl"/>
+        <mesh name="Drive56_mujoco" file="Drive56_mujoco.stl"/>
+        <mesh name="MK4_MT" file="MK4_MT.stl"/>
+        <mesh name="TORSO" file="TORSO.stl"/>
+        <mesh name="MK4_LT" file="MK4_LT.stl"/>
+        <mesh name="SHOULDER_BRACKET" file="SHOULDER_BRACKET.stl"/>
+        <mesh name="PROXIMAL_TUBE" file="PROXIMAL_TUBE.stl"/>
+        <mesh name="FOREARM_BRACKET" file="FOREARM_BRACKET.stl"/>
+        <mesh name="A35_DRIVE" file="A35_DRIVE.stl"/>
+        <mesh name="A35_BRACKET" file="A35_BRACKET.stl"/>
+        <mesh name="PINCER_HOUSING2" file="PINCER_HOUSING2.stl"/>
+        <mesh name="PINCER_FINGER2" file="PINCER_FINGER2.stl"/>
+        <mesh name="box" file="box.stl"/>
+    </asset>
+    <worldbody>
+        <body pos="0 0 0" name="base">
+            <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="50" diaginertia="8.333 8.333 8.333"/>
+            <body pos="0.3641 0.00470858 0.315" quat="0 -0.707141 0.707073 0" name="drive56">
+                <inertial pos="1.36e-06  0.00343   0.0203" quat="1 0 0 0" mass="0.392"
+                          diaginertia="0.000436  0.000393  0.000284"/>
+                <geom type="mesh" mesh="Drive56_mujoco" name="drive56_mesh" rgba="0.2 0.2 0.2 1"/>
+            </body>
+            <body name="drive57" pos="0.3641 0.00470858 0.397642" quat="3.40567e-05 -3.40567e-05 0.707107 -0.707107">
+                <inertial pos="2.69e-06 0.00285 0.0136" quat="1 0 0 0" mass="0.405"
+                          diaginertia="0.000512 0.000472 0.000269"/>
+                <site name="joint56_sensor_site"/>
+                <joint name="joint56" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-6.2 6.2"
+                       damping="50"
+                       frictionloss="0.01"/>
+                <geom type="mesh" mesh="MK4_MT" name="drive57_mesh" rgba="0.2 0.2 0.2 1"/>
+                <body name="torso" pos="0 0 -0.04085" quat="0.5 0.5 -0.5 0.5">
+                    <inertial pos="0.0292 -1.01e-05 0.251" quat="0.705398 0.0444203 0.118989 0.697339"
+                              mass="3.58" diaginertia="0.0553 0.0464 0.0105"/>
+                    <site name="joint57_sensor_site"/>
+                    <joint name="joint57" type="hinge" pos="0 0 0" axis="-1 0 0" limited="true" range="-1.5708 1.5708"
+                           damping="1000"
+                           frictionloss="0.01"/>
+                    <geom type="mesh" mesh="TORSO" name="torso" rgba="0.2 0.2 0.2 1"/>
+                    <body pos="-0.092094 0 0.44399" quat="0.5 -0.5 0.5 -0.5" name="drive1">
+                        <inertial pos="2.69e-06 0.00285 0.0136" quat="1 0 0 0" mass="0.405"
+                                  diaginertia="0.000512 0.000472 0.000269"/>
+                        <site name="joint1_sensor_site"/>
+                        <geom type="mesh" mesh="MK4_MT" name="drive1_mesh" rgba="0.2 0.2 0.2 1"/>
+                    </body>
+                    <body pos="0.167906 0 0.44399" quat="0.5 -0.5 -0.5 0.5" name="drive41">
+                        <inertial pos="2.69e-06 0.00285 0.0136" quat="1 0 0 0" mass="0.405"
+                                  diaginertia="0.000512 0.000472 0.000269"/>
+                        <site name="joint41_sensor_site"/>
+                        <geom type="mesh" mesh="MK4_MT" name="drive41_mesh" rgba="0.2 0.2 0.2 1"/>
+                    </body>
+                    <body name="drive42" pos="-0.174736 0 0.44399" quat="0.5 -0.5 -0.5 -0.5">
+                        <inertial pos=" 3.12e-06 0.00342 0.0101"
+                                  quat="0.999687 -0.0245928 0.000670972 -0.00444195"
+                                  mass="0.372" diaginertia="0.000423 0.000381 0.000247"/>
+                        <joint name="joint41" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2"
+                               damping="200"
+                               frictionloss="1"/>
+                        <geom type="mesh" mesh="MK4_LT" name="drive42_mesh" rgba="0.2 0.2 0.2 1"/>
+                        <body name="leftshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 -0.707107">
+                            <inertial pos="1.33e-06 -0.0412 0.0138"
+                                      quat="0.865182 0.501455 -0.00145709 0.000441505"
+                                      mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/>
+                            <site name="joint42_sensor_site"/>
+                            <joint name="joint42" type="hinge" pos="0 0 0" axis="0 0 1" limited="true"
+                                   range="0 3.14159" damping="200"
+                                   frictionloss="1"/>
+                            <geom type="mesh" mesh="SHOULDER_BRACKET" name="left_shoulder_bracket"
+                                  rgba="0.2 0.2 0.2 1"/>
+                            <body pos="0 -0.1 0.07526" quat="0.707107 -0.707107 0 0" name="drive43">
+                                <inertial pos="3.12e-06 0.00342 0.0101" quat="1 0 0 0" mass="0.372"
+                                          diaginertia="0.000423 0.000381 0.000247"/>
+                                <geom type="mesh" mesh="MK4_LT" name="drive43_mesh" rgba="0.2 0.2 0.2 1"/>
+                            </body>
+                            <body name="lefttube_and_drive" pos="0 -0.215888 0.07526" quat="-0.707107 -0.707107 0 0">
+                                <inertial pos="-0.00519 -2.28e-05 0.0276 "
+                                          quat="0.707443 -0.0157784 -0.0162832 0.706407"
+                                          mass="1.7" diaginertia="0.00548 0.00493 0.00172"/>
+                                <site name="joint43_sensor_site"/>
+                                <joint name="joint43" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                       range="-6.2 6.2"
+                                       damping="100" frictionloss="1"/>
+                                <body quat="0.707107 0 0.707107 0" name="lefttube">
+                                    <inertial pos="0.0342 -4.48e-12 1.93e-07" quat="1 0 0 0" mass="0.2"
+                                              diaginertia="0.000132 0.000132 9.31e-05"/>
+                                    <geom type="mesh" mesh="PROXIMAL_TUBE" name="lefttube_mesh" rgba="0.2 0.2 0.2 1"/>
+                                </body>
+                                <body pos="0 0 0.0486304" quat="0.5 -0.5 -0.5 0.5" name="drive44">
+                                    <inertial pos="3.12e-06 0.00342 0.0101 " quat="1 0 0 0" mass="0.372"
+                                              diaginertia="0.000423 0.000381 0.000247"/>
+                                    <geom type="mesh" mesh="MK4_LT" name="drive44_mesh" rgba="0.2 0.2 0.2 1"/>
+                                </body>
+                                <body name="leftforearm" pos="0.06758 0 0.0486304" quat="0 -0.707107 0 0.707107">
+                                    <inertial pos="3.28e-06 -0.0761 0.0133"
+                                              quat="0.790471 0.612292 0.00995154 -0.0124285"
+                                              mass="0.265" diaginertia="0.00109 0.00106 6e-05"/>
+                                    <site name="joint44_sensor_site"/>
+                                    <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true"
+                                           range="-3.14159 0.5"
+                                           damping="50" frictionloss="0.5"/>
+                                    <geom type="mesh" mesh="FOREARM_BRACKET" name="left_forearm_bracket"
+                                          rgba="0.2 0.2 0.2 1"/>
+                                    <body pos="0 -0.17 0.05749" quat="0.707107 -0.707107 0 0" name="drive45">
+                                        <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
+                                                  diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive45_mesh" rgba="0.2 0.2 0.2 1"/>
+                                    </body>
+                                    <body name="drive46" pos="0 -0.237262 0.05749" quat="0.707107 0 0.707107 0">
+                                        <inertial pos="-1.41e-07 0.00618 -0.00546"
+                                                  quat="0.99866 0.0517272 0.00100884 -0.00155161"
+                                                  mass="0.108" diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
+                                        <site name="joint45_sensor_site"/>
+                                        <joint name="joint45" type="hinge" pos="0 0 0" axis="0 1 0" limited="true"
+                                               range="-6.2 6.2"
+                                               damping="1.01" frictionloss="0.01"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive46_mesh" rgba="0.2 0.2 0.2 1"/>
+                                        <body name="leftwrist" pos="0 0 -0.0566728">
+                                            <inertial pos="-1.32e-06 -0.0281 0.00953"
+                                                      quat="0.906199 0.42285 0.000311153 -0.000270308"
+                                                      mass="0.0651" diaginertia="4.78e-05 4.33e-05 9.33e-06"/>
+                                            <site name="joint46_sensor_site"/>
+                                            <joint name="joint46" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                                   range="-1.5708 1.5708" damping="0.5" frictionloss="0.1"/>
+                                            <geom type="mesh" mesh="A35_BRACKET" name="left_wrist_mesh"
+                                                  rgba="0.2 0.2 0.2 1"/>
+                                            <body pos="0 -0.05 0.0566728" quat="0.707107 -0.707107 0 0"
+                                                  name="drive47">
+                                                <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
+                                                          diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
+                                                <geom type="mesh" mesh="A35_DRIVE" name="drive47_mesh"
+                                                      rgba="0.2 0.2 0.2 1"/>
+                                            </body>
+                                            <body name="drive50" pos="0 -0.086 0.0566728" quat="0 0 0.707107 -0.707107">
+                                                <inertial pos="0.0136 -5.13e-09 0.0377 " quat="1 0 0 0" mass="0.168"
+                                                          diaginertia="0.00012 0.000112 6.09e-05"/>
+                                                <site name="joint47_sensor_site"/>
+                                                <joint name="joint47" type="hinge" pos="0 0 0" axis="0 0 -1"
+                                                       limited="true"
+                                                       range="-6.2 6.2" damping="0.2" frictionloss="0.01"/>
+                                                <geom type="mesh" mesh="PINCER_HOUSING2" name="drive47_housing_mesh"
+                                                      rgba="0.2 0.2 0.2 1"/>
+                                                <site name="left_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
+                                                <body name="leftgripper_link" pos="0 0.0135 0.068553"
+                                                      euler="1.15 -1.5707 0">
+                                                    <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1" damping="0.1" frictionloss="0.01"/>
+                                                    <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
+                                                              pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
+                                                    <site name="leftgripper_sensor_site"/>
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="leftgripper_mesh"
+                                                          rgba="0.1 0.1 0.1 1"/>
+                                                </body>
+                                                <body name="leftgripper2_link" pos="0 -0.0135 0.068553"
+                                                      euler="1.99 1.5707 0">
+                                                    <joint name="leftgripper2" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1" damping="0.1" frictionloss="0.01"/>
+                                                    <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
+                                                              pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
+                                                    <site name="leftgripper2_sensor_site"/>
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="leftgripper2_mesh"
+                                                          rgba="0.1 0.1 0.1 1"/>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                    <body name="drive2" pos="0.250548 0 0.44399" quat="0.5 -0.5 0.5 0.5">
+                        <inertial pos="3.12e-06 0.00342 0.0101 "
+                                  quat="0.999687 -0.0245928 0.000670972 -0.00444195"
+                                  mass="0.372" diaginertia="0.000423 0.000381 0.000247"/>
+                        <joint name="joint1" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-6.2 6.2"
+                               damping="200"
+                               frictionloss="1"/>
+                        <geom type="mesh" mesh="MK4_LT" name="joint2_mesh" rgba="0.2 0.2 0.2 1"/>
+                        <body name="rightshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 0.707107">
+                            <inertial pos="1.33e-06 -0.0412 0.0138"
+                                      quat="0.865182 0.501455 -0.00145709 0.000441505"
+                                      mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/>
+                            <site name="joint2_sensor_site"/>
+                            <joint name="joint2" type="hinge" pos="0 0 0" axis="0 0 1" limited="true"
+                                   range="-3.14159 0" damping="200"
+                                   frictionloss="1"/>
+                            <geom type="mesh" mesh="SHOULDER_BRACKET" name="right_shoulder_bracket"
+                                  rgba="0.2 0.2 0.2 1"/>
+                            <body pos="0 -0.1 0.07526" quat="0.707107 -0.707107 0 0" name="drive3">
+                                <inertial pos="3.12e-06 0.00342 0.0101" quat="1 0 0 0" mass="0.372"
+                                          diaginertia="0.000423 0.000381 0.000247"/>
+                                <geom type="mesh" mesh="MK4_LT" name="joint3_mesh" rgba="0.2 0.2 0.2 1"/>
+                            </body>
+                            <body name="righttube_and_drive" pos="0 -0.215888 0.07526" quat="0 0 -0.707107 0.707107">
+                                <inertial pos="-0.00519 -2.28e-05 0.0276 "
+                                          quat="0.707443 -0.0157784 -0.0162832 0.706407"
+                                          mass="1.7" diaginertia="0.00548 0.00493 0.00172"/>
+                                <site name="joint3_sensor_site"/>
+                                <joint name="joint3" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                       range="-6.2 6.2" damping="100"
+                                       frictionloss="1"/>
+                                <body quat="0.707107 0 0.707107 0" name="righttube">
+                                    <inertial pos="0.0342 -4.48e-12 1.93e-07" quat="1 0 0 0" mass="0.2"
+                                              diaginertia="0.000132 0.000132 9.31e-05"/>
+                                    <geom type="mesh" mesh="PROXIMAL_TUBE" name="righttube_mesh" rgba="0.2 0.2 0.2 1"/>
+                                </body>
+                                <body pos="0 0 0.0486304" quat="0.5 -0.5 -0.5 0.5" name="drive4">
+                                    <inertial pos="3.12e-06 0.00342 0.0101" quat="1 0 0 0" mass="0.372"
+                                              diaginertia="0.000423 0.000381 0.000247"/>
+                                    <geom type="mesh" mesh="MK4_LT" name="drive4_mesh" rgba="0.2 0.2 0.2 1"/>
+                                </body>
+                                <body name="rightforearm" pos="0.06758 0 0.0486304" quat="0.707107 0 -0.707107 0">
+                                    <inertial pos="3.28e-06 -0.0761 0.0133"
+                                              quat="0.790471 0.612292 0.00995154 -0.0124285"
+                                              mass="0.265" diaginertia="0.00109 0.00106 6e-05"/>
+                                    <site name="joint4_sensor_site"/>
+                                    <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                           range="-3.14159 0.5"
+                                           damping="50" frictionloss="0.5"/>
+                                    <geom type="mesh" mesh="FOREARM_BRACKET" name="right_forearm_bracket"
+                                          rgba="0.2 0.2 0.2 1"/>
+                                    <body pos="0 -0.17 0.05749" quat="0.707107 -0.707107 0 0" name="drive5">
+                                        <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
+                                                  diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive5_mesh" rgba="0.2 0.2 0.2 1"/>
+                                    </body>
+                                    <body name="drive6" pos="0 -0.237262 0.05749" quat="0.707107 0 -0.707107 0">
+                                        <inertial pos="-1.41e-07 0.00618 -0.00546"
+                                                  quat="0.99866 0.0517272 0.00100884 -0.00155161"
+                                                  mass="0.108" diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
+                                        <site name="joint5_sensor_site"/>
+                                        <joint name="joint5" type="hinge" pos="0 0 0" axis="0 1 0" limited="true"
+                                               range="-6.2 6.2"
+                                               damping="1.01" frictionloss="0.01"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive6_mesh" rgba="0.2 0.2 0.2 1"/>
+                                        <body name="rightwrist" pos="0 0 -0.0566728">
+                                            <inertial pos="-1.32e-06 -0.0281 0.00953"
+                                                      quat="0.906199 0.42285 0.000311153 -0.000270308"
+                                                      mass="0.0651" diaginertia="4.78e-05 4.33e-05 9.33e-06"/>
+                                            <site name="joint6_sensor_site"/>
+                                            <joint name="joint6" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                                   range="-1.5708 1.5708" damping="0.5" frictionloss="0.1"/>
+                                            <geom type="mesh" mesh="A35_BRACKET" name="rightwrist_mesh"
+                                                  rgba="0.2 0.2 0.2 1"/>
+                                            <body pos="0 -0.05 0.0566728" quat="0.707107 -0.707107 0 0"
+                                                  name="drive7">
+                                                <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
+                                                          diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
+                                                <geom type="mesh" mesh="A35_DRIVE" name="drive7_mesh" rgba="0.2 0.2 0.2 1"/>
+                                            </body>
+                                            <body name="drive10" pos="0 -0.086 0.0566728" quat="0.707107 0.707107 0 0">
+                                                <inertial pos="0.0136 -5.13e-09 0.0377" quat="1 0 0 0" mass="0.168"
+                                                          diaginertia="0.00012 0.000112 6.09e-05"/>
+                                                <site name="joint7_sensor_site"/>
+                                                <joint name="joint7" type="hinge" pos="0 0 0" axis="0 0 -1"
+                                                       limited="true"
+                                                       range="-6.2 6.2" damping=".2" frictionloss="0.01"/>
+                                                <geom type="mesh" mesh="PINCER_HOUSING2" name="drive7_housing_mesh"
+                                                      rgba="0.2 0.2 0.2 1"/>
+                                                <site name="right_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
+                                                <body name="rightgripper_link" pos="0 0.0135 0.068553"
+                                                      euler="1.15 -1.5707 0">
+                                                    <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1" damping="0.1" frictionloss="0.01"/>
+                                                    <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
+                                                              pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
+                                                    <site name="rightgripper_sensor_site"/>
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="rightgripper_geom"
+                                                          rgba="0.1 0.1 0.1 1"/>
+                                                </body>
+                                                <body name="rightgripper2_link" pos="0 -0.0135 0.068553"
+                                                      euler="1.99 1.5707 0">
+                                                    <joint name="rightgripper2" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1" damping="0.1" frictionloss="0.01"/>
+                                                    <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
+                                                              pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
+                                                    <site name="rightgripper2_sensor_site"/>
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="rightgripper2_geom"
+                                                          rgba="0.1 0.1 0.1 1"/>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="base_link">
+                <geom type="mesh" mesh="base_link" name="base_link_mesh" rgba="0.8 0.8 0.2 1"/>
+            </body>
+            <body pos="0.0812 0 0.245" name="top_plate">
+                <geom type="mesh" mesh="top_plate" name="top_plate_mesh" rgba="0.2 0.2 0.2 1"/>
+            </body>
+            <body pos="0.412 0 0.068" name="front_lidar">
+                <geom type="mesh" mesh="ark_lidar" name="front_ark_lidar_mesh" rgba="0.6 0.2 0.2 1"/>
+            </body>
+            <body pos="-0.412 0 0.068" quat="1.32679e-06 0 0 1" name="back_lidar">
+                <geom type="mesh" mesh="ark_lidar" name="back_ark_lidar_mesh" rgba="0.6 0.2 0.2 1"/>
+            </body>
+            <body pos="0.275 0.0047 0.315" quat="0.500024 -0.500024 0.499976 -0.499976" name="pedestal_assembly">
+                <geom type="mesh" mesh="PEDESTAL_ASSEMBLY" name="pedestal_mesh" rgba="0.9 0.9 0.9 1"/>
+            </body>
+            <body name="front_left_wheel_link" pos="0.256 0.35 0.03282">
+                <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
+                <!--                <joint name="front_left_wheel" type="hinge" pos="0 0 0" axis="0 1 0" damping="20"/>-->
+                <geom type="mesh" mesh="wheel" name="front_left_wheel" rgba="0.2 0.2 0.2 1"/>
+            </body>
+            <body name="front_right_wheel_link" pos="0.256 -0.35 0.03282">
+                <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
+                <!--                <joint name="front_right_wheel" type="hinge" pos="0 0 0" axis="0 1 0" damping="20"/>-->
+                <geom type="mesh" mesh="wheel" name="front_right_wheel" rgba="0.2 0.2 0.2 1"/>
+            </body>
+            <body name="rear_left_wheel_link" pos="-0.256 0.35 0.03282">
+                <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
+                <!--                <joint name="rear_left_wheel" type="hinge" pos="0 0 0" axis="0 1 0" damping="20"/>-->
+                <geom type="mesh" mesh="wheel" name="rear_left_wheel" rgba="0.2 0.2 0.2 1"/>
+            </body>
+            <body name="rear_right_wheel_link" pos="-0.256 -0.35 0.03282">
+                <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
+                <!--                <joint name="rear_right_wheel" type="hinge" pos="0 0 0" axis="0 1 0" damping="20"/>-->
+                <geom type="mesh" mesh="wheel" name="rear_right_wheel" rgba="0.2 0.2 0.2 1"/>
+            </body>
+        </body>
+    </worldbody>
+    <actuator>
+        <position name="joint56_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint56" kp="500" forcelimited="true" forcerange="-200 200"/> <!--  0 -->
+        <position name="joint57_pos" ctrllimited="true" ctrlrange="-1.5707 1.5707" joint="joint57" kp="10000" forcelimited="true" forcerange="-500 500"/>
+
+        <position name="joint41_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint41" kp="5000" forcelimited="true" forcerange="-400 400"/> <!--  2 -->
+        <position name="joint42_pos" ctrllimited="true" ctrlrange="0 3.14159" joint="joint42" kp="5000" forcelimited="true" forcerange="-100 100"/>
+        <position name="joint43_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint43" kp="5000" forcelimited="true" forcerange="-150 150"/>
+        <position name="joint44_pos" ctrllimited="true" ctrlrange="-3.141 0.5" joint="joint44" kp="1000" forcelimited="true" forcerange="-35 35"/><!--  5 -->
+        <position name="joint45_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint45" kp="100" forcelimited="true" forcerange="-10 10"/>
+        <position name="joint46_pos" ctrllimited="true" ctrlrange="-1.5707 1.5707" joint="joint46" kp="50" forcelimited="true" forcerange="-1 1"/>
+        <position name="joint47_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint47" kp="50" forcelimited="true" forcerange="-1 1"/>
+        <position name="leftgripper_pos" ctrllimited="true" ctrlrange="-0.1166 1" joint="leftgripper" kp="10" forcelimited="true" forcerange="-0.1 0.1"/>
+        <position name="leftgripper2_pos" ctrllimited="true" ctrlrange="-0.1166 1" joint="leftgripper2" kp="10" forcelimited="true" forcerange="-0.1 0.1"/>
+
+        <position name="joint1_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint1" kp="5000" forcelimited="true" forcerange="-400 400"/><!--  9 -->
+        <position name="joint2_pos" ctrllimited="true" ctrlrange="-3.14159 0" joint="joint2" kp="5000" forcelimited="true" forcerange="-100 100"/>
+        <position name="joint3_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint3" kp="5000" forcelimited="true" forcerange="-150 150"/>
+        <position name="joint4_pos" ctrllimited="true" ctrlrange="-3.14159 0.5" joint="joint4" kp="1000" forcelimited="true" forcerange="-40 40"/>
+        <position name="joint5_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint5" kp="100" forcelimited="true" forcerange="-10 10"/><!--  13 -->
+        <position name="joint6_pos" ctrllimited="true" ctrlrange="-1.5707 1.5707" joint="joint6" kp="50" forcelimited="true" forcerange="-1 1"/>
+        <position name="joint7_pos" ctrllimited="true" ctrlrange="-6.2 6.2" joint="joint7" kp="50" forcelimited="true" forcerange="-1 1"/>
+        <position name="rightgripper_pos" ctrllimited="true" ctrlrange="-0.1166 1" joint="rightgripper" kp="10" forcelimited="true" forcerange="-0.1 0.1"/>
+        <position name="rightgripper2_pos" ctrllimited="true" ctrlrange="-0.1166 1" joint="rightgripper2" kp="10" forcelimited="true" forcerange="-0.1 0.1"/>
+    </actuator>
+    <sensor>
+        <torque name="joint56_torque" site="joint56_sensor_site"/>
+        <torque name="joint57_torque" site="joint57_sensor_site"/>
+        <torque name="joint1_torque" site="joint1_sensor_site"/>
+        <torque name="joint2_torque" site="joint2_sensor_site"/>
+        <torque name="joint3_torque" site="joint3_sensor_site"/>
+        <torque name="joint4_torque" site="joint4_sensor_site"/>
+        <torque name="joint5_torque" site="joint5_sensor_site"/>
+        <torque name="joint6_torque" site="joint6_sensor_site"/>
+        <torque name="joint7_torque" site="joint7_sensor_site"/>
+        <torque name="joint41_torque" site="joint41_sensor_site"/>
+        <torque name="joint42_torque" site="joint42_sensor_site"/>
+        <torque name="joint43_torque" site="joint43_sensor_site"/>
+        <torque name="joint44_torque" site="joint44_sensor_site"/>
+        <torque name="joint45_torque" site="joint45_sensor_site"/>
+        <torque name="joint46_torque" site="joint46_sensor_site"/>
+        <torque name="joint47_torque" site="joint47_sensor_site"/>
+        <torque name="rightgripper_torque" site="rightgripper_sensor_site"/>
+        <torque name="rightgripper2_torque" site="rightgripper2_sensor_site"/>
+        <torque name="leftgripper_torque" site="leftgripper_sensor_site"/>
+        <torque name="leftgripper2_torque" site="leftgripper2_sensor_site"/>
+    </sensor>
+</mujoco>
