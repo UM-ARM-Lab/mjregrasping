@@ -1,0 +1,7 @@
+<mujoco model="floor">
+    <worldbody>
+        <body pos="0 0 0" name="floor">
+            <geom type="plane" name="floor" size="10 10 0.1"  material="cream-plaster"/>
+        </body>
+    </worldbody>
+</mujoco>

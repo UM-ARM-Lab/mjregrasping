@@ -1,0 +1,20 @@
+<mujoco model="val">
+    <extension>
+        <plugin plugin="mujoco.elasticity.cable"/>
+    </extension>
+    <worldbody>
+        <body pos="0.88 0 0.73" euler="0 0 -1.5707" name="rope">
+            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
+            <composite type="cable" curve="cos(s) sin(s)" count="25 1 1" size="1 0.22 1">
+                <plugin plugin="mujoco.elasticity.cable">
+                    <config key="twist" value="1e7"/>
+                    <config key="bend" value="4e6"/>
+                    <config key="vmax" value="0.05"/>
+                </plugin>
+                <joint kind="main" damping=".015"/>
+                <geom type="capsule" size=".01" rgba=".8 .2 .1 1" condim="1"/>
+            </composite>
+            <joint type="free"/>
+        </body>
+    </worldbody>
+</mujoco>

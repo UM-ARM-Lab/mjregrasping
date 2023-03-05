@@ -1,3 +1,4 @@
+#include <unistd.h>
 #include <iostream>
 #include <mujoco/mujoco.h>
 #include <simulate.h>
@@ -8,6 +9,7 @@ namespace mj = ::mujoco;
 namespace mju = ::mujoco::sample_util;
 
 // constants
+const auto MUJOCO_PLUGIN_DIR = "mujoco_plugin";
 const double syncMisalign = 0.1;       // maximum mis-alignment before re-sync (simulation seconds)
 const double simRefreshFraction = 0.7; // fraction of refresh available for simulation
 const int kErrorLength = 1024;         // load error string length
@@ -20,6 +22,87 @@ mjData *d = nullptr;
 mjtNum *ctrlnoise = nullptr;
 
 using Seconds = std::chrono::duration<double>;
+
+std::string getExecutableDir() {
+  constexpr char kPathSep = '/';
+  const char* path = "/proc/self/exe";
+  std::string realpath = [&]() -> std::string {
+    std::unique_ptr<char[]> realpath(nullptr);
+    std::uint32_t buf_size = 128;
+    bool success = false;
+    while (!success) {
+      realpath.reset(new(std::nothrow) char[buf_size]);
+      if (!realpath) {
+        std::cerr << "cannot allocate memory to store executable path\n";
+        return "";
+      }
+
+      std::size_t written = readlink(path, realpath.get(), buf_size);
+      if (written < buf_size) {
+        realpath.get()[written] = '\0';
+        success = true;
+      } else if (written == -1) {
+        if (errno == EINVAL) {
+          // path is already not a symlink, just use it
+          return path;
+        }
+
+        std::cerr << "error while resolving executable path: " << strerror(errno) << '\n';
+        return "";
+      } else {
+        // realpath is too small, grow and retry
+        buf_size *= 2;
+      }
+    }
+    return realpath.get();
+  }();
+
+  if (realpath.empty()) {
+    return "";
+  }
+
+  for (std::size_t i = realpath.size() - 1; i > 0; --i) {
+    if (realpath.c_str()[i] == kPathSep) {
+      return realpath.substr(0, i);
+    }
+  }
+
+  // don't scan through the entire file system's root
+  return "";
+}
+
+
+
+// scan for libraries in the plugin directory to load additional plugins
+void scanPluginLibraries() {
+  // check and print plugins that are linked directly into the executable
+  int nplugin = mjp_pluginCount();
+  if (nplugin) {
+    std::printf("Built-in plugins:\n");
+    for (int i = 0; i < nplugin; ++i) {
+      std::printf("    %s\n", mjp_getPluginAtSlot(i)->name);
+    }
+  }
+
+  const std::string sep = "/";
+
+  // try to open the ${EXECDIR}/plugin directory
+  // ${EXECDIR} is the directory containing the simulate binary itself
+  const std::string executable_dir = getExecutableDir();
+  if (executable_dir.empty()) {
+    return;
+  }
+
+  const std::string plugin_dir = getExecutableDir() + sep + MUJOCO_PLUGIN_DIR;
+  mj_loadAllPluginLibraries(
+      plugin_dir.c_str(), +[](const char* filename, int first, int count) {
+        std::printf("Plugins registered by library '%s':\n", filename);
+        for (int i = first; i < first + count; ++i) {
+          std::printf("    %s\n", mjp_getPluginAtSlot(i)->name);
+        }
+      });
+}
+
 
 mjModel *LoadModel(const char *file, mj::Simulate &sim)
 {
@@ -75,6 +158,8 @@ mjModel *LoadModel(const char *file, mj::Simulate &sim)
         std::printf("Model compiled, but simulation warning (paused):\n  %s\n", loadError);
         sim.run = 0;
     }
+
+    sim.run = 0;
 
     return mnew;
 }
@@ -311,9 +396,11 @@ int main(int argc, char **argv)
         mju_error("Headers and library have Different versions");
     }
 
+    scanPluginLibraries();
+
     auto sim = std::make_unique<mujoco::Simulate>(std::make_unique<mujoco::GlfwAdapter>());
 
-    const char *filename = "../val_husky.xml";
+    const char *filename = "../untangle.xml";
 
     mjcb_control = controller;
 

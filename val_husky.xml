@@ -24,7 +24,8 @@
         <mesh name="box" file="box.stl"/>
     </asset>
     <worldbody>
-        <body pos="0 0 0" name="base">
+        <light name="top" pos="0 0 105" mode="trackcom"/>
+        <body pos="0 0 0.145" name="base">
             <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="50" diaginertia="8.333 8.333 8.333"/>
             <body pos="0.3641 0.00470858 0.315" quat="0 -0.707141 0.707073 0" name="drive56">
                 <inertial pos="1.36e-06  0.00343   0.0203" quat="1 0 0 0" mass="0.392"
