@@ -1,6 +1,3 @@
 [submodule "dependencies/mujoco"]
 	path = dependencies/mujoco
 	url = git@github.com:deepmind/mujoco.git
-[submodule "dependencies/abseil-cpp"]
-	path = dependencies/abseil-cpp
-	url = git@github.com:abseil/abseil-cpp.git

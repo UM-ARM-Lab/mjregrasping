@@ -8,7 +8,6 @@ set(MUJOCO_BUILD_EXAMPLES ON)
 set(MUJOCO_BUILD_SIMULATE ON)
 set(MUJOCO_BUILD_TESTS OFF)
 set(MUJOCO_TEST_PYTHON_UTIL OFF)
-set(DABSL_BUILD_TESTING OFF)
 
 add_subdirectory(dependencies)
 
@@ -18,8 +17,14 @@ target_link_libraries(app
     mujoco::mujoco
     mujoco::libsimulate
     elasticity
-    glfw
-    absl::flags
-    absl::flags_parse)
+    glfw)
+
+add_executable(mujoco_mppi src/mujoco_mppi.cpp)
+target_include_directories(mujoco_mppi PUBLIC include)
+target_link_libraries(mujoco_mppi
+    mujoco::mujoco
+    mujoco::libsimulate
+    elasticity
+    glfw)
 
 
