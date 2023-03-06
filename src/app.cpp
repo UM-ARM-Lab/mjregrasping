@@ -377,15 +377,30 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
     mj_deleteModel(m);
 }
 
-// controller
-extern "C"
-{
-    void controller(const mjModel *m, mjData *d);
-}
-
-// controller callback
 void controller(const mjModel *m, mjData *data)
 {
+    auto const target_position = 1.5707;
+
+    // Get the position of the joint
+    auto const joint_idx = mj_name2id(m, mjOBJ_JOINT, "joint41");
+    auto const joint_pos = data->qpos[joint_idx];
+
+    // compute the velocity to reach the target position
+    // if the error is 1 radian, the velocity will be kv radians per second
+    // so let's say we want to move at max speed until within 5 degrees.
+    // 5 degrees is 0.087 radians, so we want v_max = (0.087) * kv
+    
+
+    // NOTE: assumes velocity limits are symmetric
+    auto const ctrl_idx = mj_name2id(m, mjOBJ_ACTUATOR, "joint41_vel");
+    auto const v_max = m->actuator_ctrlrange[2 * ctrl_idx + 1];
+
+    auto const kv = v_max / 0.087;
+    auto const vel = (target_position - joint_pos) * kv;
+
+    // velocities will be clamped by ctrlrange in the XML
+
+    data->ctrl[ctrl_idx] = vel;
 }
 
 int main(int argc, char **argv)
