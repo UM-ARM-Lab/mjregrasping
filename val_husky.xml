@@ -3,7 +3,7 @@
     <default>
         <geom solref="0.002 1"/>
     </default>
-    <size njmax="500" nconmax="100"/>
+    <size njmax="500" nconmax="100" nuserdata="20"/>
     <asset>
         <mesh name="base_link" file="base_link.stl"/>
         <mesh name="wheel" file="wheel.stl"/>

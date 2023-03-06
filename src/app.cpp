@@ -1,5 +1,9 @@
 #include <unistd.h>
 #include <iostream>
+
+#include <absl/flags/flag.h>
+#include <absl/flags/parse.h>
+
 #include <mujoco/mujoco.h>
 #include <simulate.h>
 #include <array_safety.h>
@@ -23,86 +27,100 @@ mjtNum *ctrlnoise = nullptr;
 
 using Seconds = std::chrono::duration<double>;
 
-std::string getExecutableDir() {
-  constexpr char kPathSep = '/';
-  const char* path = "/proc/self/exe";
-  std::string realpath = [&]() -> std::string {
-    std::unique_ptr<char[]> realpath(nullptr);
-    std::uint32_t buf_size = 128;
-    bool success = false;
-    while (!success) {
-      realpath.reset(new(std::nothrow) char[buf_size]);
-      if (!realpath) {
-        std::cerr << "cannot allocate memory to store executable path\n";
-        return "";
-      }
+std::string getExecutableDir()
+{
+    constexpr char kPathSep = '/';
+    const char *path = "/proc/self/exe";
+    std::string realpath = [&]() -> std::string
+    {
+        std::unique_ptr<char[]> realpath(nullptr);
+        std::uint32_t buf_size = 128;
+        bool success = false;
+        while (!success)
+        {
+            realpath.reset(new (std::nothrow) char[buf_size]);
+            if (!realpath)
+            {
+                std::cerr << "cannot allocate memory to store executable path\n";
+                return "";
+            }
 
-      std::size_t written = readlink(path, realpath.get(), buf_size);
-      if (written < buf_size) {
-        realpath.get()[written] = '\0';
-        success = true;
-      } else if (written == -1) {
-        if (errno == EINVAL) {
-          // path is already not a symlink, just use it
-          return path;
+            std::size_t written = readlink(path, realpath.get(), buf_size);
+            if (written < buf_size)
+            {
+                realpath.get()[written] = '\0';
+                success = true;
+            }
+            else if (written == -1)
+            {
+                if (errno == EINVAL)
+                {
+                    // path is already not a symlink, just use it
+                    return path;
+                }
+
+                std::cerr << "error while resolving executable path: " << strerror(errno) << '\n';
+                return "";
+            }
+            else
+            {
+                // realpath is too small, grow and retry
+                buf_size *= 2;
+            }
         }
+        return realpath.get();
+    }();
 
-        std::cerr << "error while resolving executable path: " << strerror(errno) << '\n';
+    if (realpath.empty())
+    {
         return "";
-      } else {
-        // realpath is too small, grow and retry
-        buf_size *= 2;
-      }
     }
-    return realpath.get();
-  }();
 
-  if (realpath.empty()) {
+    for (std::size_t i = realpath.size() - 1; i > 0; --i)
+    {
+        if (realpath.c_str()[i] == kPathSep)
+        {
+            return realpath.substr(0, i);
+        }
+    }
+
+    // don't scan through the entire file system's root
     return "";
-  }
-
-  for (std::size_t i = realpath.size() - 1; i > 0; --i) {
-    if (realpath.c_str()[i] == kPathSep) {
-      return realpath.substr(0, i);
-    }
-  }
-
-  // don't scan through the entire file system's root
-  return "";
 }
 
-
-
 // scan for libraries in the plugin directory to load additional plugins
-void scanPluginLibraries() {
-  // check and print plugins that are linked directly into the executable
-  int nplugin = mjp_pluginCount();
-  if (nplugin) {
-    std::printf("Built-in plugins:\n");
-    for (int i = 0; i < nplugin; ++i) {
-      std::printf("    %s\n", mjp_getPluginAtSlot(i)->name);
+void scanPluginLibraries()
+{
+    // check and print plugins that are linked directly into the executable
+    int nplugin = mjp_pluginCount();
+    if (nplugin)
+    {
+        std::printf("Built-in plugins:\n");
+        for (int i = 0; i < nplugin; ++i)
+        {
+            std::printf("    %s\n", mjp_getPluginAtSlot(i)->name);
+        }
     }
-  }
 
-  const std::string sep = "/";
+    const std::string sep = "/";
 
-  // try to open the ${EXECDIR}/plugin directory
-  // ${EXECDIR} is the directory containing the simulate binary itself
-  const std::string executable_dir = getExecutableDir();
-  if (executable_dir.empty()) {
-    return;
-  }
+    // try to open the ${EXECDIR}/plugin directory
+    // ${EXECDIR} is the directory containing the simulate binary itself
+    const std::string executable_dir = getExecutableDir();
+    if (executable_dir.empty())
+    {
+        return;
+    }
 
-  const std::string plugin_dir = getExecutableDir() + sep + MUJOCO_PLUGIN_DIR;
-  mj_loadAllPluginLibraries(
-      plugin_dir.c_str(), +[](const char* filename, int first, int count) {
+    const std::string plugin_dir = getExecutableDir() + sep + MUJOCO_PLUGIN_DIR;
+    mj_loadAllPluginLibraries(
+        plugin_dir.c_str(), +[](const char *filename, int first, int count)
+                            {
         std::printf("Plugins registered by library '%s':\n", filename);
         for (int i = first; i < first + count; ++i) {
           std::printf("    %s\n", mjp_getPluginAtSlot(i)->name);
-        }
-      });
+        } });
 }
-
 
 mjModel *LoadModel(const char *file, mj::Simulate &sim)
 {
@@ -377,34 +395,34 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
     mj_deleteModel(m);
 }
 
+// run at the desired velocity until position error is less than this value
+constexpr auto MAX_VEL_TILL_ERROR_RAD = 0.087;
+
 void controller(const mjModel *m, mjData *data)
 {
-    auto const target_position = 1.5707;
+    // this method is bad because it means we cant use the gui the way it's intended
+    for (auto i{0}; i < m->nuserdata; ++i)
+    {
+        auto const target_position = data->userdata[i];
+        auto const current_position = data->qpos[i];
 
-    // Get the position of the joint
-    auto const joint_idx = mj_name2id(m, mjOBJ_JOINT, "joint41");
-    auto const joint_pos = data->qpos[joint_idx];
+        // NOTE: assumes velocity limits are symmetric
+        // NOTE: we might want this v_max to be lower in some cases?
+        auto const v_max = m->actuator_ctrlrange[2 * i + 1];
 
-    // compute the velocity to reach the target position
-    // if the error is 1 radian, the velocity will be kv radians per second
-    // so let's say we want to move at max speed until within 5 degrees.
-    // 5 degrees is 0.087 radians, so we want v_max = (0.087) * kv
-    
+        // compute the velocity to reach the target position
+        auto const kv = v_max / MAX_VEL_TILL_ERROR_RAD;
+        auto const vel = (target_position - current_position) * kv;
 
-    // NOTE: assumes velocity limits are symmetric
-    auto const ctrl_idx = mj_name2id(m, mjOBJ_ACTUATOR, "joint41_vel");
-    auto const v_max = m->actuator_ctrlrange[2 * ctrl_idx + 1];
-
-    auto const kv = v_max / 0.087;
-    auto const vel = (target_position - joint_pos) * kv;
-
-    // velocities will be clamped by ctrlrange in the XML
-
-    data->ctrl[ctrl_idx] = vel;
+        // set the target velocity. velocities will be clamped based on ctrlrange in the XML
+        data->ctrl[i] = vel;
+    }
 }
 
 int main(int argc, char **argv)
 {
+    auto const filename = argv[1];
+
     std::printf("MuJoCo Version: %s\n", mj_versionString());
     if (mjVERSION_HEADER != mj_version())
     {
@@ -414,8 +432,6 @@ int main(int argc, char **argv)
     scanPluginLibraries();
 
     auto sim = std::make_unique<mujoco::Simulate>(std::make_unique<mujoco::GlfwAdapter>());
-
-    const char *filename = "../untangle.xml";
 
     mjcb_control = controller;
 
