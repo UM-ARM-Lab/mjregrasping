@@ -1,4 +1,6 @@
 build
+.idea
+__pycache__
 .vscode
 venv
 

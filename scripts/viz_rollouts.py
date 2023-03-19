@@ -1,68 +1,63 @@
 #!/usr/bin/env python3
-import multiprocessing
-import concurrent
-import threading
-from mujoco import rollout, rollout_test
-import copy
-import numpy as np
-from time import perf_counter
 import mujoco
+import numpy as np
+
+from arc_utilities.tf2wrapper import TF2Wrapper
+from arm_rviz.rviz_animation_controller import RvizAnimationController
+from mjregrasping.mujoco_visualizer import MujocoVisualizer
+from mjregrasping.rollout import parallel_rollout
 import argparse
 
-N_TIME = 10
-N_SUB_TIME = 20
-
-
-def rollout_one_trajectory(model, data, controls):
-    qs = []
-    for t in range(N_TIME):
-        control_t = controls[t]
-        np.copyto(data.ctrl, control_t)
-        for sub_t in range(N_SUB_TIME):
-            mujoco.mj_step(model, data)
-        qs.append(data.qpos.copy())
-    return qs
+import rospy
+from visualization_msgs.msg import MarkerArray
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("xml_path", type=str)
+    parser.add_argument("--n-time", type=int, default=20)
 
     args = parser.parse_args()
 
     model = mujoco.MjModel.from_xml_path(args.xml_path)
     data = mujoco.MjData(model)
 
-    for n_samples  in [1, 4, 8, 80, 250, 500]:
-        controls = np.zeros([N_TIME, 20])
+    n_time = args.n_time
+    n_samples = 100
 
-        t0 = perf_counter()
-        for sample in range(n_samples):
-            data_for_rollout = copy.copy(data)
-            rollout_one_trajectory(model, data_for_rollout, controls)
-        dt_serial = perf_counter() - t0
+    controls_samples = np.zeros(n_samples, n_time, model.nu)
+    # controls_samples = np.random.randn(n_samples, 1, model.nu) * 0.2
+    # controls_samples = np.tile(controls_samples, [1, n_time, 1])
+    controls_samples[:, :, 0] = 0.4
 
-        thread_local = threading.local()
+    states = parallel_rollout(model, data, controls_samples)
 
-        def thread_initializer():
-            thread_local.data = mujoco.MjData(model)
+    rospy.init_node("viz_rollouts")
 
-        def call_rollout(ctrl):
-            rollout_one_trajectory(model, thread_local.data, ctrl)
+    tfw = TF2Wrapper()
+    mjviz = MujocoVisualizer(tfw)
 
-        chunks = [(controls,)] * n_samples
+    # while True:
+    #     for _ in range(20):
+    #         mujoco.mj_step(model, data)
+    #     mjviz.viz(model, data)
+    #     rospy.sleep(0.1)
 
-        t0 = perf_counter()
-        with concurrent.futures.ThreadPoolExecutor(
-            max_workers=multiprocessing.cpu_count(), initializer=thread_initializer
-        ) as executor:
-            futures = []
-            for chunk in chunks:
-                futures.append(executor.submit(call_rollout, *chunk))
-            for future in concurrent.futures.as_completed(futures):
-                future.result()
-        dt_parallel = perf_counter() - t0
-        print(f"| {n_samples} | {dt_serial:.3f} | {dt_parallel:.3f} |")
+    trajs_viz = RvizAnimationController(n_time_steps=n_samples, ns='trajs')
+    time_viz = RvizAnimationController(n_time_steps=n_time, ns='time')
+    while not trajs_viz.done:
+        traj_idx = trajs_viz.t()
+        time_viz.reset()
+        while not time_viz.done:
+            t = time_viz.t()
+
+            data.qpos[:] = states[traj_idx, t, :]
+            mujoco.mj_forward(model, data)
+            mjviz.viz(model, data)
+
+            time_viz.step()
+        trajs_viz.step()
+
 
 
 if __name__ == "__main__":
