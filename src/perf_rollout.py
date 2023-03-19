@@ -33,15 +33,14 @@ def main():
     model = mujoco.MjModel.from_xml_path(args.xml_path)
     data = mujoco.MjData(model)
 
-    for n_samples  in [1, 4, 8, 80, 800]:
+    for n_samples  in [1, 4, 8, 80, 250, 500]:
         controls = np.zeros([N_TIME, 20])
 
         t0 = perf_counter()
         for sample in range(n_samples):
             data_for_rollout = copy.copy(data)
             rollout_one_trajectory(model, data_for_rollout, controls)
-        dt = perf_counter() - t0
-        print(f"{n_samples=} in serial: {dt:.3f} seconds")
+        dt_serial = perf_counter() - t0
 
         thread_local = threading.local()
 
@@ -62,8 +61,8 @@ def main():
                 futures.append(executor.submit(call_rollout, *chunk))
             for future in concurrent.futures.as_completed(futures):
                 future.result()
-        dt = perf_counter() - t0
-        print(f"{n_samples=} in parallel: {dt:.3f} seconds")
+        dt_parallel = perf_counter() - t0
+        print(f"| {n_samples} | {dt_serial:.3f} | {dt_parallel:.3f} |")
 
 
 if __name__ == "__main__":

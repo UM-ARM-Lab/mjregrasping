@@ -1,0 +1,12 @@
+Sat Mar 18 18:32:06 2023
+ERROR: nefc under-allocation: found nefc=35 but allocated only 22
+
+Sat Mar 18 18:32:06 2023
+ERROR: nefc under-allocation: found nefc=35 but allocated only 22
+
+Sat Mar 18 18:38:18 2023
+WARNING: Nan, Inf or huge value in QPOS at DOF 21. The simulation is unstable. Time = 0.0000.
+
+Sat Mar 18 18:38:35 2023
+WARNING: Nan, Inf or huge value in QPOS at DOF 21. The simulation is unstable. Time = 0.0000.
+
