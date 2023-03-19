@@ -22,16 +22,9 @@ def rollout(model, data, controls):
 
 
 def parallel_rollout(model, data, controls_samples):
-    thread_local = threading.local()
-
-    def init():
-        thread_local.data = copy.copy(data)
-
-    def _rollout(ctrl):
-        return rollout(model, thread_local.data, ctrl)
-
-    with ThreadPoolExecutor(multiprocessing.cpu_count(), initializer=init) as pool:
-        futures = [pool.submit(_rollout, controls) for controls in controls_samples]
+    args_sets = [(model, copy.copy(data), controls) for controls in controls_samples]
+    with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
+        futures = [pool.submit(rollout, *args) for args in args_sets]
 
     results = np.array([f.result() for f in concurrent.futures.as_completed(futures)])
 

@@ -9,10 +9,11 @@ from mjregrasping.rollout import parallel_rollout
 import argparse
 
 import rospy
-from visualization_msgs.msg import MarkerArray
 
 
 def main():
+    np.set_printoptions(suppress=True, precision=5)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("xml_path", type=str)
     parser.add_argument("--n-time", type=int, default=20)
@@ -25,10 +26,10 @@ def main():
     n_time = args.n_time
     n_samples = 100
 
-    controls_samples = np.zeros(n_samples, n_time, model.nu)
-    # controls_samples = np.random.randn(n_samples, 1, model.nu) * 0.2
-    # controls_samples = np.tile(controls_samples, [1, n_time, 1])
-    controls_samples[:, :, 0] = 0.4
+    controls_samples = np.random.uniform(-0.4, 0.4, size=[n_samples, 1, model.nu])
+    controls_samples = np.tile(controls_samples, [1, n_time, 1])
+    # controls_samples = np.zeros([n_samples, n_time, model.nu])
+    # controls_samples[:, :, 1] = 0.4
 
     states = parallel_rollout(model, data, controls_samples)
 
@@ -36,12 +37,6 @@ def main():
 
     tfw = TF2Wrapper()
     mjviz = MujocoVisualizer(tfw)
-
-    # while True:
-    #     for _ in range(20):
-    #         mujoco.mj_step(model, data)
-    #     mjviz.viz(model, data)
-    #     rospy.sleep(0.1)
 
     trajs_viz = RvizAnimationController(n_time_steps=n_samples, ns='trajs')
     time_viz = RvizAnimationController(n_time_steps=n_time, ns='time')
