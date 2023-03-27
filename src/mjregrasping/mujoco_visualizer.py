@@ -18,6 +18,16 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
 
+class RVizPublishers:
+
+    def __init__(self, tfw: TF2Wrapper):
+        self.tfw = tfw
+        self.state_viz_pub = rospy.Publisher("state_viz", MarkerArray, queue_size=10)
+        self.action_viz_pub = rospy.Publisher("action_viz", MarkerArray, queue_size=10)
+        self.ee_path_pub = rospy.Publisher("ee_path", MarkerArray, queue_size=10)
+        self.goal_markers_pub = rospy.Publisher("goal_markers", MarkerArray, queue_size=10)
+
+
 class MujocoVisualizer:
     def __init__(self, tfw: Optional[TF2Wrapper] = None):
         self.tfw = tfw
@@ -361,7 +371,7 @@ def plot_points_rviz(pub, positions, idx, label, color="g", frame_id="world", s=
 
 
 def plot_lines_rviz(
-        pub, positions, label, idx=0, color="g", colors=None, frame_id="world"
+        pub, positions, label, idx=0, color="g", colors=None, frame_id="world", scale=0.005
 ):
     marker_msg = Marker()
     marker_msg.header.frame_id = frame_id
@@ -371,9 +381,9 @@ def plot_lines_rviz(
     marker_msg.type = Marker.LINE_STRIP
     marker_msg.action = Marker.ADD
     marker_msg.pose.orientation.w = 1
-    marker_msg.scale.x = 0.005
-    marker_msg.scale.y = 0.005
-    marker_msg.scale.z = 0.005
+    marker_msg.scale.x = scale
+    marker_msg.scale.y = scale
+    marker_msg.scale.z = scale
     marker_msg.color = ColorRGBA(*to_rgba(color))
     for t, position in enumerate(positions):
         p = Point(x=position[0], y=position[1], z=position[2])
