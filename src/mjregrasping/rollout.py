@@ -73,8 +73,7 @@ def control_step(model, data, qvel_target):
     else:
         print("control is None!!!")
     n_sub_time = int(N_SUB_TIME_S / model.opt.timestep)
-    for sub_t in range(n_sub_time):
-        mujoco.mj_step(model, data)
+    mujoco.mj_step(model, data, nstep=n_sub_time)
 
 
 def parallel_rollout(model, data, controls_samples, get_result_func=None):
