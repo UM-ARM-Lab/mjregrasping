@@ -57,6 +57,7 @@ def main():
         state_costs = gripper_pos_cost + contact_cost
         return state_costs[:, 1:]
 
+    dts = []
     with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
         mppi = MujocoMPPI(pool, model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon, lambda_=0.005)
 
@@ -65,7 +66,7 @@ def main():
             viz(mppi, data, model, command, viz_pubs)
             plot_sphere_rviz(viz_pubs.goal_markers_pub, left_gripper_goal_point, 0.01, label='goal')
 
-        for t in range(100):
+        for t in range(10):
             mjviz.viz(model, data)
             plot_sphere_rviz(viz_pubs.goal_markers_pub, left_gripper_goal_point, 0.01, label='goal')
 
@@ -73,6 +74,7 @@ def main():
             t0 = perf_counter()
             command = mppi.command(data, get_result, _cost_func)
             dt = perf_counter() - t0
+            dts.append(dt)
             print(f"mppi.command: {dt:.3f}s")
             costs_viz.append(mppi.cost)
             viz(mppi, data, model, command, viz_pubs)
@@ -80,15 +82,17 @@ def main():
             # actually step
             control_step(model, data, command)
 
+    print(f"mean dt: {np.mean(dts):.3f}s")
+
     costs_viz = np.array(costs_viz)
 
-    import matplotlib.pyplot as plt
-    plt.figure()
-    plt.plot(np.min(costs_viz, axis=1), label='min')
-    plt.plot(np.mean(costs_viz, axis=1), label='mean')
-    plt.plot(np.max(costs_viz, axis=1), label='max')
-    plt.legend()
-    plt.show()
+    # import matplotlib.pyplot as plt
+    # plt.figure()
+    # plt.plot(np.min(costs_viz, axis=1), label='min')
+    # plt.plot(np.mean(costs_viz, axis=1), label='mean')
+    # plt.plot(np.max(costs_viz, axis=1), label='max')
+    # plt.legend()
+    # plt.show()
 
 
 def viz(mppi, data, model, command, viz_pubs):
