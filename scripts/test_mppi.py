@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 
 import argparse
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 from time import perf_counter
 from copy import copy
 
@@ -55,27 +57,28 @@ def main():
         state_costs = gripper_pos_cost + contact_cost
         return state_costs[:, 1:]
 
-    mppi = MujocoMPPI(model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon, lambda_=0.005)
+    with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
+        mppi = MujocoMPPI(pool, model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon, lambda_=0.005)
 
-    for warmstart_i in range(5):
-        command = mppi._command(data, get_result, _cost_func)
-        viz(mppi, data, model, command, viz_pubs)
-        plot_sphere_rviz(viz_pubs.goal_markers_pub, left_gripper_goal_point, 0.01, label='goal')
+        for warmstart_i in range(5):
+            command = mppi._command(data, get_result, _cost_func)
+            viz(mppi, data, model, command, viz_pubs)
+            plot_sphere_rviz(viz_pubs.goal_markers_pub, left_gripper_goal_point, 0.01, label='goal')
 
-    for t in range(100):
-        mjviz.viz(model, data)
-        plot_sphere_rviz(viz_pubs.goal_markers_pub, left_gripper_goal_point, 0.01, label='goal')
+        for t in range(100):
+            mjviz.viz(model, data)
+            plot_sphere_rviz(viz_pubs.goal_markers_pub, left_gripper_goal_point, 0.01, label='goal')
 
-        # warmstart
-        t0 = perf_counter()
-        command = mppi.command(data, get_result, _cost_func)
-        dt = perf_counter() - t0
-        print(f"mppi.command: {dt:.3f}s")
-        costs_viz.append(mppi.cost)
-        viz(mppi, data, model, command, viz_pubs)
+            # warmstart
+            t0 = perf_counter()
+            command = mppi.command(data, get_result, _cost_func)
+            dt = perf_counter() - t0
+            print(f"mppi.command: {dt:.3f}s")
+            costs_viz.append(mppi.cost)
+            viz(mppi, data, model, command, viz_pubs)
 
-        # actually step
-        control_step(model, data, command)
+            # actually step
+            control_step(model, data, command)
 
     costs_viz = np.array(costs_viz)
 

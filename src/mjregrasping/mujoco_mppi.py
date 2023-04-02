@@ -10,7 +10,8 @@ def softmax(x, temp):
 
 class MujocoMPPI:
 
-    def __init__(self, model, num_samples, horizon, noise_sigma, lambda_=1., gamma=0.9):
+    def __init__(self, pool, model, num_samples, horizon, noise_sigma, lambda_=1., gamma=0.9):
+        self.pool = pool
         self.model = model
         self.num_samples = num_samples
         self.horizon = horizon
@@ -49,7 +50,7 @@ class MujocoMPPI:
         noise = self.noise_rng.randn(self.num_samples, self.horizon, self.nu) * self.noise_sigma
         perturbed_action = self.U + noise
 
-        results = parallel_rollout(self.model, data, perturbed_action, get_result_func)
+        results = parallel_rollout(self.pool, self.model, data, perturbed_action, get_result_func)
         self.rollout_results = results
         self.actions = perturbed_action
         costs = cost_func(results)

@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
+
 import mujoco
 import numpy as np
 
@@ -26,12 +29,14 @@ def main():
     n_time = args.n_time
     n_samples = 100
 
+
     controls_samples = np.random.uniform(-0.4, 0.4, size=[n_samples, 1, model.nu])
     controls_samples = np.tile(controls_samples, [1, n_time, 1])
     # controls_samples = np.zeros([n_samples, n_time, model.nu])
     # controls_samples[:, :, 1] = 0.4
 
-    states = parallel_rollout(model, data, controls_samples)
+    with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
+        states = parallel_rollout(pool, model, data, controls_samples)
 
     rospy.init_node("viz_rollouts")
 

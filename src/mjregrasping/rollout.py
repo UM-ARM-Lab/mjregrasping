@@ -76,10 +76,9 @@ def control_step(model, data, qvel_target):
     mujoco.mj_step(model, data, nstep=n_sub_time)
 
 
-def parallel_rollout(model, data, controls_samples, get_result_func=None):
+def parallel_rollout(pool: ThreadPoolExecutor, model, data, controls_samples, get_result_func=None):
     args_sets = [(model, copy.copy(data), controls, get_result_func) for controls in controls_samples]
-    with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
-        futures = [pool.submit(rollout, *args) for args in args_sets]
+    futures = [pool.submit(rollout, *args) for args in args_sets]
 
     results = [f.result() for f in futures]
 
