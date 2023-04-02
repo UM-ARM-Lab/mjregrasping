@@ -51,6 +51,9 @@ def rollout(model, data, controls, get_result_func=None):
             for result_list, result in zip(results_lists, result_tuple):
                 result_list.append(result)
 
+    if results_lists is None:
+        return None
+
     if len(results_lists) == 1:
         return results_lists[0]
     return results_lists
