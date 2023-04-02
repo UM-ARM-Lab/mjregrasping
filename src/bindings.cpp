@@ -8,4 +8,5 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(pymjregrasping, m)
 {
+  m.doc() = "pymjregrasping module";
 }

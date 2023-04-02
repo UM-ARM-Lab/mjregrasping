@@ -1,8 +1,13 @@
+#include <vector>
+#include <random>
+#include <cmath>
+
 #include <mjregrasping/mjregrasping.h>
 
 auto const N_SUB_TIME = 50;
 
-std::vector<State> rollout_one_trajectory(mjModel const *model, mjData *data, std::vector<Control> const &controls) {
+std::vector<State>
+rollout_one_trajectory(mjModel const *const model, mjData *data, std::vector<Control> const &controls) {
     std::vector<State> qs;
     for (auto const &control_t: controls) {
         std::copy(control_t.begin(), control_t.end(), data->ctrl);

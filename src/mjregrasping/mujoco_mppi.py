@@ -1,4 +1,5 @@
 import numpy as np
+import pymjregrasping
 
 from mjregrasping.rollout import parallel_rollout
 
@@ -51,6 +52,8 @@ class MujocoMPPI:
         perturbed_action = self.U + noise
 
         results = parallel_rollout(self.pool, self.model, data, perturbed_action, get_result_func)
+        results = mymjregrasping.parallel_rollout(self.pool, self.model, data, perturbed_action, get_result_func)
+
         self.rollout_results = results
         self.actions = perturbed_action
         costs = cost_func(results)
