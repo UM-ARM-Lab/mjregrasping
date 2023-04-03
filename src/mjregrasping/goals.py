@@ -184,6 +184,8 @@ class ObjectPointGoal(MPPIGoal):
         joint_positions = data.qpos[joint_indices_for_actuators]
         is_grasping = model.eq_active
 
+        # doing the contact cost calculation here means we don't need to return the entire data.contact array,
+        # which makes things simpler and possibly faster, since this operation can't be easily vectorized.
         contact_cost = 0
         for contact in data.contact:
             geom_name1 = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, contact.geom1)

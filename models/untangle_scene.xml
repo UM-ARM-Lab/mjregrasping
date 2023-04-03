@@ -5,7 +5,6 @@
     </default>
     <option viscosity="1"/>
     <include file="materials.xml"/>
-    <include file="floor.xml"/>
     <include file="val_husky.xml"/>
     <include file="computer_rack.xml"/>
     <include file="rope.xml"/>
