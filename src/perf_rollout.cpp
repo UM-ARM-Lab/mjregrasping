@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
     for (auto i = 0; i < 10; ++i) {
         auto const t0 = std::chrono::high_resolution_clock::now();
 
-        parallel_rollout(p, model, data, datas, controls);
+        parallel_rollout(model, data, datas, controls);
 
         auto const dt = std::chrono::high_resolution_clock::now() - t0;
         // print dt in seconds as a decimal number

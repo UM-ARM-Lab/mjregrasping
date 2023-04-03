@@ -22,10 +22,10 @@ class RVizPublishers:
 
     def __init__(self, tfw: TF2Wrapper):
         self.tfw = tfw
-        self.state_viz_pub = rospy.Publisher("state_viz", MarkerArray, queue_size=10)
-        self.action_viz_pub = rospy.Publisher("action_viz", MarkerArray, queue_size=10)
-        self.ee_path_pub = rospy.Publisher("ee_path", MarkerArray, queue_size=10)
-        self.goal_markers_pub = rospy.Publisher("goal_markers", MarkerArray, queue_size=10)
+        self.state = rospy.Publisher("state_viz", MarkerArray, queue_size=10)
+        self.action = rospy.Publisher("action_viz", MarkerArray, queue_size=10)
+        self.ee_path = rospy.Publisher("ee_path", MarkerArray, queue_size=10)
+        self.goal = rospy.Publisher("goal_markers", MarkerArray, queue_size=10)
 
 
 class MujocoVisualizer:
@@ -150,7 +150,7 @@ class MujocoVisualizer:
                 geom_marker_msg.type = Marker.MESH_RESOURCE
                 geom_marker_msg.mesh_use_embedded_materials = True
                 geom_marker_msg.mesh_resource = (
-                    f"package://mjregrasping/meshes/{mesh_name}.stl"
+                    f"package://mjregrasping/models/meshes/{mesh_name}.stl"
                 )
 
                 # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />

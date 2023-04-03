@@ -24,7 +24,7 @@
     </asset>
     <worldbody>
         <light name="top" pos="0 0 105" mode="trackcom"/>
-        <body pos="0 0 0.145" name="base">
+        <body pos="0 0 0.145" name="val_base">
             <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="50" diaginertia="8.333 8.333 8.333"/>
             <body pos="0.3641 0.00470858 0.315" quat="0 -0.707141 0.707073 0" name="drive56">
                 <inertial pos="1.36e-06  0.00343   0.0203" quat="1 0 0 0" mass="0.392"
@@ -285,19 +285,19 @@
             <body pos="0.275 0.0047 0.315" quat="0.500024 -0.500024 0.499976 -0.499976" name="pedestal_assembly">
                 <geom type="mesh" mesh="PEDESTAL_ASSEMBLY_simplified" name="pedestal_mesh" rgba="0.9 0.9 0.9 1"/>
             </body>
-            <body name="front_left_wheel_link" pos="0.256 0.35 0.03282">
+            <body name="front_left_wheel_link" pos="0.256 0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
                 <geom type="mesh" mesh="wheel_simplified" name="front_left_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
-            <body name="front_right_wheel_link" pos="0.256 -0.35 0.03282">
+            <body name="front_right_wheel_link" pos="0.256 -0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
                 <geom type="mesh" mesh="wheel_simplified" name="front_right_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
-            <body name="rear_left_wheel_link" pos="-0.256 0.35 0.03282">
+            <body name="rear_left_wheel_link" pos="-0.256 0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
                 <geom type="mesh" mesh="wheel_simplified" name="rear_left_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
-            <body name="rear_right_wheel_link" pos="-0.256 -0.35 0.03282">
+            <body name="rear_right_wheel_link" pos="-0.256 -0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
                 <geom type="mesh" mesh="wheel_simplified" name="rear_right_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>

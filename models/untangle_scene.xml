@@ -1,7 +1,13 @@
 <mujoco model="untangle">
+    <default>
+        <joint stiffness="0.5"/>
+        <geom friction="0.01"/>
+    </default>
+    <option viscosity="1"/>
     <include file="materials.xml"/>
     <include file="floor.xml"/>
     <include file="val_husky.xml"/>
+    <include file="computer_rack.xml"/>
     <include file="rope.xml"/>
     <equality>
         <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181"/>

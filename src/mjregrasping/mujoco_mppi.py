@@ -1,5 +1,4 @@
 import numpy as np
-import pymjregrasping
 
 from mjregrasping.rollout import parallel_rollout
 
@@ -37,22 +36,35 @@ class MujocoMPPI:
         self.actions = None
 
     def roll(self):
-        # shift command 1 time step
+        """ shift command 1 time step. Used before sampling a new command. """
         self.U = np.roll(self.U, -1, axis=0)
         # sample a new random reference control for the last time step
         self.U[-1] = self.noise_rng.randn(self.nu) * self.noise_sigma
 
     def command(self, data, get_result_func, cost_func):
+        """
+        Use this for no warmstarting.
+
+        cost func needs to take in the output of get_result_func and return a cost for each sample.
+        get_result_func needs to take in the model and data and return a result for each sample, which
+        can be any object or tuple of objects.
+        """
         self.roll()
 
         return self._command(data, get_result_func, cost_func)
 
     def _command(self, data, get_result_func, cost_func):
+        """
+        Use this for warmstarting.
+
+        cost func needs to take in the output of get_result_func and return a cost for each sample.
+        get_result_func needs to take in the model and data and return a result for each sample, which
+        can be any object or tuple of objects.
+        """
         noise = self.noise_rng.randn(self.num_samples, self.horizon, self.nu) * self.noise_sigma
         perturbed_action = self.U + noise
 
         results = parallel_rollout(self.pool, self.model, data, perturbed_action, get_result_func)
-        results = mymjregrasping.parallel_rollout(self.pool, self.model, data, perturbed_action, get_result_func)
 
         self.rollout_results = results
         self.actions = perturbed_action
@@ -73,4 +85,7 @@ class MujocoMPPI:
         return action
 
     def reset(self):
+        """
+        Resets the control samples.
+        """
         self.U = np.zeros([self.horizon, self.nu])

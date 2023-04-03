@@ -1,4 +1,5 @@
 #include <vector>
+#include <iostream>
 #include <random>
 #include <cmath>
 
@@ -19,7 +20,7 @@ rollout_one_trajectory(mjModel const *const model, mjData *data, std::vector<Con
     return qs;
 }
 
-void parallel_rollout(ctpl::thread_pool &p, mjModel const *model, mjData *data, std::vector<mjData *> const &datas,
+void parallel_rollout(mjModel const *model, mjData *data, std::vector<mjData *> const &datas,
                       std::vector<std::vector<Control>> const &controls) {
     std::vector<std::future<std::vector<State>>> results;
     for (auto i = 0; i < controls.size(); ++i) {
@@ -28,8 +29,9 @@ void parallel_rollout(ctpl::thread_pool &p, mjModel const *model, mjData *data, 
         auto *data_i = datas[i];
         mj_copyData(data_i, model, data);
 
-        results.emplace_back(p.push(
-                [&model, data_i, &controls_i](int) {
+        results.emplace_back(std::async(
+                std::launch::async,
+                [&model, data_i, &controls_i]() {
                     return rollout_one_trajectory(model, data_i, controls_i);
                 }));
     }
@@ -38,4 +40,13 @@ void parallel_rollout(ctpl::thread_pool &p, mjModel const *model, mjData *data, 
     for (auto &result: results) {
         result.get();
     }
+}
+
+std::vector<mjData *> preallocate_data_for_threads(mjModel const *const model, int const n_samples) {
+    std::vector<mjData *> datas;
+    for (auto i = 0; i < n_samples; ++i) {
+        auto *empty_data = mj_makeData(model);
+        datas.emplace_back(empty_data);
+    }
+    return datas;
 }

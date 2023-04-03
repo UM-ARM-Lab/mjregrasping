@@ -7,7 +7,7 @@ import mujoco
 import argparse
 from mjregrasping.rollout import parallel_rollout
 
-N_TIME = 10
+N_TIME = 9
 N_SUB_TIME = 50
 
 
@@ -22,7 +22,7 @@ def main():
     data = mujoco.MjData(model)
 
     n_samples = 50
-    with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
+    with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         for _ in range(10):
             controls = np.zeros([n_samples, N_TIME, 20])
 

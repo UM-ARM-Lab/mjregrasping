@@ -22,12 +22,13 @@ catkin_package(
 )
 
 include_directories(include ${MUJOCO_HOME}/include)
+
 add_library(mjregrasping SHARED src/mjregrasping.cpp)
-target_link_directories(mjregrasping PUBLIC Eigen3::Eigen)
+target_link_directories(mjregrasping PUBLIC ${MUJOCO_HOME})
+target_link_libraries(mjregrasping PUBLIC Eigen3::Eigen Threads::Threads ${MUJOCO_LIBRARY} ${catkin_LIBRARIES})
 
 add_executable(perf_rollout src/perf_rollout.cpp)
-target_link_directories(perf_rollout PUBLIC ${MUJOCO_HOME})
-target_link_libraries(perf_rollout PUBLIC mjregrasping Threads::Threads ${MUJOCO_LIBRARY})
+target_link_libraries(perf_rollout PUBLIC mjregrasping)
 
 pybind_add_module(pymjregrasping src/bindings.cpp)
 target_link_libraries(pymjregrasping PUBLIC mjregrasping ${catkin_LIBRARIES})

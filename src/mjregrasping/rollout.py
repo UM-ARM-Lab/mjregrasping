@@ -12,7 +12,7 @@ N_SUB_TIME_S = 0.1
 
 
 def rollout(model, data, controls, get_result_func=None):
-    joint_indices_for_actuators = model.actuator_trnid[:, 0]
+    # run for the initial data, so that the current state is returned in the output
     results_lists = None
     if get_result_func is not None:
         result_tuple = get_result_tuple(data, get_result_func, model)
@@ -25,20 +25,6 @@ def rollout(model, data, controls, get_result_func=None):
 
     for t in range(controls.shape[0]):
         qvel_target = controls[t]
-        # q_target = controls[t]
-        #
-        # q_current = data.qpos[joint_indices_for_actuators]
-        # qvel_current = data.qvel[joint_indices_for_actuators]
-        #
-        # qerr = q_target - q_current
-        #
-        # # do the lowest-level control here
-        # v_max = model.actuator_ctrlrange[:, 1]  # NOTE: assumes symmetric range
-        # kv = v_max / MAX_VEL_TILL_ERROR_RAD
-        # qvel_target = qerr * kv
-        #
-        # qvel_err = qvel_target - qvel_current
-        # data.userdata = np.concatenate([qerr, qvel_target, qvel_err])
 
         control_step(model, data, qvel_target)
 

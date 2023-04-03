@@ -8,5 +8,8 @@ namespace py = pybind11;
 
 PYBIND11_MODULE(pymjregrasping, m)
 {
-  m.doc() = "pymjregrasping module";
+    m.doc() = "pymjregrasping module";
+
+    m.def("preallocate_data_for_threads", &preallocate_data_for_threads);
+    m.def("parallel_rollout", &parallel_rollout);
 }

@@ -9,5 +9,7 @@ using Control = std::vector<double>;
 
 std::vector<State> rollout_one_trajectory(mjModel const *model, mjData *data, std::vector<Control> const &controls);
 
-void parallel_rollout(ctpl::thread_pool &p, mjModel const *model, mjData *data, std::vector<mjData *> const &datas,
+void parallel_rollout(mjModel const *model, mjData *data, std::vector<mjData *> const &datas,
                       std::vector<std::vector<Control>> const &controls);
+
+std::vector<mjData *> preallocate_data_for_threads(mjModel const *model, int n_samples);
