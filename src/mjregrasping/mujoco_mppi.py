@@ -20,7 +20,7 @@ class MujocoMPPI:
 
         # dimensions of state and control
         self.nx = model.nq
-        self.nu = model.na
+        self.nu = model.nu
         self.lambda_ = lambda_
 
         self.noise_sigma = np.ones(self.nu) * noise_sigma

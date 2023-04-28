@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-
+import importlib
+import logging
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from copy import copy
@@ -8,17 +9,23 @@ from time import perf_counter
 import numpy as np
 from matplotlib import cm
 
+import rospy
 from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.initialize import initialize
+from mjregrasping.initialize import initialize, activate_eq
+from mjregrasping.mppi_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.mujoco_visualizer import plot_lines_rviz
 from mjregrasping.rollout import control_step, rollout
 
 
 def main():
+    importlib.reload(logging)
+
     np.set_printoptions(precision=4, suppress=True)
 
     model, data, mjviz, viz_pubs = initialize("untangle", "models/untangle_scene.xml")
+
+    setup_untangle_scene(model, data, mjviz)
 
     horizon = 9  # number of actions. states will be horizon + 1
     n_samples = 50
@@ -32,7 +39,7 @@ def main():
     dts = []
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         mppi = MujocoMPPI(pool, model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon,
-                          lambda_=0.005)
+                          lambda_=0.01)
 
         for warmstart_i in range(5):
             command = mppi._command(data, goal.get_results, goal.cost)
@@ -73,11 +80,38 @@ def viz(mppi, goal, data, model, command, viz_pubs):
         c = cm.RdYlGn(1 - cost_normalized)
         plot_lines_rviz(viz_pubs.ee_path, left_tool_pos, label='left_ee', idx=i, scale=0.002, color=c)
         plot_lines_rviz(viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.002, color=c)
+        rospy.sleep(0.01)
 
     cmd_rollout_results = rollout(model, copy(data), command[None], get_result_func=goal.get_results)
     left_tool_pos, right_tool_pos = goal.tool_positions(cmd_rollout_results)
     plot_lines_rviz(viz_pubs.ee_path, left_tool_pos, label='left_ee', idx=i, scale=0.004, color='b')
     plot_lines_rviz(viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.004, color='b')
+
+def setup_untangle_scene(model, data, mjviz):
+    robot_q1 = np.array([
+        -0.7, 0.1,  # torso
+        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+        0, 0,  # left gripper
+        0.0, -0.2, 0, -0.30, 0, -0.2, 0,  # right arm
+        0, 0,  # right gripper
+    ])
+    pid_to_joint_config(mjviz, model, data, robot_q1)
+    robot_q2 = np.array([
+        -0.5, 0.4,  # torso
+        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+        0, 0,  # left gripper
+        1.2, -0.2, 0, -0.90, 0, -0.2, 0,  # right arm
+        0, 0,  # right gripper
+    ])
+    pid_to_joint_config(mjviz, model, data, robot_q2)
+    # Activate the connect constraint between the rope and the gripper to
+    activate_eq(model, 'right')
+
+    # settle
+    for _ in range(10):
+        mjviz.viz(model, data)
+        control_step(model, data, np.zeros(model.nu))
+        rospy.sleep(0.01)
 
 
 if __name__ == "__main__":

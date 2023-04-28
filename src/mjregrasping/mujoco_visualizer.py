@@ -34,6 +34,9 @@ class MujocoVisualizer:
         self.eq_constraints_pub = rospy.Publisher(
             "eq_constraints", MarkerArray, queue_size=1000, latch=False
         )
+        self.contacts_pub = rospy.Publisher(
+            "contacts", MarkerArray, queue_size=1000, latch=False
+        )
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=1000, latch=False)
 
     def viz(self, model, data, alpha=1, idx=0):
@@ -278,6 +281,30 @@ class MujocoVisualizer:
                             child=parent_name + "_weld",
                         )
 
+        contact_markers = MarkerArray()
+        for contact in data.contact:
+            geom1_name = mj_id2name(model, mju_str2Type("geom"), contact.geom1)
+            geom2_name = mj_id2name(model, mju_str2Type("geom"), contact.geom2)
+
+            contact_marker = Marker()
+            contact_marker.action = Marker.ADD
+            contact_marker.type = Marker.SPHERE
+            contact_marker.header.frame_id = "world"
+            contact_marker.scale.x = 0.01
+            contact_marker.scale.y = 0.01
+            contact_marker.scale.z = 0.01
+            contact_marker.ns = f"{geom1_name}_{geom2_name}"
+            contact_marker.color = ColorRGBA(*to_rgba("r"))
+            contact_marker.pose.orientation.w = 1
+            contact_marker.pose.position.x = float(contact.pos[0])
+            contact_marker.pose.position.y = float(contact.pos[1])
+            contact_marker.pose.position.z = float(contact.pos[2])
+            contact_markers.markers.append(contact_marker)
+
+        clear_contact_markers = MarkerArray()
+        clear_contact_markers.markers.append(Marker(action=Marker.DELETEALL))
+        self.contacts_pub.publish(clear_contact_markers)
+        self.contacts_pub.publish(contact_markers)
 
 def plot_sphere_rviz(
         pub, position, radius, frame_id="world", color="m", idx=0, label=""

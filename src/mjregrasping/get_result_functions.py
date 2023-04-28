@@ -1,5 +1,6 @@
 import mujoco
 
+
 def get_left_tool_pos_and_contact_cost(model, data):
     contact_cost = 0
     for contact in data.contact:
@@ -8,3 +9,8 @@ def get_left_tool_pos_and_contact_cost(model, data):
         if geom_name1 == 'obstacle' or geom_name2 == 'obstacle':
             contact_cost += 1
     return data.site_xpos[model.site('left_tool').id], contact_cost
+
+
+def get_q_current(model, data):
+    # FIXME: don't hardcode the indices
+    return data.qpos[:20]

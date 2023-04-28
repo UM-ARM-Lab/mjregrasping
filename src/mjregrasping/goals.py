@@ -182,7 +182,11 @@ class ObjectPointGoal(MPPIGoal):
         rope_points = np.array([data.geom_xpos[rope_geom_idx] for rope_geom_idx in self.rope.geom_indices])
         joint_indices_for_actuators = model.actuator_trnid[:, 0]
         joint_positions = data.qpos[joint_indices_for_actuators]
-        is_grasping = model.eq_active
+        eq_indices = [
+            mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_EQUALITY, 'left'),
+            mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_EQUALITY, 'right'),
+        ]
+        is_grasping = model.eq_active[eq_indices]
 
         # doing the contact cost calculation here means we don't need to return the entire data.contact array,
         # which makes things simpler and possibly faster, since this operation can't be easily vectorized.

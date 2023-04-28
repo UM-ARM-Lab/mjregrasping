@@ -10,13 +10,18 @@ def initialize(node_name, xml_path):
 
     model = mujoco.MjModel.from_xml_path(xml_path)
     data = mujoco.MjData(model)
-    mujoco.mj_forward(model, data)
 
     tfw = TF2Wrapper()
     mjviz = MujocoVisualizer(tfw)
-    mjviz.viz(model, data)
 
+    mujoco.mj_forward(model, data)
+    mjviz.viz(model, data)
     viz_pubs = RVizPublishers(tfw)
 
     return model, data, mjviz, viz_pubs
 
+
+def activate_eq(model, eq_name):
+    eq_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_EQUALITY, eq_name)
+    model.eq_active[eq_idx] = 1
+    model.eq_data[eq_idx][3:6] = 0

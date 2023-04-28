@@ -2,7 +2,7 @@
     <worldbody>
         <body name="computer_rack" pos="1.1 0 0">
             <geom type="box" name="wall" pos="-0.2 0.7 0.975" size="0.01 0.25 1" rgba="0.1 0.1 0.1 1"/>
-            <body name="attach" pos="0 0.6 0.53">
+            <body name="attach" pos="0 0.25 0.55">
                 <geom type="box" name="rack_attach" size="0.005 0.005 0.005" rgba="0.5 0 0 1"/>
             </body>
             <body name="rack1">
@@ -14,7 +14,7 @@
             </body>
             <body name="rack2" pos="0 0 0.5">
                 <geom type="box" name="rack2_bottom" size="0.25 0.4 0.03" material="dark-wood"/>
-                <geom type="box" name="rack2_top" pos="0 0 0.5" size="0.25 0.4 0.03" material="dark-wood"/>
+                <geom type="box" name="rack2_top" pos="0 0 0.45" size="0.29 0.42 0.05" material="dark-wood"/>
                 <geom type="box" name="rack2_post1" pos="-0.24 -0.39 0.25" size="0.05 0.05 0.25" material="metal"/>
                 <geom type="box" name="rack2_post2" pos="-0.24 0.39 0.25" size="0.05 0.05 0.25" material="metal"/>
                 <geom type="box" name="rack2_post3" pos="0.24 -0.39 0.25" size="0.05 0.05 0.25" material="metal"/>

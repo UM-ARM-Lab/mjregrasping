@@ -9,7 +9,8 @@
     <include file="computer_rack.xml"/>
     <include file="rope.xml"/>
     <equality>
-        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181"/>
-        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.181"/>
+        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" />
+        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181" active="false" />
+        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.181" active="false" />
     </equality>
 </mujoco>

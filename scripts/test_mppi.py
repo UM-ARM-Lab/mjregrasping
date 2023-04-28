@@ -12,7 +12,7 @@ from matplotlib import cm
 from mjregrasping.get_result_functions import get_left_tool_pos_and_contact_cost
 from mjregrasping.initialize import initialize
 from mjregrasping.mujoco_mppi import MujocoMPPI
-from mjregrasping.mujoco_visualizer import RVizPublishers, plot_sphere_rviz, plot_lines_rviz
+from mjregrasping.mujoco_visualizer import plot_sphere_rviz, plot_lines_rviz
 from mjregrasping.rollout import control_step, rollout
 
 
@@ -87,7 +87,8 @@ def viz(mppi, data, model, command, viz_pubs):
         left_gripper_positions = mppi.rollout_results[0][sorted_traj_idx]
         c = cm.RdYlGn(1 - cost_normalized)
         plot_lines_rviz(viz_pubs.ee_path, left_gripper_positions, label='ee', idx=i, scale=0.001, color=c)
-    left_gripper_positions, _ = rollout(model, copy(data), command[None], get_result_func=get_left_tool_pos_and_contact_cost)
+    left_gripper_positions, _ = rollout(model, copy(data), command[None],
+                                        get_result_func=get_left_tool_pos_and_contact_cost)
     plot_lines_rviz(viz_pubs.ee_path, left_gripper_positions, label='command', scale=0.004, color='blue')
 
 
