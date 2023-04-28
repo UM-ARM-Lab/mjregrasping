@@ -25,7 +25,8 @@ def main():
 
     model, data, mjviz, viz_pubs = initialize("untangle", "models/untangle_scene.xml")
 
-    setup_untangle_scene(model, data, mjviz)
+    # setup_tangled_scene(model, data, mjviz)
+    setup_untangled_scene(model, data, mjviz)
 
     horizon = 9  # number of actions. states will be horizon + 1
     n_samples = 50
@@ -87,7 +88,8 @@ def viz(mppi, goal, data, model, command, viz_pubs):
     plot_lines_rviz(viz_pubs.ee_path, left_tool_pos, label='left_ee', idx=i, scale=0.004, color='b')
     plot_lines_rviz(viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.004, color='b')
 
-def setup_untangle_scene(model, data, mjviz):
+
+def setup_tangled_scene(model, data, mjviz):
     robot_q1 = np.array([
         -0.7, 0.1,  # torso
         -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
@@ -104,11 +106,18 @@ def setup_untangle_scene(model, data, mjviz):
         0, 0,  # right gripper
     ])
     pid_to_joint_config(mjviz, model, data, robot_q2)
+    activate_and_settle(data, mjviz, model)
+
+
+def setup_untangled_scene(model, data, mjviz):
+    activate_and_settle(data, mjviz, model)
+
+
+def activate_and_settle(data, mjviz, model):
     # Activate the connect constraint between the rope and the gripper to
     activate_eq(model, 'right')
-
     # settle
-    for _ in range(10):
+    for _ in range(25):
         mjviz.viz(model, data)
         control_step(model, data, np.zeros(model.nu))
         rospy.sleep(0.01)
