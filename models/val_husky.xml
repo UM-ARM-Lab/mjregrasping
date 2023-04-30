@@ -302,13 +302,13 @@
     </worldbody>
     <actuator>
         <!--  0 -->
-        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="1000" forcelimited="true" forcerange="-10 10"/>
+        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="20000" forcelimited="true" forcerange="-10 10"/>
         <intvelocity name="joint57_vel" joint="joint57" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-1.5708 1.5708" kp="50000" forcelimited="true" forcerange="-200 200"/>
 
         <!--  2 -->
         <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-25 25"/>
-        <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000" forcelimited="true" forcerange="-5 5"/>
-        <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000" forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-5 5"/>
         <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-10 10"/>
         <!--  6 -->
         <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-1 1"/>
@@ -319,8 +319,8 @@
 
         <!--  11 -->
         <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-25 25"/>
-        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000" forcelimited="true" forcerange="-5 2"/>
-        <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000" forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-5 5"/>
         <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-10 10"/>
         <!--  15 -->
         <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-1 1"/>

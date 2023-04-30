@@ -12,7 +12,7 @@ from matplotlib import cm
 import rospy
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.initialize import initialize, activate_eq
-from mjregrasping.mppi_to_joint_config import pid_to_joint_config
+from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.mujoco_visualizer import plot_lines_rviz
 from mjregrasping.rollout import control_step, rollout

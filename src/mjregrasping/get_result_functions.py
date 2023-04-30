@@ -1,3 +1,5 @@
+from copy import copy
+
 import mujoco
 
 
@@ -13,4 +15,4 @@ def get_left_tool_pos_and_contact_cost(model, data):
 
 def get_q_current(model, data):
     # FIXME: don't hardcode the indices
-    return data.qpos[:20]
+    return copy(data.qpos[:20])
