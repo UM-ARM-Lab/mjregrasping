@@ -25,8 +25,8 @@ def main():
 
     model, data, mjviz, viz_pubs = initialize("untangle", "models/untangle_scene.xml")
 
-    # setup_tangled_scene(model, data, mjviz)
-    setup_untangled_scene(model, data, mjviz)
+    setup_tangled_scene(model, data, mjviz)
+    # setup_untangled_scene(model, data, mjviz)
 
     horizon = 9  # number of actions. states will be horizon + 1
     n_samples = 50
