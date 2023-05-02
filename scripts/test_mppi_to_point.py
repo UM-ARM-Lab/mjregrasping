@@ -44,7 +44,7 @@ def main():
                           lambda_=0.005)
 
         for warmstart_i in range(5):
-            command = mppi._command(data, get_left_tool_pos_and_contact_cost, _cost_func)
+            command = mppi.command(data, get_left_tool_pos_and_contact_cost, _cost_func)
             viz(mppi, data, model, command, viz_pubs)
             plot_sphere_rviz(viz_pubs.goal, left_gripper_goal_point, 0.01, label='goal')
 
@@ -54,7 +54,7 @@ def main():
 
             # warmstart
             t0 = perf_counter()
-            command = mppi.command(data, get_left_tool_pos_and_contact_cost, _cost_func)
+            command = mppi.roll_and_command(data, get_left_tool_pos_and_contact_cost, _cost_func)
             dt = perf_counter() - t0
             dts.append(dt)
             print(f"mppi.command: {dt:.3f}s")

@@ -4,9 +4,10 @@ from typing import Optional
 import matplotlib.cm as cm
 import mujoco
 import numpy as np
+import rerun as rr
 import transformations
 from matplotlib.colors import to_rgba
-from mujoco import mju_str2Type, mju_mat2Quat, mjtGeom, mj_id2name
+from mujoco import mju_str2Type, mju_mat2Quat, mjtGeom, mj_id2name, mjtSensor
 
 import ros_numpy
 import rospy
@@ -40,20 +41,21 @@ class MujocoVisualizer:
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=1000, latch=False)
 
     def viz(self, model, data, alpha=1, idx=0):
+        rr.set_time_seconds('sim_time', data.time)
         markers_by_entity = {}
 
+        # 2D viz in rerun
+        for sensor_idx in range(model.nsensor):
+            sensor = model.sensor(sensor_idx)
+            if sensor.type in [mjtSensor.mjSENS_TORQUE, mjtSensor.mjSENS_FORCE]:
+                rr.log_scalar(f'sensor/{sensor.name}', float(data.sensordata[sensor.adr]))
+
+        rr.log_scalar(f'contact/num_contacts', len(data.contact))
+
+        # 3D viz in rviz
         for geom_id in range(model.ngeom):
             geom_bodyid = model.geom_bodyid[geom_id]
-            parent_bodyid = geom_bodyid
-            parent_names = []
-            while True:
-                parent_bodyid = model.body_parentid[parent_bodyid]
-                parent_name = mj_id2name(model, mju_str2Type("body"), parent_bodyid)
-                parent_names.append(parent_name)
-                if parent_bodyid == 0:
-                    break
-            body_name = mj_id2name(model, mju_str2Type("body"), geom_bodyid)
-            entity_name = body_name.split("/")[0]
+            entity_name, parent_names = self.names(geom_bodyid, model)
             if entity_name not in markers_by_entity:
                 markers_by_entity[entity_name] = MarkerArray()
             geoms_marker_msg = markers_by_entity[entity_name]
@@ -305,6 +307,20 @@ class MujocoVisualizer:
         clear_contact_markers.markers.append(Marker(action=Marker.DELETEALL))
         self.contacts_pub.publish(clear_contact_markers)
         self.contacts_pub.publish(contact_markers)
+
+    def names(self, geom_bodyid, model):
+        parent_bodyid = geom_bodyid
+        parent_names = []
+        while True:
+            parent_bodyid = model.body_parentid[parent_bodyid]
+            parent_name = mj_id2name(model, mju_str2Type("body"), parent_bodyid)
+            parent_names.append(parent_name)
+            if parent_bodyid == 0:
+                break
+        body_name = mj_id2name(model, mju_str2Type("body"), geom_bodyid)
+        entity_name = body_name.split("/")[0]
+        return entity_name, parent_names
+
 
 def plot_sphere_rviz(
         pub, position, radius, frame_id="world", color="m", idx=0, label=""

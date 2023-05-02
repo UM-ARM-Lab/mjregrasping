@@ -62,6 +62,11 @@ def control_step(model, data, qvel_target):
     else:
         print("control is None!!!")
     n_sub_time = int(N_SUB_TIME_S / model.opt.timestep)
+    # FIXME: don't move the grippers... horrible hack
+    data.ctrl[model.actuator('leftgripper_vel').id] = 0
+    data.ctrl[model.actuator('leftgripper2_vel').id] = 0
+    data.ctrl[model.actuator('rightgripper_vel').id] = 0
+    data.ctrl[model.actuator('rightgripper2_vel').id] = 0
     mujoco.mj_step(model, data, nstep=n_sub_time)
 
 

@@ -1,15 +1,24 @@
+import importlib
+import logging
+
 import mujoco
 
+import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.mujoco_visualizer import MujocoVisualizer, RVizPublishers
 
 
 def initialize(node_name, xml_path):
+    rr.init('mjregrasping')
+    rr.connect()
+
     rospy.init_node(node_name)
 
     model = mujoco.MjModel.from_xml_path(xml_path)
     data = mujoco.MjData(model)
+
+    # add a custom callback to define the sensor values for "external force"
 
     tfw = TF2Wrapper()
     mjviz = MujocoVisualizer(tfw)

@@ -7,7 +7,7 @@ from mjregrasping.rollout import control_step
 def pid_to_joint_config(mjviz, model, data, q_target):
     kP = 5.0
     q_prev = get_q_current(model, data)
-    for i in range(100):
+    for i in range(200):
         mjviz.viz(model, data)
         q_current = get_q_current(model, data)
         command = kP * (q_target - q_current)

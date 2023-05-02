@@ -6,6 +6,7 @@ import numpy as np
 
 from mjregrasping.initialize import initialize
 from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.rollout import control_step
 
 
 def main():
@@ -23,6 +24,8 @@ def main():
     high = model.jnt_range[:, 1] * 0.2
 
     rng = np.random.RandomState(0)
+
+    qvel_target = np.zeros(model.nu)
     for i in range(10):
         q_target = rng.uniform(low, high, size=model.nq)
         try:

@@ -1,7 +1,11 @@
+import logging
+
 import mujoco
 import numpy as np
 
 from mjregrasping.mujoco_visualizer import plot_sphere_rviz
+
+logger = logging.getLogger(f'rosout.{__name__}')
 
 
 class Children:
@@ -84,6 +88,66 @@ class MPPIGoal:
         raise NotImplementedError()
 
 
+class GripperPointGoal(MPPIGoal):
+
+    def __init__(self, model, goal_point: np.array, goal_radius: float, gripper_idx: int, viz_pubs):
+        super().__init__(model, viz_pubs)
+        self.goal_point = goal_point
+        self.goal_radius = goal_radius
+        self.gripper_idx = gripper_idx
+
+    def cost(self, results):
+        """
+        Args:
+            results: the output of get_results()
+
+        Returns:
+            matrix of costs [b, horizon]
+
+        """
+        left_gripper_pos, right_gripper_pos = results
+        gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
+        dist_cost = np.linalg.norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
+        return dist_cost
+
+    def satisfied(self, data):
+        gripper_pos = self.choose_gripper_pos(data.site('left_tool').xpos, data.site('right_tool').xpos)
+        distance = np.linalg.norm(self.goal_point - gripper_pos, axis=-1)
+        return distance < self.goal_radius
+
+    def viz(self):
+        plot_sphere_rviz(self.viz_pubs.goal, position=self.goal_point, radius=self.goal_radius, frame_id='world',
+                         color=[1, 0, 1, 0.5])
+        if self.viz_pubs.tfw:
+            self.viz_pubs.tfw.send_transform(translation=self.goal_point, quaternion=[0, 0, 0, 1],
+                                             parent='world', child='gripper_point_goal')
+
+    def get_results(self, model, data):
+        """
+
+        Args:
+            model: mjModel
+            data: mjData
+
+        Returns: the result is any object or tuple of objects, and will be passed to cost()
+
+        """
+        return data.site('left_tool').xpos, data.site('right_tool').xpos
+
+    def choose_gripper_pos(self, left_gripper_pos, right_gripper_pos):
+        if self.gripper_idx == 0:
+            gripper_point = left_gripper_pos
+        elif self.gripper_idx == 1:
+            gripper_point = right_gripper_pos
+        else:
+            raise ValueError(f"unknown gripper_idx {self.gripper_idx}")
+        return gripper_point
+
+
+    def tool_positions(self, results):
+        return results
+
+
 class ObjectPointGoal(MPPIGoal):
 
     def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, viz_pubs):
@@ -115,13 +179,18 @@ class ObjectPointGoal(MPPIGoal):
         pred_is_grasping = is_grasping[:, 1:]  # skip t=0
         specified_points = pred_rope_points[..., 0, self.body_idx, :]
         specified_point_to_goal_dir = (self.goal_point - specified_points)  # [b, 3]
+        # negative dot product between:
+        # 1. the direction from the specified point to the goal
+        # 2. the direction the gripper is moving
         gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir)  # [b, horizon, 2]
+        # Cost the discouraged moveing the gripper away from the goal
         grasping_gripper_direction_cost = np.einsum('abc,abc->ab', gripper_direction_cost, pred_is_grasping)
 
         is_grasping0 = is_grasping[:, 0]  # grasp state cannot change within a rollout
         cannot_progress = np.logical_or(np.all(is_grasping0, axis=-1), np.all(~is_grasping0, axis=-1))
         cannot_progress_penalty = cannot_progress * 1000
 
+        logger.debug(f"{any_points_useful=}")
         if any_points_useful:
             cost = point_dist
             # if self.spaces.debug.config.obj_point_goal:
@@ -177,8 +246,8 @@ class ObjectPointGoal(MPPIGoal):
                                              parent='world', child='rope_point_goal')
 
     def get_results(self, model, data):
-        left_tool_pos = data.site_xpos[model.site('left_tool').id]
-        right_tool_pos = data.site_xpos[model.site('right_tool').id]
+        left_tool_pos = data.site('left_tool').xpos
+        right_tool_pos = data.site('right_tool').xpos
         rope_points = np.array([data.geom_xpos[rope_geom_idx] for rope_geom_idx in self.rope.geom_indices])
         joint_indices_for_actuators = model.actuator_trnid[:, 0]
         joint_positions = data.qpos[joint_indices_for_actuators]

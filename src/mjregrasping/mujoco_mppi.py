@@ -1,7 +1,11 @@
+import logging
+
 import numpy as np
 
 from mjregrasping.rollout import parallel_rollout
 
+
+logger = logging.getLogger(f'rosout.{__name__}')
 
 def softmax(x, temp):
     x = x / temp
@@ -41,7 +45,7 @@ class MujocoMPPI:
         # sample a new random reference control for the last time step
         self.U[-1] = self.noise_rng.randn(self.nu) * self.noise_sigma
 
-    def command(self, data, get_result_func, cost_func):
+    def roll_and_command(self, data, get_result_func, cost_func):
         """
         Use this for no warmstarting.
 
@@ -51,9 +55,9 @@ class MujocoMPPI:
         """
         self.roll()
 
-        return self._command(data, get_result_func, cost_func)
+        return self.command(data, get_result_func, cost_func)
 
-    def _command(self, data, get_result_func, cost_func):
+    def command(self, data, get_result_func, cost_func):
         """
         Use this for warmstarting.
 
@@ -75,7 +79,7 @@ class MujocoMPPI:
         self.cost_normalized = (self.cost - self.cost.min()) / (self.cost.max() - self.cost.min())
 
         weights = softmax(-self.cost_normalized, self.lambda_)
-        print(f'weights: std={float(np.std(weights)):.2f} max={float(np.max(weights)):.2f}')
+        logger.debug(f'weights: std={float(np.std(weights)):.2f} max={float(np.max(weights)):.2f}')
 
         # compute the (weighted) average noise and add that to the reference control
         weighted_avg_noise = np.sum(weights[:, None, None] * noise, axis=0)
