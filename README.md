@@ -19,13 +19,12 @@ cd ~/catkin_ws
 rosdep install --from-paths src --ignore-src -r -y
 # Create a virtual environment with access to the system ROS packages
 cd ~/catkin_ws
-# If you're using Ubuntu 20.04 and do not have python3.10 installed,
-# you can add it via the deadsnakes PPA
-sudo apt install python3.10-venv
-python3.10 -m venv --system-site-packages venv
+# you may need sudo apt install python3.8-venv
+python3 -m venv --system-site-packages venv
 source venv/bin/activate
 # Python dependencies
 cd ~/catkin_ws/src/mjregrasping
+pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
