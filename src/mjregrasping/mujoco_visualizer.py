@@ -18,6 +18,7 @@ from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
+from line_profiler_pycharm import profile
 
 class RVizPublishers:
 
@@ -40,6 +41,8 @@ class MujocoVisualizer:
         )
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=1000, latch=False)
 
+
+    @profile
     def viz(self, model, data, alpha=1, idx=0):
         rr.set_time_seconds('sim_time', data.time)
 
@@ -103,7 +106,6 @@ class MujocoVisualizer:
                 geom_marker_msg.scale.y = geom_size[0] * 2
                 geom_marker_msg.scale.z = geom_size[1] * 2
             elif geom_type == mjtGeom.mjGEOM_CAPSULE:
-                # FIXME: not accurate, should use 2 spheres and a cylinder?
                 geom_marker_msg.type = Marker.CYLINDER
                 geom_marker_msg.scale.x = geom_size[0] * 2
                 geom_marker_msg.scale.y = geom_size[0] * 2
@@ -180,46 +182,6 @@ class MujocoVisualizer:
 
         self.pub.publish(geom_markers_msg)
 
-        # visualize the weld constraints (regardless of whether they are active)
-        eq_lines_msg = MarkerArray()
-        for eq_id in range(model.neq):
-            eq_name = mj_id2name(model, mju_str2Type("equality"), eq_id)
-            if eq_name is not None and "weld" in eq_name:
-                eq_data = model.eq_data[eq_id]
-                eq_rel_pos = eq_data[:3]
-                eq_rel_quat = eq_data[3:]
-                parent_id = model.eq_obj1id[eq_id]
-                parent_pos = data.xpos[parent_id]
-                parent_xmat = data.xmat[parent_id]
-
-                child_id = model.eq_obj2id[eq_id]
-                child_pos = data.xpos[child_id]
-                child_xmat = data.xmat[child_id]
-
-                # compute the error in position & orientation
-                # create the 4x4 transform matrix that represents the transformation from parent_bodyid frame to
-                parent2eq = transformations.quaternion_matrix(eq_rel_quat)
-                parent2eq[:3, 3] = eq_rel_pos
-                world2parent = pos_mat_to_matrix(parent_pos, parent_xmat)
-                world2child = pos_mat_to_matrix(child_pos, child_xmat)
-                world2eq = world2parent @ parent2eq
-                eq_value = matrix_dist(world2eq, world2child)
-
-                eq_line_msg = Marker()
-                eq_line_msg.action = Marker.ADD
-                eq_line_msg.ns = eq_name
-                eq_line_msg.type = Marker.LINE_STRIP
-                eq_line_msg.header.frame_id = "world"
-                eq_line_msg.pose.orientation.w = 1
-                eq_line_msg.scale.x = 0.001
-                eq_line_msg.color = ColorRGBA(
-                    *to_rgba(cm.viridis(eq_value), alpha=alpha)
-                )
-                eq_line_msg.points.append(Point(*world2eq[:3, 3]))
-                eq_line_msg.points.append(Point(*child_pos))
-                eq_lines_msg.markers.append(eq_line_msg)
-        self.eq_constraints_pub.publish(eq_lines_msg)
-
         for body_id in range(model.nbody):
             name = mj_id2name(model, mju_str2Type("body"), body_id)
             pos = data.xpos[body_id]
@@ -259,29 +221,6 @@ class MujocoVisualizer:
                     parent="world",
                     child=name + "_site",
                 )
-
-        weld_parents = []
-        for eq_id in range(model.neq):
-            eq_name = mj_id2name(model, mju_str2Type("equality"), eq_id)
-            if eq_name is not None and "weld" in eq_name:
-                eq_data = model.eq_data[eq_id]
-                eq_rel_pos = eq_data[:3]
-                eq_rel_quat = eq_data[3:]
-                parent_id = model.eq_obj1id[eq_id]
-                parent_name = mj_id2name(
-                    model, mju_str2Type("body"), parent_id
-                )
-
-                # only publish one per parent_bodyid
-                if parent_name not in weld_parents:
-                    weld_parents.append(parent_name)
-                    if self.tfw:
-                        self.tfw.send_transform(
-                            translation=eq_rel_pos,
-                            quaternion=np_wxyz_to_xyzw(eq_rel_quat),
-                            parent=parent_name + "_body",
-                            child=parent_name + "_weld",
-                        )
 
         contact_markers = MarkerArray()
         for contact_idx, contact in enumerate(data.contact):

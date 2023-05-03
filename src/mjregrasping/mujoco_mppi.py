@@ -45,7 +45,7 @@ class MujocoMPPI:
         # sample a new random reference control for the last time step
         self.U[-1] = self.noise_rng.randn(self.nu) * self.noise_sigma
 
-    def roll_and_command(self, data, get_result_func, cost_func):
+    def roll_and_command(self, data, get_result_func, cost_func, sub_time_s):
         """
         Use this for no warmstarting.
 
@@ -55,9 +55,9 @@ class MujocoMPPI:
         """
         self.roll()
 
-        return self.command(data, get_result_func, cost_func)
+        return self.command(data, get_result_func, cost_func, sub_time_s)
 
-    def command(self, data, get_result_func, cost_func):
+    def command(self, data, get_result_func, cost_func, sub_time_s):
         """
         Use this for warmstarting.
 
@@ -68,7 +68,7 @@ class MujocoMPPI:
         noise = self.noise_rng.randn(self.num_samples, self.horizon, self.nu) * self.noise_sigma
         perturbed_action = self.U + noise
 
-        results = parallel_rollout(self.pool, self.model, data, perturbed_action, get_result_func)
+        results = parallel_rollout(self.pool, self.model, data, perturbed_action, sub_time_s, get_result_func)
 
         self.rollout_results = results
         self.actions = perturbed_action

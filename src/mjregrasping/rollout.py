@@ -1,17 +1,14 @@
-import concurrent
 import copy
-import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 
 import mujoco
 import numpy as np
 
 MAX_VEL_TILL_ERROR_RAD = np.deg2rad(3)
+DEFAULT_SUB_TIME_S = 0.1
 
-N_SUB_TIME_S = 0.1
 
-
-def rollout(model, data, controls, get_result_func=None):
+def rollout(model, data, controls, sub_time_s, get_result_func=None):
     # run for the initial data, so that the current state is returned in the output
     results_lists = None
     if get_result_func is not None:
@@ -26,7 +23,7 @@ def rollout(model, data, controls, get_result_func=None):
     for t in range(controls.shape[0]):
         qvel_target = controls[t]
 
-        control_step(model, data, qvel_target)
+        control_step(model, data, qvel_target, sub_time_s=sub_time_s)
 
         if get_result_func is not None:
             result_tuple = get_result_tuple(data, get_result_func, model)
@@ -56,12 +53,12 @@ def get_result_tuple(data, get_result_func, model):
     return result_tuple
 
 
-def control_step(model, data, qvel_target):
+def control_step(model, data, qvel_target, sub_time_s: float):
     if qvel_target is not None:
         np.copyto(data.ctrl, qvel_target)
     else:
         print("control is None!!!")
-    n_sub_time = int(N_SUB_TIME_S / model.opt.timestep)
+    n_sub_time = int(sub_time_s / model.opt.timestep)
     # FIXME: don't move the grippers... horrible hack
     data.ctrl[model.actuator('leftgripper_vel').id] = 0
     data.ctrl[model.actuator('leftgripper2_vel').id] = 0
@@ -70,8 +67,8 @@ def control_step(model, data, qvel_target):
     mujoco.mj_step(model, data, nstep=n_sub_time)
 
 
-def parallel_rollout(pool: ThreadPoolExecutor, model, data, controls_samples, get_result_func=None):
-    args_sets = [(model, copy.copy(data), controls, get_result_func) for controls in controls_samples]
+def parallel_rollout(pool: ThreadPoolExecutor, model, data, controls_samples, sub_time_s, get_result_func=None):
+    args_sets = [(model, copy.copy(data), controls, sub_time_s, get_result_func) for controls in controls_samples]
     futures = [pool.submit(rollout, *args) for args in args_sets]
 
     results = [f.result() for f in futures]

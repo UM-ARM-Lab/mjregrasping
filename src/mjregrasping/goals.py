@@ -2,9 +2,10 @@ import logging
 
 import mujoco
 import numpy as np
+import rerun as rr
 
 from mjregrasping.mujoco_visualizer import plot_sphere_rviz
-from mjregrasping.body_with_children import BodyWithChildren
+from mjregrasping.params import params
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
@@ -115,7 +116,6 @@ class GripperPointGoal(MPPIGoal):
             raise ValueError(f"unknown gripper_idx {self.gripper_idx}")
         return gripper_point
 
-
     def tool_positions(self, results):
         return results
 
@@ -138,10 +138,11 @@ class ObjectPointGoal(MPPIGoal):
         pred_contact_cost = contact_cost[:, 1:]
         point_dist = self.min_dist_to_specified_point(pred_rope_points)
         gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
+        pred_gripper_points = gripper_points[:, 1:]
 
         initial_point_dist = self.min_dist_to_specified_point(rope_points[:, 0])
         final_point_dist = point_dist[:, -1]
-        near_threshold = 0.02
+        near_threshold = params['costs']['near_threshold']
         points_can_progress = (final_point_dist + near_threshold) < initial_point_dist
         points_near_goal = initial_point_dist < (2 * near_threshold)
         points_useful = np.logical_or(points_can_progress, points_near_goal)
@@ -156,41 +157,43 @@ class ObjectPointGoal(MPPIGoal):
         gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir)  # [b, horizon, 2]
         # Cost the discouraged moveing the gripper away from the goal
         grasping_gripper_direction_cost = np.einsum('abc,abc->ab', gripper_direction_cost, pred_is_grasping)
+        grasping_gripper_direction_cost *= params['costs']['gripper_dir']
 
         is_grasping0 = is_grasping[:, 0]  # grasp state cannot change within a rollout
-        cannot_progress = np.logical_or(np.all(is_grasping0, axis=-1), np.all(~is_grasping0, axis=-1))
-        cannot_progress_penalty = cannot_progress * 1000
+        cannot_progress = np.logical_or(np.all(is_grasping0, axis=-1), np.all(np.logical_not(is_grasping0), axis=-1))
+        cannot_progress_penalty = cannot_progress * params['costs']['cannot_progress']
 
         logger.debug(f"{any_points_useful=}")
         if any_points_useful:
             cost = point_dist
-            # if self.spaces.debug.config.obj_point_goal:
-            #     most_useful_point = np.argmax(initial_point_dist - final_point_dist)
-            #     useful_points_traj = rope_points[most_useful_point]
-            #     anim = RvizAnimationController(n_time_steps=useful_points_traj.shape[0], ns='time')
-            #     while not anim.done:
-            #         t = anim.t()
-            #         r = useful_points_traj[t]
-            #         plot_rope_rviz(self.viz_pubs.state_viz_pub, r, idx=0, label='useful')
-            #         anim.step()
         else:
             cost = grasping_gripper_direction_cost
-            # if self.spaces.debug.config.obj_point_goal:
-            #     print("no points useful!")
-            #     b_viz = np.topk(grasping_gripper_direction_cost.mean(axis=1), 1, largest=False).indices
-            #     masked_gripper_direction = gripper_dir * is_grasping[:, None, :, None]
-            #     grasping_gripper_direction = masked_gripper_direction.sum(axis=2).mean(axis=1)
-            #     masked_grasping_gripper_positions = gripper_points * is_grasping[:, None, :, None]
-            #     grasping_gripper_positions = masked_grasping_gripper_positions.sum(axis=2).mean(axis=1)
-            #     plot_arrows_rviz(self.viz_pubs.state_viz_pub, numpify(specified_points[b_viz]),
-            #                      numpify(specified_point_to_goal_dir[b_viz]), label='goal dir')
-            #     plot_arrows_rviz(self.viz_pubs.state_viz_pub, numpify(grasping_gripper_positions[b_viz]),
-            #                      5 * numpify(grasping_gripper_direction[b_viz]), label='gripper dir', color='white',
-            #                      frame_id='val/base_body')
 
-        cost += pred_contact_cost + np.expand_dims(cannot_progress_penalty, -1)
+        pred_contact_cost = pred_contact_cost + np.expand_dims(cannot_progress_penalty, -1)
+        cost += pred_contact_cost
         if not any_points_useful:
-            cost += 10
+            no_points_useful_cost = params['costs']['no_points_useful']
+            cost += no_points_useful_cost
+
+        # add cost for grippers that are not grasping
+        # that encourages them to remain close to the rope
+        # [b, horizon, n_rope_points, n_grippers]
+        rope_gripper_dists = np.linalg.norm(
+            np.expand_dims(pred_gripper_points, -3) - np.expand_dims(pred_rope_points, -2),
+            axis=-1)
+        pred_is_not_grasping = 1 - pred_is_grasping
+        min_nongrasping_dists = np.sum(np.min(rope_gripper_dists, -2) * pred_is_not_grasping, -1)  # [b, horizon]
+        min_nongrasping_dists = np.sqrt(np.maximum(min_nongrasping_dists - params['costs']['nongrasping_close'], 0))
+
+        min_nongrasping_cost = min_nongrasping_dists * params['costs']['min_nongrasping_rope_gripper_dists']
+        cost += min_nongrasping_cost
+
+        rr.log_scalar('costs/any_points_useful', any_points_useful)
+        rr.log_scalar('costs/points', point_dist.mean())
+        rr.log_scalar('costs/gripper_dir', grasping_gripper_direction_cost.mean())
+        rr.log_scalar('costs/pred_contact', pred_contact_cost.mean())
+        rr.log_scalar('costs/min_nongrasping', min_nongrasping_cost.mean())
+
         return cost  # [b, horizon]
 
     def satisfied(self, data):
@@ -240,8 +243,8 @@ class ObjectPointGoal(MPPIGoal):
         max_expected_contacts = 6.0
         contact_cost /= max_expected_contacts
         # clamp to be between 0 and 1, and more sensitive to just a few contacts
-        # FIXME: hyperparameter should come from a config dict or something
-        contact_cost = min(np.power(contact_cost, 0.5), 1.0)
+        contact_cost = min(np.power(contact_cost, params['costs']['contact_exponent']),
+                           params['costs']['max_contact_cost'])
 
         return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
 

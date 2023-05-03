@@ -5,7 +5,7 @@ import numpy as np
 from time import perf_counter
 import mujoco
 import argparse
-from mjregrasping.rollout import parallel_rollout
+from mjregrasping.rollout import parallel_rollout, DEFAULT_SUB_TIME_S
 
 N_TIME = 9
 N_SUB_TIME = 50
@@ -27,7 +27,7 @@ def main():
             controls = np.zeros([n_samples, N_TIME, 20])
 
             t0 = perf_counter()
-            parallel_rollout(pool, model, data, controls)
+            parallel_rollout(pool, model, data, controls, sub_time_s=DEFAULT_SUB_TIME_S)
             dt = perf_counter() - t0
 
             print(f"| {n_samples} | {dt:.3f} |")

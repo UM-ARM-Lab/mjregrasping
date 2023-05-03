@@ -8,7 +8,7 @@ import numpy as np
 from arc_utilities.tf2wrapper import TF2Wrapper
 from arm_rviz.rviz_animation_controller import RvizAnimationController
 from mjregrasping.mujoco_visualizer import MujocoVisualizer
-from mjregrasping.rollout import parallel_rollout
+from mjregrasping.rollout import parallel_rollout, DEFAULT_SUB_TIME_S
 import argparse
 
 import rospy
@@ -36,7 +36,7 @@ def main():
     # controls_samples[:, :, 1] = 0.4
 
     with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
-        states = parallel_rollout(pool, model, data, controls_samples)
+        states = parallel_rollout(pool, model, data, controls_samples, sub_time_s=DEFAULT_SUB_TIME_S)
 
     rospy.init_node("viz_rollouts")
 

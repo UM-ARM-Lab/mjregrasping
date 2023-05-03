@@ -17,3 +17,6 @@ class Buffer:
 
     def most_recent(self):
         return self.data[-1]
+
+    def reset(self):
+        self.data = []

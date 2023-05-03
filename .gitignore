@@ -4,4 +4,5 @@ __pycache__
 .vscode
 venv
 MUJOCO_LOG.TXT
+*.*prof
 

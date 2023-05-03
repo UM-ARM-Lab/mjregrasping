@@ -1,4 +1,5 @@
 import logging
+import rerun as rr
 from copy import copy
 
 import numpy as np
@@ -29,7 +30,7 @@ class RegraspMPC:
         self.obstacle = BodyWithChildren(model, 'computer_rack')
         self.goal = ObjectPointGoal(model=self.model,
                                     viz_pubs=viz_pubs,
-                                    goal_point=np.array([0.85, 0.04, 1.27]),
+                                    goal_point=np.array([0.80, 0.04, 1.27]),
                                     body_idx=-1,
                                     goal_radius=0.05,
                                     val=self.val,
@@ -42,32 +43,42 @@ class RegraspMPC:
         self.mppi = MujocoMPPI(pool, self.model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon,
                                lambda_=lambda_)
         self.buffer = Buffer(5)
+        self.regrasp_idx = 0
 
     def run(self, data):
         for i in range(params['iters']):
+            if rospy.is_shutdown():
+                break
+
             self.move_to_goal(data)
             self.regrasp(data)
 
-    def move_to_goal(self, data):
+    def move_to_goal(self, data, sub_time_s=params['move_sub_time_s']):
         """
         Runs MPPI with our novel cost function until the goal is reached or the robot is struck
         """
         warmstart_count = 0
+        self.mppi.reset()
+        self.buffer.reset()
+        self.mjviz.viz(self.model, data)
         while True:
+            if rospy.is_shutdown():
+                break
+
             self.goal.viz()
             if self.goal.satisfied(data):
                 logger.info(Fore.GREEN + "Goal reached!" + Fore.RESET)
                 return
 
             while warmstart_count < params['warmstart']:
-                command = self.mppi.command(data, self.goal.get_results, self.goal.cost)
-                self.mppi_viz(self.goal, data, command)
+                command = self.mppi.command(data, self.goal.get_results, self.goal.cost, sub_time_s)
+                self.mppi_viz(self.goal, data, command, sub_time_s)
                 warmstart_count += 1
-            command = self.mppi.command(data, self.goal.get_results, self.goal.cost)
-            self.mppi_viz(self.goal, data, command)
+            command = self.mppi.command(data, self.goal.get_results, self.goal.cost, sub_time_s)
+            self.mppi_viz(self.goal, data, command, sub_time_s)
 
+            control_step(self.model, data, command, sub_time_s)
             self.mjviz.viz(self.model, data)
-            control_step(self.model, data, command)
 
             self.mppi.roll()
 
@@ -82,18 +93,26 @@ class RegraspMPC:
         has_not_moved = dq.mean() < params['needs_regrasp']['min_dq']
         zero_command = np.linalg.norm(command) < params['needs_regrasp']['min_command']
         needs_regrasp = self.buffer.full() and (has_not_moved or zero_command)
+        rr.log_scalar('needs_regrasp/dq', dq.mean())
+        rr.log_scalar('needs_regrasp/command_norm', np.linalg.norm(command))
         return needs_regrasp
 
-    def regrasp(self, data):
+    def regrasp(self, data, sub_time_s=params['grasp_sub_time_s']):
         # new_grasp = self.compute_new_grasp(data)
         current_grasp = get_grasp_indices(self.model)
-        new_grasp = np.array([56, -1])
+        # FIXME: this is a hack
+        if self.regrasp_idx % 2 == 0:
+            new_grasp = np.array([57, -1])
+        else:
+            new_grasp = np.array([-1, 60])
+        self.regrasp_idx += 1
+
         if np.all(new_grasp == current_grasp):
             logger.info(Fore.GREEN + "No need to regrasp!" + Fore.RESET)
             return
         elif np.all(new_grasp != current_grasp) and np.all(new_grasp != -1):
             raise NotImplementedError("Cannot regrasp with both grippers at once")
-        elif new_grasp[0] != current_grasp[0]:
+        elif new_grasp[0] != -1:
             gripper_idx = 0
         else:
             gripper_idx = 1
@@ -103,12 +122,18 @@ class RegraspMPC:
         logger.info(f"grasping {rope_body_to_grasp.name}")
 
         warmstart_count = 0
+        self.mppi.reset()
+        self.buffer.reset()
+        self.mjviz.viz(self.model, data)
         while True:
+            if rospy.is_shutdown():
+                break
+
             # recreate the goal at each time step so the goal point is updated
             regrasp_goal = GripperPointGoal(model=self.model,
                                             goal_point=data.xpos[rope_body_to_grasp.id],
-                                            goal_radius=0.01,
-                                            gripper_idx=0,
+                                            goal_radius=0.015,
+                                            gripper_idx=gripper_idx,
                                             viz_pubs=self.viz_pubs)
 
             regrasp_goal.viz()
@@ -117,14 +142,14 @@ class RegraspMPC:
                 break
 
             while warmstart_count < params['warmstart']:
-                command = self.mppi.command(data, regrasp_goal.get_results, regrasp_goal.cost)
-                self.mppi_viz(regrasp_goal, data, command)
+                command = self.mppi.command(data, regrasp_goal.get_results, regrasp_goal.cost, sub_time_s)
+                self.mppi_viz(regrasp_goal, data, command, sub_time_s)
                 warmstart_count += 1
-            command = self.mppi.command(data, regrasp_goal.get_results, regrasp_goal.cost)
-            self.mppi_viz(regrasp_goal, data, command)
+            command = self.mppi.command(data, regrasp_goal.get_results, regrasp_goal.cost, sub_time_s)
+            self.mppi_viz(regrasp_goal, data, command, sub_time_s)
 
+            control_step(self.model, data, command, sub_time_s=params['grasp_sub_time_s'])
             self.mjviz.viz(self.model, data)
-            control_step(self.model, data, command)
 
             self.mppi.roll()
 
@@ -140,7 +165,7 @@ class RegraspMPC:
     def compute_new_grasp(self, data):
         pass
 
-    def mppi_viz(self, goal, data, command):
+    def mppi_viz(self, goal, data, command, sub_time_s):
         sorted_traj_indices = np.argsort(self.mppi.cost)
 
         # viz
@@ -156,7 +181,7 @@ class RegraspMPC:
             plot_lines_rviz(self.viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.002, color=c)
             rospy.sleep(0.01)
 
-        cmd_rollout_results = rollout(self.model, copy(data), command[None], get_result_func=goal.get_results)
+        cmd_rollout_results = rollout(self.model, copy(data), command[None], sub_time_s, get_result_func=goal.get_results)
         left_tool_pos, right_tool_pos = goal.tool_positions(cmd_rollout_results)
         plot_lines_rviz(self.viz_pubs.ee_path, left_tool_pos, label='left_ee', idx=i, scale=0.004, color='b')
         plot_lines_rviz(self.viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.004, color='b')

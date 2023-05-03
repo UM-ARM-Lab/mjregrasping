@@ -4,7 +4,7 @@ from mjregrasping.get_result_functions import get_q_current
 from mjregrasping.rollout import control_step
 
 
-def pid_to_joint_config(mjviz, model, data, q_target):
+def pid_to_joint_config(mjviz, model, data, q_target, sub_time_s):
     kP = 5.0
     q_prev = get_q_current(model, data)
     for i in range(200):
@@ -12,7 +12,7 @@ def pid_to_joint_config(mjviz, model, data, q_target):
         q_current = get_q_current(model, data)
         command = kP * (q_target - q_current)
 
-        control_step(model, data, command)
+        control_step(model, data, command, sub_time_s=sub_time_s)
 
         # get the new current q
         q_current = get_q_current(model, data)

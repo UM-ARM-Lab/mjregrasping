@@ -13,7 +13,7 @@ from mjregrasping.get_result_functions import get_left_tool_pos_and_contact_cost
 from mjregrasping.initialize import initialize
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.mujoco_visualizer import plot_sphere_rviz, plot_lines_rviz
-from mjregrasping.rollout import control_step, rollout
+from mjregrasping.rollout import control_step, rollout, DEFAULT_SUB_TIME_S
 
 
 def main():
@@ -44,7 +44,7 @@ def main():
                           lambda_=0.005)
 
         for warmstart_i in range(5):
-            command = mppi.command(data, get_left_tool_pos_and_contact_cost, _cost_func)
+            command = mppi.command(data, get_left_tool_pos_and_contact_cost, _cost_func, sub_time_s=DEFAULT_SUB_TIME_S)
             viz(mppi, data, model, command, viz_pubs)
             plot_sphere_rviz(viz_pubs.goal, left_gripper_goal_point, 0.01, label='goal')
 
@@ -54,7 +54,8 @@ def main():
 
             # warmstart
             t0 = perf_counter()
-            command = mppi.roll_and_command(data, get_left_tool_pos_and_contact_cost, _cost_func)
+            command = mppi.roll_and_command(data, get_left_tool_pos_and_contact_cost, _cost_func,
+                                            sub_time_s=DEFAULT_SUB_TIME_S)
             dt = perf_counter() - t0
             dts.append(dt)
             print(f"mppi.command: {dt:.3f}s")
@@ -62,7 +63,7 @@ def main():
             viz(mppi, data, model, command, viz_pubs)
 
             # actually step
-            control_step(model, data, command)
+            control_step(model, data, command, sub_time_s=DEFAULT_SUB_TIME_S)
 
     print(f"mean dt: {np.mean(dts):.3f}s")
 
@@ -87,7 +88,7 @@ def viz(mppi, data, model, command, viz_pubs):
         left_gripper_positions = mppi.rollout_results[0][sorted_traj_idx]
         c = cm.RdYlGn(1 - cost_normalized)
         plot_lines_rviz(viz_pubs.ee_path, left_gripper_positions, label='ee', idx=i, scale=0.001, color=c)
-    left_gripper_positions, _ = rollout(model, copy(data), command[None],
+    left_gripper_positions, _ = rollout(model, copy(data), command[None], sub_time_s=DEFAULT_SUB_TIME_S,
                                         get_result_func=get_left_tool_pos_and_contact_cost)
     plot_lines_rviz(viz_pubs.ee_path, left_gripper_positions, label='command', scale=0.004, color='blue')
 

@@ -21,7 +21,7 @@
                 <geom type="box" name="rack2_post4" pos="0.24 0.39 0.25" size="0.05 0.05 0.25" material="metal"/>
                 <geom type="box" name="box1" pos="-0.14 0.20 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1"/>
             </body>
-            <body name="computer" pos="-0.05 0 1">
+            <body name="computer" pos="-0.10 0 1">
                 <geom type="box" name="case" pos="0 0 0.2" size="0.15 0.1 0.2" rgba="0.2 0.2 0.4 1"/>
                 <geom type="box" name="port" pos="-0.15 0.04 0.28" size="0.01 0.01 0.01" rgba="0.2 0.6 0.4 1"/>
             </body>
