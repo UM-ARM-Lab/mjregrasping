@@ -1,24 +1,30 @@
 <mujoco model="computer_rack">
     <worldbody>
         <body name="base" pos="0 0 0">
-            <body name="arm" pos="0.5 0 0">
-                <joint name="joint1" type="hinge" pos="-0.5 0 0" axis="0 1 0" limited="true" range="-180 180" damping="10" frictionloss="0.1"/>
+            <body name="link1" pos="0.25 0 0">
+                <joint name="joint1" type="hinge" pos="-0.25 0 0" axis="0 1 0" limited="true" range="-180 180" damping="10" frictionloss="0.1"/>
                 <site name="sensor_site" pos="0 0 0"/>
-                <geom type="box" name="arm" pos="0 0 0" size="0.5 0.02 0.02" rgba="1 0.1 0.1 1"/>
+                <geom type="box" name="link1" pos="0 0 0" size="0.25 0.02 0.02" rgba="1 0.1 0.1 1"/>
+                <body name="link2" pos="0.5 0 0">
+                    <joint name="joint2" type="hinge" pos="-0.25 0 0" axis="0 1 0" limited="true" range="-180 180" damping="10" frictionloss="0.1"/>
+                    <site name="link2_sensor_site" pos="0 0 0"/>
+                    <geom type="box" name="link2" pos="0 0 0" size="0.25 0.02 0.02" rgba="0.1 1 0.1 1"/>
+                </body>
             </body>
         </body>
-        <body name="force_tester" pos="0.9 0 0.1">
+        <body name="force_tester2" pos="0.5 0 0.15">
             <inertial pos="0 0 0" mass="0.01" diaginertia="0.0001 0.0001 0.0001"/>
-            <joint type="slide" name="slider" axis="0 0 1" stiffness="50" springref="-0.1" damping="1"/>
-            <geom type="box" name="force_tester" size="0.08 0.08 0.08" rgba="0.1 1 0.1 1"/>
+            <geom type="box" name="force_tester2" size="0.08 0.08 0.08" rgba="0.1 1 0.1 1"/>
         </body>
     </worldbody>
     <actuator>
-        <intvelocity name="vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2"
+        <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2"
+                     kp="100000" forcelimited="true" forcerange="-80 80"/>
+        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2"
                      kp="100000" forcelimited="true" forcerange="-20 20"/>
     </actuator>
     <sensor>
-        <torque name="torque" site="sensor_site"/>
-        <force name="force" site="sensor_site"/>
+        <torque name="link1_torque" site="sensor_site"/>
+        <torque name="link2_torque" site="link2_sensor_site"/>
     </sensor>
 </mujoco>

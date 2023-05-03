@@ -2,13 +2,13 @@ import logging
 from copy import copy
 
 import numpy as np
-import rerun as rr
 from colorama import Fore
 from matplotlib import cm
 
 import rospy
+from mjregrasping.body_with_children import BodyWithChildren
 from mjregrasping.buffer import Buffer
-from mjregrasping.goals import ObjectPointGoal, GripperPointGoal, BodyWithChildren
+from mjregrasping.goals import ObjectPointGoal, GripperPointGoal
 from mjregrasping.grasping import get_grasp_indices, get_grasp_constraints
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.mujoco_visualizer import plot_lines_rviz, MujocoVisualizer
@@ -18,26 +18,30 @@ from mjregrasping.rollout import control_step, rollout
 logger = logging.getLogger(f'rosout.{__name__}')
 
 
-
 class RegraspMPC:
 
     def __init__(self, model, mjviz: MujocoVisualizer, viz_pubs, pool):
         self.model = model
         self.viz_pubs = viz_pubs
         self.mjviz = mjviz
+        self.val = BodyWithChildren(model, 'val_base')
         self.rope = BodyWithChildren(model, 'rope')
+        self.obstacle = BodyWithChildren(model, 'computer_rack')
         self.goal = ObjectPointGoal(model=self.model,
                                     viz_pubs=viz_pubs,
                                     goal_point=np.array([0.85, 0.04, 1.27]),
                                     body_idx=-1,
-                                    goal_radius=0.05)
+                                    goal_radius=0.05,
+                                    val=self.val,
+                                    rope=self.rope,
+                                    obstacle=self.obstacle)
 
         n_samples = params['move_to_goal']['n_samples']
         horizon = params['move_to_goal']['horizon']
         lambda_ = params['move_to_goal']['lambda']
         self.mppi = MujocoMPPI(pool, self.model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon,
                                lambda_=lambda_)
-        self.buffer = Buffer(3)
+        self.buffer = Buffer(5)
 
     def run(self, data):
         for i in range(params['iters']):
@@ -67,20 +71,18 @@ class RegraspMPC:
 
             self.mppi.roll()
 
-            needs_regrasp = self.check_needs_regrasp(data)
+            needs_regrasp = self.check_needs_regrasp(data, command)
             if needs_regrasp:
+                logger.warning("Needs regrasp!")
                 break
 
-    def check_needs_regrasp(self, data):
-        external_force = data.qfrc_actuator - data.qfrc_bias - data.qfrc_passive
-        max_force = np.max(external_force)
-        total_force = np.sum(np.abs(external_force))
-        self.buffer.insert(total_force)
-        mean_total_force = np.mean(self.buffer.data)
-        rr.log_scalar("external_force/max", max_force)
-        rr.log_scalar("external_force/total", total_force)
-        rr.log_scalar("external_force/mean_total", mean_total_force)
-        return mean_total_force > 120
+    def check_needs_regrasp(self, data, command):
+        self.buffer.insert(data.qpos[self.val.qpos_indices])
+        dq = np.abs(self.buffer.get(0) - self.buffer.get(-1))
+        has_not_moved = dq.mean() < params['needs_regrasp']['min_dq']
+        zero_command = np.linalg.norm(command) < params['needs_regrasp']['min_command']
+        needs_regrasp = self.buffer.full() and (has_not_moved or zero_command)
+        return needs_regrasp
 
     def regrasp(self, data):
         # new_grasp = self.compute_new_grasp(data)

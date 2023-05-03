@@ -42,23 +42,24 @@ class MujocoVisualizer:
 
     def viz(self, model, data, alpha=1, idx=0):
         rr.set_time_seconds('sim_time', data.time)
-        markers_by_entity = {}
 
         # 2D viz in rerun
         for sensor_idx in range(model.nsensor):
             sensor = model.sensor(sensor_idx)
             if sensor.type in [mjtSensor.mjSENS_TORQUE, mjtSensor.mjSENS_FORCE]:
                 rr.log_scalar(f'sensor/{sensor.name}', float(data.sensordata[sensor.adr]))
+        for joint_idx in range(model.njnt):
+            joint = model.joint(joint_idx)
+            if joint.type == mujoco.mjtJoint.mjJNT_HINGE:
+                rr.log_scalar(f'qpos/{joint.name}', float(data.qpos[joint.qposadr]))
 
         rr.log_scalar(f'contact/num_contacts', len(data.contact))
 
         # 3D viz in rviz
+        geom_markers_msg = MarkerArray()
         for geom_id in range(model.ngeom):
             geom_bodyid = model.geom_bodyid[geom_id]
             entity_name, parent_names = self.names(geom_bodyid, model)
-            if entity_name not in markers_by_entity:
-                markers_by_entity[entity_name] = MarkerArray()
-            geoms_marker_msg = markers_by_entity[entity_name]
 
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
@@ -138,8 +139,8 @@ class MujocoVisualizer:
                 geom_marker_msg_ball2.pose.position.y += ball2_pos_world[1]
                 geom_marker_msg_ball2.pose.position.z += ball2_pos_world[2]
 
-                geoms_marker_msg.markers.append(geom_marker_msg_ball1)
-                geoms_marker_msg.markers.append(geom_marker_msg_ball2)
+                geom_markers_msg.markers.append(geom_marker_msg_ball1)
+                geom_markers_msg.markers.append(geom_marker_msg_ball2)
             elif geom_type == mjtGeom.mjGEOM_SPHERE:
                 geom_marker_msg.type = Marker.SPHERE
                 geom_marker_msg.scale.x = geom_size[0] * 2
@@ -175,10 +176,9 @@ class MujocoVisualizer:
                 rospy.loginfo_once(f"Unsupported geom type {geom_type}")
                 continue
 
-            geoms_marker_msg.markers.append(geom_marker_msg)
+            geom_markers_msg.markers.append(geom_marker_msg)
 
-        for entity_name, geoms_marker_msg in markers_by_entity.items():
-            self.pub.publish(geoms_marker_msg)
+        self.pub.publish(geom_markers_msg)
 
         # visualize the weld constraints (regardless of whether they are active)
         eq_lines_msg = MarkerArray()
@@ -284,7 +284,7 @@ class MujocoVisualizer:
                         )
 
         contact_markers = MarkerArray()
-        for contact in data.contact:
+        for contact_idx, contact in enumerate(data.contact):
             geom1_name = mj_id2name(model, mju_str2Type("geom"), contact.geom1)
             geom2_name = mj_id2name(model, mju_str2Type("geom"), contact.geom2)
 
@@ -296,6 +296,7 @@ class MujocoVisualizer:
             contact_marker.scale.y = 0.01
             contact_marker.scale.z = 0.01
             contact_marker.ns = f"{geom1_name}_{geom2_name}"
+            contact_marker.id = contact_idx
             contact_marker.color = ColorRGBA(*to_rgba("r"))
             contact_marker.pose.orientation.w = 1
             contact_marker.pose.position.x = float(contact.pos[0])

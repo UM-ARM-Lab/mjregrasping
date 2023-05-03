@@ -1,5 +1,4 @@
 import numpy as np
-import torch
 from mujoco import mju_negQuat, mju_mulQuat, mju_quat2Mat, mju_mat2Quat
 from transformations import quaternion_from_euler as _wxyz_quaternion_from_euler
 from transformations import quaternion_from_matrix as _wxyz_quaternion_from_matrix
@@ -39,9 +38,6 @@ def np_wxyz_to_xyzw(quat):
     z = quat[..., 3]
     return np.stack([x, y, z, w], axis=-1)
 
-
-def torch_quat_diff(q1: torch.Tensor, q2: torch.Tensor):
-    return 1 - (q1 * q2).sum(dim=1).square()
 
 
 def matrix_dist(m1, m2):

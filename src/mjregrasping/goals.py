@@ -4,37 +4,9 @@ import mujoco
 import numpy as np
 
 from mjregrasping.mujoco_visualizer import plot_sphere_rviz
+from mjregrasping.body_with_children import BodyWithChildren
 
 logger = logging.getLogger(f'rosout.{__name__}')
-
-
-class Children:
-    def __init__(self, model, parent_body_idx):
-        self.body_names = []
-        self.geom_names = []
-        self.body_indices = []
-        self.geom_indices = []
-        for body_idx in range(model.nbody):
-            body = model.body(body_idx)
-            parent_idx = body.parentid
-            while parent_idx != 0:
-                if parent_idx == parent_body_idx:
-                    self.body_indices.append(body_idx)
-                    self.body_names.append(body.name)
-                    for geom_idx in range(int(body.geomadr), int(body.geomadr + body.geomnum)):
-                        self.geom_indices.append(geom_idx)
-                        self.geom_names.append(model.geom(geom_idx).name)
-                    break
-                parent_idx = model.body(parent_idx).parentid
-
-
-class BodyWithChildren(Children):
-
-    def __init__(self, model, parent_body_name):
-        self.parent_body_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, parent_body_name)
-        if self.parent_body_idx == -1:
-            raise ValueError(f"body {parent_body_name} not found")
-        Children.__init__(self, model, self.parent_body_idx)
 
 
 class MPPIGoal:
@@ -150,15 +122,14 @@ class GripperPointGoal(MPPIGoal):
 
 class ObjectPointGoal(MPPIGoal):
 
-    def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, viz_pubs):
+    def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, viz_pubs, rope, val, obstacle):
         super().__init__(model, viz_pubs)
         self.goal_point = goal_point
         self.body_idx = body_idx
         self.goal_radius = goal_radius
-
-        self.rope = BodyWithChildren(model, 'rope')
-        self.obstacle = BodyWithChildren(model, 'computer_rack')
-        self.val = BodyWithChildren(model, 'val_base')
+        self.rope = rope
+        self.val = val
+        self.obstacle = obstacle
 
     def cost(self, results):
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
