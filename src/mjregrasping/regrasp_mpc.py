@@ -1,8 +1,8 @@
 import logging
-import rerun as rr
 from copy import copy
 
 import numpy as np
+import rerun as rr
 from colorama import Fore
 from matplotlib import cm
 
@@ -13,7 +13,7 @@ from mjregrasping.goals import ObjectPointGoal, GripperPointGoal
 from mjregrasping.grasping import get_grasp_indices, get_grasp_constraints
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.mujoco_visualizer import plot_lines_rviz, MujocoVisualizer
-from mjregrasping.params import params
+from mjregrasping.params import Params
 from mjregrasping.rollout import control_step, rollout
 
 logger = logging.getLogger(f'rosout.{__name__}')
@@ -21,7 +21,8 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 class RegraspMPC:
 
-    def __init__(self, model, mjviz: MujocoVisualizer, viz_pubs, pool):
+    def __init__(self, model, mjviz: MujocoVisualizer, viz_pubs, pool, p: Params):
+        self.p = p
         self.model = model
         self.viz_pubs = viz_pubs
         self.mjviz = mjviz
@@ -35,28 +36,31 @@ class RegraspMPC:
                                     goal_radius=0.05,
                                     val=self.val,
                                     rope=self.rope,
-                                    obstacle=self.obstacle)
+                                    obstacle=self.obstacle,
+                                    p=p)
 
-        n_samples = params['move_to_goal']['n_samples']
-        horizon = params['move_to_goal']['horizon']
-        lambda_ = params['move_to_goal']['lambda']
+        n_samples = self.p.n_samples
+        horizon = self.p.horizon
+        lambda_ = self.p.lambda_
         self.mppi = MujocoMPPI(pool, self.model, num_samples=n_samples, noise_sigma=np.deg2rad(10), horizon=horizon,
                                lambda_=lambda_)
         self.buffer = Buffer(5)
+        self.max_dq = 0
         self.regrasp_idx = 0
 
     def run(self, data):
-        for i in range(params['iters']):
+        for i in range(self.p.iters):
             if rospy.is_shutdown():
                 break
 
             self.move_to_goal(data)
             self.regrasp(data)
 
-    def move_to_goal(self, data, sub_time_s=params['move_sub_time_s']):
+    def move_to_goal(self, data):
         """
         Runs MPPI with our novel cost function until the goal is reached or the robot is struck
         """
+        sub_time_s = self.p.move_sub_time_s
         warmstart_count = 0
         self.mppi.reset()
         self.buffer.reset()
@@ -70,7 +74,7 @@ class RegraspMPC:
                 logger.info(Fore.GREEN + "Goal reached!" + Fore.RESET)
                 return
 
-            while warmstart_count < params['warmstart']:
+            while warmstart_count < self.p.warmstart:
                 command = self.mppi.command(data, self.goal.get_results, self.goal.cost, sub_time_s)
                 self.mppi_viz(self.goal, data, command, sub_time_s)
                 warmstart_count += 1
@@ -89,15 +93,22 @@ class RegraspMPC:
 
     def check_needs_regrasp(self, data, command):
         self.buffer.insert(data.qpos[self.val.qpos_indices])
-        dq = np.abs(self.buffer.get(0) - self.buffer.get(-1))
-        has_not_moved = dq.mean() < params['needs_regrasp']['min_dq']
-        zero_command = np.linalg.norm(command) < params['needs_regrasp']['min_command']
+        qposs = np.array(self.buffer.data)
+        if len(qposs) < 2:
+            dq = 0
+        else:
+            dq = np.abs(qposs[1:] - qposs[:-1]).mean()
+        self.max_dq = max(self.max_dq, dq)
+        has_not_moved = dq < self.p.frac_max_dq * self.max_dq
+        zero_command = np.linalg.norm(command) < self.p.min_command
         needs_regrasp = self.buffer.full() and (has_not_moved or zero_command)
-        rr.log_scalar('needs_regrasp/dq', dq.mean())
+        rr.log_scalar('needs_regrasp/dq', dq)
+        rr.log_scalar('needs_regrasp/max_dq', self.max_dq)
         rr.log_scalar('needs_regrasp/command_norm', np.linalg.norm(command))
         return needs_regrasp
 
-    def regrasp(self, data, sub_time_s=params['grasp_sub_time_s']):
+    def regrasp(self, data):
+        sub_time_s = self.p.grasp_sub_time_s
         # new_grasp = self.compute_new_grasp(data)
         current_grasp = get_grasp_indices(self.model)
         # FIXME: this is a hack
@@ -141,14 +152,15 @@ class RegraspMPC:
                 logger.info(Fore.GREEN + "Regrasp successful!" + Fore.RESET)
                 break
 
-            while warmstart_count < params['warmstart']:
+            while warmstart_count < self.p.warmstart:
                 command = self.mppi.command(data, regrasp_goal.get_results, regrasp_goal.cost, sub_time_s)
                 self.mppi_viz(regrasp_goal, data, command, sub_time_s)
                 warmstart_count += 1
             command = self.mppi.command(data, regrasp_goal.get_results, regrasp_goal.cost, sub_time_s)
             self.mppi_viz(regrasp_goal, data, command, sub_time_s)
 
-            control_step(self.model, data, command, sub_time_s=params['grasp_sub_time_s'])
+            # NOTE: what if sub_time_s was proportional to the distance to goal? or the cost?
+            control_step(self.model, data, command, sub_time_s=self.p.grasp_sub_time_s)
             self.mjviz.viz(self.model, data)
 
             self.mppi.roll()
@@ -181,7 +193,8 @@ class RegraspMPC:
             plot_lines_rviz(self.viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.002, color=c)
             rospy.sleep(0.01)
 
-        cmd_rollout_results = rollout(self.model, copy(data), command[None], sub_time_s, get_result_func=goal.get_results)
+        cmd_rollout_results = rollout(self.model, copy(data), command[None], sub_time_s,
+                                      get_result_func=goal.get_results)
         left_tool_pos, right_tool_pos = goal.tool_positions(cmd_rollout_results)
         plot_lines_rviz(self.viz_pubs.ee_path, left_tool_pos, label='left_ee', idx=i, scale=0.004, color='b')
         plot_lines_rviz(self.viz_pubs.ee_path, right_tool_pos, label='right_ee', idx=i, scale=0.004, color='b')

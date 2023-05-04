@@ -5,7 +5,7 @@ import numpy as np
 import rerun as rr
 
 from mjregrasping.mujoco_visualizer import plot_sphere_rviz
-from mjregrasping.params import params
+from mjregrasping.params import Params
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
@@ -37,6 +37,13 @@ class MPPIGoal:
             matrix of costs [b, horizon]
 
         """
+        # TODO: tag costs as either primary or secondary, and soft or hard
+        # so we can use them to detect being "stuck"
+        raise NotImplementedError()
+
+    def costs(self, results):
+        # TODO: tag costs as either primary or secondary, and soft or hard
+        #  override this method not "cost()"
         raise NotImplementedError()
 
     def satisfied(self, data):
@@ -122,7 +129,8 @@ class GripperPointGoal(MPPIGoal):
 
 class ObjectPointGoal(MPPIGoal):
 
-    def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, viz_pubs, rope, val, obstacle):
+    def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, viz_pubs, rope, val, obstacle,
+                 p: Params):
         super().__init__(model, viz_pubs)
         self.goal_point = goal_point
         self.body_idx = body_idx
@@ -130,6 +138,7 @@ class ObjectPointGoal(MPPIGoal):
         self.rope = rope
         self.val = val
         self.obstacle = obstacle
+        self.p = p
 
     def cost(self, results):
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
@@ -142,7 +151,7 @@ class ObjectPointGoal(MPPIGoal):
 
         initial_point_dist = self.min_dist_to_specified_point(rope_points[:, 0])
         final_point_dist = point_dist[:, -1]
-        near_threshold = params['costs']['near_threshold']
+        near_threshold = self.p.near_threshold
         points_can_progress = (final_point_dist + near_threshold) < initial_point_dist
         points_near_goal = initial_point_dist < (2 * near_threshold)
         points_useful = np.logical_or(points_can_progress, points_near_goal)
@@ -157,11 +166,11 @@ class ObjectPointGoal(MPPIGoal):
         gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir)  # [b, horizon, 2]
         # Cost the discouraged moveing the gripper away from the goal
         grasping_gripper_direction_cost = np.einsum('abc,abc->ab', gripper_direction_cost, pred_is_grasping)
-        grasping_gripper_direction_cost *= params['costs']['gripper_dir']
+        grasping_gripper_direction_cost *= self.p.gripper_dir
 
         is_grasping0 = is_grasping[:, 0]  # grasp state cannot change within a rollout
         cannot_progress = np.logical_or(np.all(is_grasping0, axis=-1), np.all(np.logical_not(is_grasping0), axis=-1))
-        cannot_progress_penalty = cannot_progress * params['costs']['cannot_progress']
+        cannot_progress_penalty = cannot_progress * self.p.cannot_progress
 
         logger.debug(f"{any_points_useful=}")
         if any_points_useful:
@@ -172,7 +181,7 @@ class ObjectPointGoal(MPPIGoal):
         pred_contact_cost = pred_contact_cost + np.expand_dims(cannot_progress_penalty, -1)
         cost += pred_contact_cost
         if not any_points_useful:
-            no_points_useful_cost = params['costs']['no_points_useful']
+            no_points_useful_cost = self.p.no_points_useful
             cost += no_points_useful_cost
 
         # add cost for grippers that are not grasping
@@ -183,16 +192,22 @@ class ObjectPointGoal(MPPIGoal):
             axis=-1)
         pred_is_not_grasping = 1 - pred_is_grasping
         min_nongrasping_dists = np.sum(np.min(rope_gripper_dists, -2) * pred_is_not_grasping, -1)  # [b, horizon]
-        min_nongrasping_dists = np.sqrt(np.maximum(min_nongrasping_dists - params['costs']['nongrasping_close'], 0))
+        min_nongrasping_dists = np.sqrt(np.maximum(min_nongrasping_dists - self.p.nongrasping_close, 0))
 
-        min_nongrasping_cost = min_nongrasping_dists * params['costs']['min_nongrasping_rope_gripper_dists']
+        min_nongrasping_cost = min_nongrasping_dists * self.p.min_nongrasping_rope_gripper_dists
         cost += min_nongrasping_cost
+
+        # add cost for actions
+        action_cost = np.sum(np.abs(joint_positions[:, 1:] - joint_positions[:, :-1]), axis=-1)
+        action_cost *= self.p.action
+        cost += action_cost
 
         rr.log_scalar('costs/any_points_useful', any_points_useful)
         rr.log_scalar('costs/points', point_dist.mean())
         rr.log_scalar('costs/gripper_dir', grasping_gripper_direction_cost.mean())
         rr.log_scalar('costs/pred_contact', pred_contact_cost.mean())
         rr.log_scalar('costs/min_nongrasping', min_nongrasping_cost.mean())
+        rr.log_scalar('costs/action', action_cost.mean())
 
         return cost  # [b, horizon]
 
@@ -243,8 +258,8 @@ class ObjectPointGoal(MPPIGoal):
         max_expected_contacts = 6.0
         contact_cost /= max_expected_contacts
         # clamp to be between 0 and 1, and more sensitive to just a few contacts
-        contact_cost = min(np.power(contact_cost, params['costs']['contact_exponent']),
-                           params['costs']['max_contact_cost'])
+        contact_cost = min(np.power(contact_cost, self.p.contact_exponent),
+                           self.p.max_contact_cost)
 
         return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
 

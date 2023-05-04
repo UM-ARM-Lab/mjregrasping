@@ -12,4 +12,5 @@
   <depend>rospy</depend>
   <depend>arc_utilities</depend>
   <depend>rviz_voxelgrid_visuals</depend>
+  <depend>dynamic_reconfigure</depend>
 </package>
