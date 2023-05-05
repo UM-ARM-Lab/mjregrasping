@@ -12,7 +12,7 @@ from matplotlib import cm
 from mjregrasping.get_result_functions import get_left_tool_pos_and_contact_cost
 from mjregrasping.initialize import initialize
 from mjregrasping.mujoco_mppi import MujocoMPPI
-from mjregrasping.mujoco_visualizer import plot_sphere_rviz, plot_lines_rviz
+from mjregrasping.rviz import plot_sphere_rviz, plot_lines_rviz
 from mjregrasping.rollout import control_step, rollout, DEFAULT_SUB_TIME_S
 
 

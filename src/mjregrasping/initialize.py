@@ -1,10 +1,12 @@
 import mujoco
-
 import rerun as rr
+
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.mujoco_visualizer import MujocoVisualizer, RVizPublishers
+from mjregrasping.mujoco_visualizer import MjRViz
 from mjregrasping.params import Params
+from mjregrasping.rerun_visualizer import MjReRun
+from mjregrasping.viz import Viz
 
 
 def initialize(node_name, xml_path):
@@ -18,19 +20,13 @@ def initialize(node_name, xml_path):
 
     # add a custom callback to define the sensor values for "external force"
 
+    # TODO: wrap send_transform in the Viz class so we can do it to non-ros visualizers as well
     tfw = TF2Wrapper()
-    mjviz = MujocoVisualizer(tfw)
+    mjviz = MjRViz(tfw)
 
     mujoco.mj_forward(m, d)
     mjviz.viz(m, d)
-    viz_pubs = RVizPublishers(tfw)
 
     p = Params()
 
-    return m, d, mjviz, viz_pubs, p
-
-
-def activate_eq(m, eq_name):
-    eq_idx = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_EQUALITY, eq_name)
-    m.eq_active[eq_idx] = 1
-    m.eq_data[eq_idx][3:6] = 0
+    return m, d, Viz(rviz=mjviz, mjrr=MjReRun(), tfw=tfw, p=p)

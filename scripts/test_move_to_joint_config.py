@@ -6,7 +6,7 @@ import numpy as np
 
 from mjregrasping.initialize import initialize
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.rollout import control_step
+from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 
 
 def main():
@@ -17,21 +17,20 @@ def main():
 
     args = parser.parse_args()
 
-    model, data, mjviz, viz_pubs = initialize("test_move_to_joint_config", args.xml_path)
+    m, d, viz = initialize("test_move_to_joint_config", args.xml_path)
 
     # get the upper and lower actuator limits
-    low = model.jnt_range[:, 0] * 0.2
-    high = model.jnt_range[:, 1] * 0.2
+    low = m.jnt_range[:, 0] * 0.2
+    high = m.jnt_range[:, 1] * 0.2
 
     rng = np.random.RandomState(0)
 
-    qvel_target = np.zeros(model.nu)
     for i in range(10):
-        q_target = rng.uniform(low, high, size=model.nq)
+        q_target = rng.uniform(low, high, size=m.nq)
         try:
-            pid_to_joint_config(mjviz, model, data, q_target)
+            pid_to_joint_config(viz, m, d, q_target, sub_time_s=DEFAULT_SUB_TIME_S)
         except RuntimeError as e:
-            if len(data.contact) > 0:
+            if len(d.contact) > 0:
                 # we hit the obstacle, continue to the next random configuration
                 continue
             else:

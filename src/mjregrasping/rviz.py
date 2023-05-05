@@ -1,36 +1,21 @@
 from copy import deepcopy
 from typing import Optional
 
-import matplotlib.cm as cm
 import mujoco
 import numpy as np
-import rerun as rr
-import transformations
 from matplotlib.colors import to_rgba
-from mujoco import mju_str2Type, mju_mat2Quat, mjtGeom, mj_id2name, mjtSensor
+from mujoco import mju_str2Type, mju_mat2Quat, mjtGeom, mj_id2name
 
 import ros_numpy
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
-from mjregrasping.my_transforms import matrix_dist, pos_mat_to_matrix
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
-from line_profiler_pycharm import profile
 
-class RVizPublishers:
-
-    def __init__(self, tfw: TF2Wrapper):
-        self.tfw = tfw
-        self.state = rospy.Publisher("state_viz", MarkerArray, queue_size=10)
-        self.action = rospy.Publisher("action_viz", MarkerArray, queue_size=10)
-        self.ee_path = rospy.Publisher("ee_path", MarkerArray, queue_size=10)
-        self.goal = rospy.Publisher("goal_markers", MarkerArray, queue_size=10)
-
-
-class MujocoVisualizer:
+class MjRViz:
     def __init__(self, tfw: Optional[TF2Wrapper] = None):
         self.tfw = tfw
         self.eq_constraints_pub = rospy.Publisher(
@@ -41,23 +26,7 @@ class MujocoVisualizer:
         )
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=1000, latch=False)
 
-
-    @profile
     def viz(self, model, data, alpha=1, idx=0):
-        rr.set_time_seconds('sim_time', data.time)
-
-        # 2D viz in rerun
-        for sensor_idx in range(model.nsensor):
-            sensor = model.sensor(sensor_idx)
-            if sensor.type in [mjtSensor.mjSENS_TORQUE, mjtSensor.mjSENS_FORCE]:
-                rr.log_scalar(f'sensor/{sensor.name}', float(data.sensordata[sensor.adr]))
-        for joint_idx in range(model.njnt):
-            joint = model.joint(joint_idx)
-            if joint.type == mujoco.mjtJoint.mjJNT_HINGE:
-                rr.log_scalar(f'qpos/{joint.name}', float(data.qpos[joint.qposadr]))
-
-        rr.log_scalar(f'contact/num_contacts', len(data.contact))
-
         # 3D viz in rviz
         geom_markers_msg = MarkerArray()
         for geom_id in range(model.ngeom):

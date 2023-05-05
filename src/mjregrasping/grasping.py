@@ -1,3 +1,4 @@
+import mujoco
 import numpy as np
 
 
@@ -15,3 +16,9 @@ def get_is_grasping(model):
 
 def get_grasp_constraints(model):
     return [model.eq('left'), model.eq('right')]
+
+
+def activate_eq(m, eq_name):
+    eq_idx = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_EQUALITY, eq_name)
+    m.eq_active[eq_idx] = 1
+    m.eq_data[eq_idx][3:6] = 0
