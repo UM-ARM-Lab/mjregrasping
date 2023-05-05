@@ -2,9 +2,9 @@ import mujoco
 
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.mujoco_visualizer import MjRViz
 from mjregrasping.params import Params
 from mjregrasping.rerun_visualizer import MjReRun
+from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz
 from visualization_msgs.msg import MarkerArray
 
 
@@ -17,19 +17,28 @@ class Viz:
         self.tfw = tfw
         self.p = p
 
-        self.state = rospy.Publisher("state_viz", MarkerArray, queue_size=10)
-        self.action = rospy.Publisher("action_viz", MarkerArray, queue_size=10)
-        self.ee_path = rospy.Publisher("ee_path", MarkerArray, queue_size=10)
-        self.goal = rospy.Publisher("goal_markers", MarkerArray, queue_size=10)
+        self.markers_pub = rospy.Publisher("markers", MarkerArray, queue_size=10)
 
     def sphere(self, ns: str, position, radius, frame_id, color):
-        pass
+        plot_sphere_rviz(pub=self.markers_pub, position=position, radius=radius, frame_id=frame_id, color=color,
+                         label=f'{ns}')
+        # TODO: also show in rerun
 
     def lines(self, positions, ns: str, idx: int, scale: float, color):
-        pass
+        plot_lines_rviz(
+            pub=self.markers_pub,
+            positions=positions,
+            label=f'{ns}',
+            idx=idx,
+            color=color,
+            frame_id='world',
+            scale=scale,
+        )
+        # TODO: also show in rerun
 
     def tf(self, translation, quat_xyzw, parent='world', child='gripper_point_goal'):
-        pass
+        self.tfw.send_transform(translation, quat_xyzw, parent=parent, child=child)
+        # TODO: also show in rerun
 
     def viz(self, m: mujoco.MjModel, d: mujoco.MjData):
         if self.p.rviz:

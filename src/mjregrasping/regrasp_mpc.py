@@ -13,7 +13,6 @@ from mjregrasping.buffer import Buffer
 from mjregrasping.goals import ObjectPointGoal, GraspBodyGoal
 from mjregrasping.grasping import get_grasp_indices, get_grasp_constraints
 from mjregrasping.mujoco_mppi import MujocoMPPI
-from mjregrasping.mujoco_visualizer import plot_lines_rviz
 from mjregrasping.rollout import control_step, rollout
 from mjregrasping.viz import Viz
 
@@ -31,16 +30,14 @@ class RegraspMPC:
         # TODO: move this outside
         self.obstacle = BodyWithChildren(model, 'computer_rack')
         self.goal = ObjectPointGoal(model=self.model,
-                                    # TODO: take in the whole viz object instead of viz_pubs and p separately
-                                    viz_pubs=viz.pubs,
+                                    visualizer=viz,
                                     # TODO: move this outside
                                     goal_point=np.array([0.78, 0.04, 1.27]),
                                     body_idx=-1,
                                     goal_radius=0.05,
                                     val=self.val,
                                     rope=self.rope,
-                                    obstacle=self.obstacle,
-                                    p=viz.p)
+                                    obstacle=self.obstacle)
 
         n_samples = self.p.n_samples
         horizon = self.p.horizon
@@ -153,11 +150,10 @@ class RegraspMPC:
                                          body_id_to_grasp=rope_body_to_grasp.id,
                                          goal_radius=0.015,
                                          gripper_idx=gripper_idx,
-                                         visualizer=self.viz.pubs,
+                                         visualizer=self.viz,
                                          val=self.val,
                                          rope=self.rope,
-                                         obstacle=self.obstacle,
-                                         p=self.p)
+                                         obstacle=self.obstacle)
 
             regrasp_goal.viz(data)
             if regrasp_goal.satisfied(data):

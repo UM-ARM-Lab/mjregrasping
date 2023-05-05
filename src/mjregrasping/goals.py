@@ -74,8 +74,7 @@ class MPPIGoal:
 class GripperPointGoal(MPPIGoal):
 
     def __init__(self, model, goal_point: np.array, goal_radius: float, gripper_idx: int, visualizer: Viz, rope, val,
-                 obstacle,
-                 p: Params):
+                 obstacle):
         super().__init__(model, visualizer)
         self.goal_point = goal_point
         self.goal_radius = goal_radius
@@ -83,7 +82,7 @@ class GripperPointGoal(MPPIGoal):
         self.rope = rope
         self.val = val
         self.obstacle = obstacle
-        self.p = p
+        self.p = self.visualizer.p
 
     def cost(self, results):
         """
@@ -149,7 +148,7 @@ class GripperPointGoal(MPPIGoal):
 class GraspBodyGoal(MPPIGoal):
 
     def __init__(self, model, body_id_to_grasp: int, goal_radius: float, gripper_idx: int, visualizer: Viz, rope,
-                 val, obstacle, p: Params):
+                 val, obstacle):
         super().__init__(model, visualizer)
         self.body_id_to_grasp = body_id_to_grasp
         self.goal_radius = goal_radius
@@ -157,7 +156,7 @@ class GraspBodyGoal(MPPIGoal):
         self.rope = rope
         self.val = val
         self.obstacle = obstacle
-        self.p = p
+        self.p = self.visualizer.p
 
     def cost(self, results):
         """
@@ -229,16 +228,15 @@ class GraspBodyGoal(MPPIGoal):
 
 class ObjectPointGoal(MPPIGoal):
 
-    def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, viz_pubs, rope, val, obstacle,
-                 p: Params):
-        super().__init__(model, viz_pubs)
+    def __init__(self, model, goal_point: np.array, goal_radius: float, body_idx: int, visualizer: Viz, rope, val, obstacle):
+        super().__init__(model, visualizer)
         self.goal_point = goal_point
         self.body_idx = body_idx
         self.goal_radius = goal_radius
         self.rope = rope
         self.val = val
         self.obstacle = obstacle
-        self.p = p
+        self.p = self.visualizer.p
 
     def cost(self, results):
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results

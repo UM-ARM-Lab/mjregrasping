@@ -3,7 +3,7 @@ import rerun as rr
 
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.mujoco_visualizer import MjRViz
+from mjregrasping.rviz import MjRViz
 from mjregrasping.params import Params
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.viz import Viz
