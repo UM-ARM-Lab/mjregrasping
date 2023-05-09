@@ -45,10 +45,18 @@ class Children:
                     self.geom_names.append(model.geom(geom_idx).name)
 
 
-class BodyWithChildren(Children):
+class Object(Children):
 
     def __init__(self, model, parent_body_name):
         self.parent_body_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, parent_body_name)
         if self.parent_body_idx == -1:
             raise ValueError(f"body {parent_body_name} not found")
         Children.__init__(self, model, self.parent_body_idx)
+
+
+class Objects:
+
+    def __init__(self, model, obstacle_name='computer_rack'):
+        self.val = Object(model, "val_base")
+        self.rope = Object(model, "rope")
+        self.obstacle = Object(model, obstacle_name)

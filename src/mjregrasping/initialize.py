@@ -18,11 +18,9 @@ def initialize(node_name, xml_path):
     m = mujoco.MjModel.from_xml_path(xml_path)
     d = mujoco.MjData(m)
 
-    # add a custom callback to define the sensor values for "external force"
-
-    # TODO: wrap send_transform in the Viz class so we can do it to non-ros visualizers as well
+    # TODO: wrap send_transform in the Viz class, so we can do it to non-ros visualizers as well
     tfw = TF2Wrapper()
-    mjviz = MjRViz(tfw)
+    mjviz = MjRViz(xml_path, tfw)
 
     mujoco.mj_forward(m, d)
     mjviz.viz(m, d)

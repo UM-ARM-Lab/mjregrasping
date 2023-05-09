@@ -1,3 +1,4 @@
+import xml.etree.ElementTree as ET
 from copy import deepcopy
 from typing import Optional
 
@@ -16,8 +17,10 @@ from visualization_msgs.msg import MarkerArray, Marker
 
 
 class MjRViz:
-    def __init__(self, tfw: Optional[TF2Wrapper] = None):
+    def __init__(self, xml_path: str, tfw: Optional[TF2Wrapper] = None):
         self.tfw = tfw
+        self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
+
         self.eq_constraints_pub = rospy.Publisher(
             "eq_constraints", MarkerArray, queue_size=1000, latch=False
         )
@@ -126,9 +129,10 @@ class MjRViz:
                     mesh_name = mesh_name.split("/")[1]
                 geom_marker_msg.type = Marker.MESH_RESOURCE
                 geom_marker_msg.mesh_use_embedded_materials = True
-                geom_marker_msg.mesh_resource = (
-                    f"package://mjregrasping/models/meshes/{mesh_name}.stl"
-                )
+                mesh_file = self.mj_xml_parser.get_mesh(mesh_name)
+                if mesh_file is None:
+                    raise RuntimeError(f"Mesh {mesh_name} not found in XML file")
+                geom_marker_msg.mesh_resource = f"package://mjregrasping/models/meshes/{mesh_file}"
 
                 # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
                 #  has NO POS OR QUAT, but instead that info goes in the <body> tag
@@ -346,3 +350,25 @@ def plot_lines_rviz(
     array_msg = MarkerArray()
     array_msg.markers.append(marker_msg)
     pub.publish(array_msg)
+
+
+class MujocoXmlMeshParser:
+
+    def __init__(self, xml_path: str):
+        self.xml_path = xml_path
+        self.xml_tree = ET.parse(self.xml_path)
+        self.xml_root = self.xml_tree.getroot()
+        for include in self.xml_root.findall('include'):
+            file = include.attrib['file']
+            with open(f'models/{file}', 'r') as include_file:
+                include_root = ET.fromstring(include_file.read())
+                self.xml_root.extend(include_root)
+
+    def get_mesh(self, mesh_name):
+        for asset in self.xml_root.findall("asset"):
+            for mesh in asset.findall("mesh"):
+                name = mesh.attrib['name']
+                file = mesh.attrib['file']
+                if name == mesh_name:
+                    return file
+        return None

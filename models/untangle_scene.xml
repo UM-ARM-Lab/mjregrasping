@@ -8,6 +8,11 @@
     <include file="val_husky.xml"/>
     <include file="computer_rack.xml"/>
     <include file="rope.xml"/>
+    <worldbody>
+        <body name="mycamera">
+            <camera mode="targetbody" name="mycamera" target="B_last" euler="0 0 0" pos="0 0 0.5" />
+        </body>
+    </worldbody>
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" />
         <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181" active="false" />

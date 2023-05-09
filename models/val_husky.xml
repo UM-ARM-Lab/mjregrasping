@@ -5,20 +5,20 @@
     </default>
     <size njmax="500" nconmax="100" nuserdata="60"/>
     <asset>
-        <mesh name="base_link_simplified" file="base_link_simplified.stl"/>
-        <mesh name="wheel_simplified" file="wheel_simplified.stl"/>
+        <mesh name="base_link" file="base_link_simplified.stl"/>
+        <mesh name="wheel" file="wheel_simplified.stl"/>
         <mesh name="top_plate" file="top_plate.stl"/>
-        <mesh name="ark_lidar_simplified" file="ark_lidar_simplified.stl"/>
-        <mesh name="PEDESTAL_ASSEMBLY_simplified" file="PEDESTAL_ASSEMBLY_simplified.stl"/>
-        <mesh name="Drive56_simplified" file="Drive56_simplified.stl"/>
-        <mesh name="MK4_MT_simplified" file="MK4_MT_simplified.stl"/>
-        <mesh name="TORSO_simplified" file="TORSO_simplified.stl"/>
-        <mesh name="MK4_LT_simplified" file="MK4_LT_simplified.stl"/>
-        <mesh name="SHOULDER_BRACKET_simplified" file="SHOULDER_BRACKET_simplified.stl"/>
-        <mesh name="PROXIMAL_TUBE_simplified" file="PROXIMAL_TUBE_simplified.stl"/>
-        <mesh name="FOREARM_BRACKET_simplified" file="FOREARM_BRACKET_simplified.stl"/>
-        <mesh name="A35_DRIVE_simplified" file="A35_DRIVE_simplified.stl"/>
-        <mesh name="A35_BRACKET_simplified" file="A35_BRACKET_simplified.stl"/>
+        <mesh name="ark_lidar" file="ark_lidar_simplified.stl"/>
+        <mesh name="PEDESTAL_ASSEMBLY" file="PEDESTAL_ASSEMBLY_simplified.stl"/>
+        <mesh name="Drive56" file="Drive56_simplified.stl"/>
+        <mesh name="MK4_MT" file="MK4_MT_simplified.stl"/>
+        <mesh name="TORSO" file="TORSO_simplified.stl"/>
+        <mesh name="MK4_LT" file="MK4_LT_simplified.stl"/>
+        <mesh name="SHOULDER_BRACKET" file="SHOULDER_BRACKET_simplified.stl"/>
+        <mesh name="PROXIMAL_TUBE" file="PROXIMAL_TUBE_simplified.stl"/>
+        <mesh name="FOREARM_BRACKET" file="FOREARM_BRACKET_simplified.stl"/>
+        <mesh name="A35_DRIVE" file="A35_DRIVE_simplified.stl"/>
+        <mesh name="A35_BRACKET" file="A35_BRACKET_simplified.stl"/>
         <mesh name="PINCER_HOUSING2" file="PINCER_HOUSING2.stl"/>
         <mesh name="PINCER_FINGER2" file="PINCER_FINGER2.stl"/>
     </asset>
@@ -32,7 +32,7 @@
             <body pos="0.3641 0.00470858 0.315" quat="0 -0.707141 0.707073 0" name="drive56">
                 <inertial pos="1.36e-06  0.00343   0.0203" quat="1 0 0 0" mass="0.392"
                           diaginertia="0.000436  0.000393  0.000284"/>
-                <geom type="mesh" mesh="Drive56_simplified" name="drive56_mesh" rgba="0.2 0.2 0.2 1"/>
+                <geom type="mesh" mesh="Drive56" name="drive56_mesh" rgba="0.2 0.2 0.2 1"/>
             </body>
             <body name="drive57" pos="0.3641 0.00470858 0.397642" quat="3.40567e-05 -3.40567e-05 0.707107 -0.707107">
                 <inertial pos="2.69e-06 0.00285 0.0136" quat="1 0 0 0" mass="0.405"
@@ -41,7 +41,7 @@
                 <joint name="joint56" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-6.2 6.2"
                        damping="1"
                        frictionloss="0.01"/>
-                <geom type="mesh" mesh="MK4_MT_simplified" name="drive57_mesh" rgba="0.2 0.2 0.2 1"/>
+                <geom type="mesh" mesh="MK4_MT" name="drive57_mesh" rgba="0.2 0.2 0.2 1"/>
                 <body name="torso" pos="0 0 -0.04085" quat="0.5 0.5 -0.5 0.5">
                     <inertial pos="0.0292 -1.01e-05 0.251" quat="0.705398 0.0444203 0.118989 0.697339"
                               mass="3.58" diaginertia="0.0553 0.0464 0.0105"/>
@@ -49,18 +49,18 @@
                     <joint name="joint57" type="hinge" pos="0 0 0" axis="-1 0 0" limited="true" range="-1.5708 1.5708"
                            damping="10"
                            frictionloss="0.01"/>
-                    <geom type="mesh" mesh="TORSO_simplified" name="torso" rgba="0.2 0.2 0.2 1"/>
+                    <geom type="mesh" mesh="TORSO" name="torso" rgba="0.2 0.2 0.2 1"/>
                     <body pos="-0.092094 0 0.44399" quat="0.5 -0.5 0.5 -0.5" name="drive1">
                         <inertial pos="2.69e-06 0.00285 0.0136" quat="1 0 0 0" mass="0.405"
                                   diaginertia="0.000512 0.000472 0.000269"/>
                         <site name="joint1_sensor_site"/>
-                        <geom type="mesh" mesh="MK4_MT_simplified" name="drive1_mesh" rgba="0.2 0.2 0.2 1"/>
+                        <geom type="mesh" mesh="MK4_MT" name="drive1_mesh" rgba="0.2 0.2 0.2 1"/>
                     </body>
                     <body pos="0.167906 0 0.44399" quat="0.5 -0.5 -0.5 0.5" name="drive41">
                         <inertial pos="2.69e-06 0.00285 0.0136" quat="1 0 0 0" mass="0.405"
                                   diaginertia="0.000512 0.000472 0.000269"/>
                         <site name="joint41_sensor_site"/>
-                        <geom type="mesh" mesh="MK4_MT_simplified" name="drive41_mesh" rgba="0.2 0.2 0.2 1"/>
+                        <geom type="mesh" mesh="MK4_MT" name="drive41_mesh" rgba="0.2 0.2 0.2 1"/>
                     </body>
                     <body name="drive42" pos="-0.174736 0 0.44399" quat="0.5 -0.5 -0.5 -0.5">
                         <inertial pos=" 3.12e-06 0.00342 0.0101"
@@ -69,7 +69,7 @@
                         <joint name="joint41" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2"
                                damping="2"
                                frictionloss="1"/>
-                        <geom type="mesh" mesh="MK4_LT_simplified" name="drive42_mesh" rgba="0.2 0.2 0.2 1"/>
+                        <geom type="mesh" mesh="MK4_LT" name="drive42_mesh" rgba="0.2 0.2 0.2 1"/>
                         <body name="leftshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 -0.707107">
                             <inertial pos="1.33e-06 -0.0412 0.0138"
                                       quat="0.865182 0.501455 -0.00145709 0.000441505"
@@ -77,12 +77,12 @@
                             <site name="joint42_sensor_site"/>
                             <joint name="joint42" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="0 3.14159" damping="2"
                                    frictionloss="1"/>
-                            <geom type="mesh" mesh="SHOULDER_BRACKET_simplified" name="left_shoulder_bracket"
+                            <geom type="mesh" mesh="SHOULDER_BRACKET" name="left_shoulder_bracket"
                                   rgba="0.2 0.2 0.2 1"/>
                             <body pos="0 -0.1 0.07526" quat="0.707107 -0.707107 0 0" name="drive43">
                                 <inertial pos="3.12e-06 0.00342 0.0101" quat="1 0 0 0" mass="0.372"
                                           diaginertia="0.000423 0.000381 0.000247"/>
-                                <geom type="mesh" mesh="MK4_LT_simplified" name="drive43_mesh" rgba="0.2 0.2 0.2 1"/>
+                                <geom type="mesh" mesh="MK4_LT" name="drive43_mesh" rgba="0.2 0.2 0.2 1"/>
                             </body>
                             <body name="lefttube_and_drive" pos="0 -0.215888 0.07526" quat="-0.707107 -0.707107 0 0">
                                 <inertial pos="-0.00519 -2.28e-05 0.0276 "
@@ -93,12 +93,12 @@
                                 <body quat="0.707107 0 0.707107 0" name="lefttube">
                                     <inertial pos="0.0342 -4.48e-12 1.93e-07" quat="1 0 0 0" mass="0.2"
                                               diaginertia="0.000132 0.000132 9.31e-05"/>
-                                    <geom type="mesh" mesh="PROXIMAL_TUBE_simplified" name="lefttube_mesh" rgba="0.2 0.2 0.2 1"/>
+                                    <geom type="mesh" mesh="PROXIMAL_TUBE" name="lefttube_mesh" rgba="0.2 0.2 0.2 1"/>
                                 </body>
                                 <body pos="0 0 0.0486304" quat="0.5 -0.5 -0.5 0.5" name="drive44">
                                     <inertial pos="3.12e-06 0.00342 0.0101 " quat="1 0 0 0" mass="0.372"
                                               diaginertia="0.000423 0.000381 0.000247"/>
-                                    <geom type="mesh" mesh="MK4_LT_simplified" name="drive44_mesh" rgba="0.2 0.2 0.2 1"/>
+                                    <geom type="mesh" mesh="MK4_LT" name="drive44_mesh" rgba="0.2 0.2 0.2 1"/>
                                 </body>
                                 <body name="leftforearm" pos="0.06758 0 0.0486304" quat="0 -0.707107 0 0.707107">
                                     <inertial pos="3.28e-06 -0.0761 0.0133"
@@ -107,12 +107,12 @@
                                     <site name="joint44_sensor_site"/>
                                     <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 0.5"
                                            damping="0.5" frictionloss="0.5"/>
-                                    <geom type="mesh" mesh="FOREARM_BRACKET_simplified" name="left_forearm_bracket"
+                                    <geom type="mesh" mesh="FOREARM_BRACKET" name="left_forearm_bracket"
                                           rgba="0.2 0.2 0.2 1"/>
                                     <body pos="0 -0.17 0.05749" quat="0.707107 -0.707107 0 0" name="drive45">
                                         <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
                                                   diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
-                                        <geom type="mesh" mesh="A35_DRIVE_simplified" name="drive45_mesh" rgba="0.2 0.2 0.2 1"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive45_mesh" rgba="0.2 0.2 0.2 1"/>
                                     </body>
                                     <body name="drive46" pos="0 -0.237262 0.05749" quat="0.707107 0 0.707107 0">
                                         <inertial pos="-1.41e-07 0.00618 -0.00546"
@@ -120,20 +120,20 @@
                                                   mass="0.108" diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
                                         <site name="joint45_sensor_site"/>
                                         <joint name="joint45" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2" damping="0.01" frictionloss="0.01"/>
-                                        <geom type="mesh" mesh="A35_DRIVE_simplified" name="drive46_mesh" rgba="0.2 0.2 0.2 1"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive46_mesh" rgba="0.2 0.2 0.2 1"/>
                                         <body name="leftwrist" pos="0 0 -0.0566728">
                                             <inertial pos="-1.32e-06 -0.0281 0.00953"
                                                       quat="0.906199 0.42285 0.000311153 -0.000270308"
                                                       mass="0.0651" diaginertia="4.78e-05 4.33e-05 9.33e-06"/>
                                             <site name="joint46_sensor_site"/>
                                             <joint name="joint46" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-1.5708 1.5708" damping="0.005" frictionloss="0.1"/>
-                                            <geom type="mesh" mesh="A35_BRACKET_simplified" name="left_wrist_mesh"
+                                            <geom type="mesh" mesh="A35_BRACKET" name="left_wrist_mesh"
                                                   rgba="0.2 0.2 0.2 1"/>
                                             <body pos="0 -0.05 0.0566728" quat="0.707107 -0.707107 0 0"
                                                   name="drive47">
                                                 <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
                                                           diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
-                                                <geom type="mesh" mesh="A35_DRIVE_simplified" name="drive47_mesh"
+                                                <geom type="mesh" mesh="A35_DRIVE" name="drive47_mesh"
                                                       rgba="0.2 0.2 0.2 1"/>
                                             </body>
                                             <body name="drive50" pos="0 -0.086 0.0566728" quat="0 0 0.707107 -0.707107">
@@ -174,19 +174,19 @@
                                   quat="0.999687 -0.0245928 0.000670972 -0.00444195"
                                   mass="0.372" diaginertia="0.000423 0.000381 0.000247"/>
                         <joint name="joint1" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-6.2 6.2" damping="10" frictionloss="1"/>
-                        <geom type="mesh" mesh="MK4_LT_simplified" name="joint2_mesh" rgba="0.2 0.2 0.2 1"/>
+                        <geom type="mesh" mesh="MK4_LT" name="joint2_mesh" rgba="0.2 0.2 0.2 1"/>
                         <body name="rightshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 0.707107">
                             <inertial pos="1.33e-06 -0.0412 0.0138"
                                       quat="0.865182 0.501455 -0.00145709 0.000441505"
                                       mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/>
                             <site name="joint2_sensor_site"/>
                             <joint name="joint2" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 0" damping="2" frictionloss="1"/>
-                            <geom type="mesh" mesh="SHOULDER_BRACKET_simplified" name="right_shoulder_bracket"
+                            <geom type="mesh" mesh="SHOULDER_BRACKET" name="right_shoulder_bracket"
                                   rgba="0.2 0.2 0.2 1"/>
                             <body pos="0 -0.1 0.07526" quat="0.707107 -0.707107 0 0" name="drive3">
                                 <inertial pos="3.12e-06 0.00342 0.0101" quat="1 0 0 0" mass="0.372"
                                           diaginertia="0.000423 0.000381 0.000247"/>
-                                <geom type="mesh" mesh="MK4_LT_simplified" name="joint3_mesh" rgba="0.2 0.2 0.2 1"/>
+                                <geom type="mesh" mesh="MK4_LT" name="joint3_mesh" rgba="0.2 0.2 0.2 1"/>
                             </body>
                             <body name="righttube_and_drive" pos="0 -0.215888 0.07526" quat="0 0 -0.707107 0.707107">
                                 <inertial pos="-0.00519 -2.28e-05 0.0276 "
@@ -197,12 +197,12 @@
                                 <body quat="0.707107 0 0.707107 0" name="righttube">
                                     <inertial pos="0.0342 -4.48e-12 1.93e-07" quat="1 0 0 0" mass="0.2"
                                               diaginertia="0.000132 0.000132 9.31e-05"/>
-                                    <geom type="mesh" mesh="PROXIMAL_TUBE_simplified" name="righttube_mesh" rgba="0.2 0.2 0.2 1"/>
+                                    <geom type="mesh" mesh="PROXIMAL_TUBE" name="righttube_mesh" rgba="0.2 0.2 0.2 1"/>
                                 </body>
                                 <body pos="0 0 0.0486304" quat="0.5 -0.5 -0.5 0.5" name="drive4">
                                     <inertial pos="3.12e-06 0.00342 0.0101" quat="1 0 0 0" mass="0.372"
                                               diaginertia="0.000423 0.000381 0.000247"/>
-                                    <geom type="mesh" mesh="MK4_LT_simplified" name="drive4_mesh" rgba="0.2 0.2 0.2 1"/>
+                                    <geom type="mesh" mesh="MK4_LT" name="drive4_mesh" rgba="0.2 0.2 0.2 1"/>
                                 </body>
                                 <body name="rightforearm" pos="0.06758 0 0.0486304" quat="0.707107 0 -0.707107 0">
                                     <inertial pos="3.28e-06 -0.0761 0.0133"
@@ -210,12 +210,12 @@
                                               mass="0.265" diaginertia="0.00109 0.00106 6e-05"/>
                                     <site name="joint4_sensor_site"/>
                                     <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-3.14159 0.5" damping="0.5" frictionloss="0.5"/>
-                                    <geom type="mesh" mesh="FOREARM_BRACKET_simplified" name="right_forearm_bracket"
+                                    <geom type="mesh" mesh="FOREARM_BRACKET" name="right_forearm_bracket"
                                           rgba="0.2 0.2 0.2 1"/>
                                     <body pos="0 -0.17 0.05749" quat="0.707107 -0.707107 0 0" name="drive5">
                                         <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
                                                   diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
-                                        <geom type="mesh" mesh="A35_DRIVE_simplified" name="drive5_mesh" rgba="0.2 0.2 0.2 1"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive5_mesh" rgba="0.2 0.2 0.2 1"/>
                                     </body>
                                     <body name="drive6" pos="0 -0.237262 0.05749" quat="0.707107 0 -0.707107 0">
                                         <inertial pos="-1.41e-07 0.00618 -0.00546"
@@ -223,20 +223,20 @@
                                                   mass="0.108" diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
                                         <site name="joint5_sensor_site"/>
                                         <joint name="joint5" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2" damping="0.01" frictionloss="0.01"/>
-                                        <geom type="mesh" mesh="A35_DRIVE_simplified" name="drive6_mesh" rgba="0.2 0.2 0.2 1"/>
+                                        <geom type="mesh" mesh="A35_DRIVE" name="drive6_mesh" rgba="0.2 0.2 0.2 1"/>
                                         <body name="rightwrist" pos="0 0 -0.0566728">
                                             <inertial pos="-1.32e-06 -0.0281 0.00953"
                                                       quat="0.906199 0.42285 0.000311153 -0.000270308"
                                                       mass="0.0651" diaginertia="4.78e-05 4.33e-05 9.33e-06"/>
                                             <site name="joint6_sensor_site"/>
                                             <joint name="joint6" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-1.5708 1.5708" damping="0.005" frictionloss="0.1"/>
-                                            <geom type="mesh" mesh="A35_BRACKET_simplified" name="rightwrist_mesh"
+                                            <geom type="mesh" mesh="A35_BRACKET" name="rightwrist_mesh"
                                                   rgba="0.2 0.2 0.2 1"/>
                                             <body pos="0 -0.05 0.0566728" quat="0.707107 -0.707107 0 0"
                                                   name="drive7">
                                                 <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
                                                           diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
-                                                <geom type="mesh" mesh="A35_DRIVE_simplified" name="drive7_mesh" rgba="0.2 0.2 0.2 1"/>
+                                                <geom type="mesh" mesh="A35_DRIVE" name="drive7_mesh" rgba="0.2 0.2 0.2 1"/>
                                             </body>
                                             <body name="drive10" pos="0 -0.086 0.0566728" quat="0.707107 0.707107 0 0">
                                                 <inertial pos="0.0136 -5.13e-09 0.0377" quat="1 0 0 0" mass="0.168"
@@ -274,32 +274,32 @@
                 </body>
             </body>
             <body name="base_link">
-                <geom type="mesh" mesh="base_link_simplified" name="base_link_mesh" rgba="0.8 0.8 0.2 1"/>
+                <geom type="mesh" mesh="base_link" name="base_link_mesh" rgba="0.8 0.8 0.2 1"/>
             </body>
             <body pos="0.0812 0 0.245" name="top_plate">
                 <geom type="mesh" mesh="top_plate" name="top_plate_mesh" rgba="0.2 0.2 0.2 1"/>
             </body>
             <body pos="0.412 0 0.068" name="front_lidar">
-                <geom type="mesh" mesh="ark_lidar_simplified" name="front_ark_lidar_mesh" rgba="0.6 0.2 0.2 1"/>
+                <geom type="mesh" mesh="ark_lidar" name="front_ark_lidar_mesh" rgba="0.6 0.2 0.2 1"/>
             </body>
             <body pos="-0.412 0 0.068" quat="1.32679e-06 0 0 1" name="back_lidar">
-                <geom type="mesh" mesh="ark_lidar_simplified" name="back_ark_lidar_mesh" rgba="0.6 0.2 0.2 1"/>
+                <geom type="mesh" mesh="ark_lidar" name="back_ark_lidar_mesh" rgba="0.6 0.2 0.2 1"/>
             </body>
             <body name="front_left_wheel_link" pos="0.256 0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
-                <geom type="mesh" mesh="wheel_simplified" name="front_left_wheel" rgba="0.2 0.2 0.2 1"/>
+                <geom type="mesh" mesh="wheel" name="front_left_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
             <body name="front_right_wheel_link" pos="0.256 -0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
-                <geom type="mesh" mesh="wheel_simplified" name="front_right_wheel" rgba="0.2 0.2 0.2 1"/>
+                <geom type="mesh" mesh="wheel" name="front_right_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
             <body name="rear_left_wheel_link" pos="-0.256 0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
-                <geom type="mesh" mesh="wheel_simplified" name="rear_left_wheel" rgba="0.2 0.2 0.2 1"/>
+                <geom type="mesh" mesh="wheel" name="rear_left_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
             <body name="rear_right_wheel_link" pos="-0.256 -0.25 0.03282">
                 <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="2.637" diaginertia="0.04411 0.02467 0.02467"/>
-                <geom type="mesh" mesh="wheel_simplified" name="rear_right_wheel" rgba="0.2 0.2 0.2 1"/>
+                <geom type="mesh" mesh="wheel" name="rear_right_wheel" rgba="0.2 0.2 0.2 1"/>
             </body>
         </body>
     </worldbody>

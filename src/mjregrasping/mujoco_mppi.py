@@ -14,14 +14,13 @@ def softmax(x, temp):
 
 class MujocoMPPI:
 
-    def __init__(self, pool, model, num_samples, horizon, noise_sigma, lambda_=1., gamma=0.9):
+    def __init__(self, pool, model, seed, num_samples, horizon, noise_sigma, lambda_=1., gamma=0.9):
         # TODO: make params like horizon and num_samples dynamic
         self.pool = pool
         self.model = model
         self.num_samples = num_samples
         self.horizon = horizon
-
-        self.gammas = np.power(gamma, np.arange(horizon))[None]
+        self.gamma = gamma
 
         # dimensions of state and control
         self.nx = model.nq
@@ -29,7 +28,7 @@ class MujocoMPPI:
         self.lambda_ = lambda_
 
         self.noise_sigma = np.ones(self.nu) * noise_sigma
-        self.noise_rng = np.random.RandomState(0)
+        self.noise_rng = np.random.RandomState(seed)
 
         self.U = None
         self.reset()
@@ -75,7 +74,8 @@ class MujocoMPPI:
         self.actions = perturbed_action
         costs = cost_func(results)
 
-        self.cost = np.sum(self.gammas * costs, axis=-1)
+        gammas = np.power(self.gamma, np.arange(self.horizon))[None]
+        self.cost = np.sum(gammas * costs, axis=-1)
 
         self.cost_normalized = (self.cost - self.cost.min()) / (self.cost.max() - self.cost.min())
 
