@@ -1,4 +1,5 @@
 import copy
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
 import mujoco
@@ -6,6 +7,8 @@ import numpy as np
 
 MAX_VEL_TILL_ERROR_RAD = np.deg2rad(3)
 DEFAULT_SUB_TIME_S = 0.1
+
+logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def rollout(model, data, controls, sub_time_s, get_result_func=None):
@@ -53,18 +56,27 @@ def get_result_tuple(data, get_result_func, model):
     return result_tuple
 
 
-def control_step(model, data, qvel_target, sub_time_s: float):
+def control_step(m, d, qvel_target, sub_time_s: float):
     if qvel_target is not None:
-        np.copyto(data.ctrl, qvel_target)
+        np.copyto(d.ctrl, qvel_target)
     else:
-        print("control is None!!!")
-    n_sub_time = int(sub_time_s / model.opt.timestep)
+        logger.warning("control is None!!!")
+    n_sub_time = int(sub_time_s / m.opt.timestep)
     # FIXME: don't move the grippers... horrible hack
-    data.ctrl[model.actuator('leftgripper_vel').id] = 0
-    data.ctrl[model.actuator('leftgripper2_vel').id] = 0
-    data.ctrl[model.actuator('rightgripper_vel').id] = 0
-    data.ctrl[model.actuator('rightgripper2_vel').id] = 0
-    mujoco.mj_step(model, data, nstep=n_sub_time)
+    d.ctrl[m.actuator('leftgripper_vel').id] = 0
+    d.ctrl[m.actuator('leftgripper2_vel').id] = 0
+    d.ctrl[m.actuator('rightgripper_vel').id] = 0
+    d.ctrl[m.actuator('rightgripper2_vel').id] = 0
+
+    limit_actuator_windup(d, m)
+
+    mujoco.mj_step(m, d, nstep=n_sub_time)
+
+
+def limit_actuator_windup(d, m):
+    qpos_indices_for_act = np.array([m.actuator(i).actadr[0] for i in range(m.na)])
+    qpos_for_act = d.qpos[qpos_indices_for_act]
+    d.act = qpos_for_act + np.clip(d.act - qpos_for_act, -0.01, 0.01)
 
 
 def parallel_rollout(pool: ThreadPoolExecutor, model, data, controls_samples, sub_time_s, get_result_func=None):

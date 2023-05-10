@@ -39,6 +39,7 @@ class MjReRun:
 
         rr.log_scalar(f'contact/num_contacts', len(d.contact))
 
+        # FIXME: slow?
         # self.viz_bodies(m, d)
 
     def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData):

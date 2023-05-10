@@ -136,11 +136,9 @@ class RegraspMPC:
             dq = np.abs(qposs[1:] - qposs[:-1]).mean()
         self.max_dq = max(self.max_dq, dq)
         has_not_moved = dq < self.p.frac_max_dq * self.max_dq
-        zero_command = np.linalg.norm(command) < self.p.min_command
-        needs_regrasp = self.buffer.full() and (has_not_moved or zero_command)
+        needs_regrasp = self.buffer.full() and has_not_moved
         rr.log_scalar('needs_regrasp/dq', dq)
         rr.log_scalar('needs_regrasp/max_dq', self.max_dq)
-        rr.log_scalar('needs_regrasp/command_norm', np.linalg.norm(command))
         return needs_regrasp
 
     def regrasp(self, data):

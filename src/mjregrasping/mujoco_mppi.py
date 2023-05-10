@@ -34,8 +34,8 @@ class MujocoMPPI:
         self.reset()
 
         # sampled results from last command
-        self.cost_total = None
-        self.cost_total_non_zero = None
+        self.cost = None
+        self.cost_normalized = None
         self.rollout_results = None
         self.actions = None
 

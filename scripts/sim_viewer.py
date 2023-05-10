@@ -9,6 +9,7 @@ from mujoco import viewer
 
 from mjregrasping.buffer import Buffer
 from mjregrasping.rerun_visualizer import MjReRun
+from mjregrasping.rollout import limit_actuator_windup
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +41,6 @@ def main():
             buffers.append(SensorBuffer(sensor.name, 10))
             torque_sensors.append(sensor)
 
-    joint_to_qv_map = make_joint_qv_map(m)
     mjrr = MjReRun(xml_path)
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
@@ -49,38 +49,10 @@ def main():
 
             mjrr.viz(m, d)
 
-            qpos_indices_for_act = np.array([m.actuator(i).actadr[0] for i in range(m.na)])
-            qpos_for_act = d.qpos[qpos_indices_for_act]
-            d.act = qpos_for_act + np.clip(d.act - qpos_for_act, -0.01, 0.01)
+            limit_actuator_windup(d, m)
 
             mujoco.mj_step(m, d, nstep=10)
             sleep(0.05)
-
-
-def make_joint_qv_map(model):
-    # Iterate ove all the joints and get their DOFs
-    # the total DOFs in all joints should equal model.nv
-    my_nv = 0
-    joint_to_qv_map = {}
-    for i in range(model.njnt):
-        joint = model.joint(i)
-        if joint.type == mujoco.mjtJoint.mjJNT_HINGE:
-            joint_to_qv_map[joint.id] = joint.qposadr[0]
-            joint_nv = 1
-        elif joint.type == mujoco.mjtJoint.mjJNT_SLIDE:
-            joint_nv = 1
-        elif joint.type == mujoco.mjtJoint.mjJNT_FREE:
-            joint_nv = 6
-        elif joint.type == mujoco.mjtJoint.mjJNT_BALL:
-            joint_nv = 3
-        else:
-            raise NotImplementedError('Unsupported joint type')
-
-        my_nv += joint_nv
-        logger.debug(f'Joint {joint.name} has {joint_nv} DOFs')
-        # only 1-dof hinge joints are supported
-    logger.debug(f'Total DOFs: {my_nv} vs {model.nv}')
-    return joint_to_qv_map
 
 
 if __name__ == '__main__':

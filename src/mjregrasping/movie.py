@@ -11,13 +11,12 @@ class MjMovieMaker:
         self.gl_ctx.make_current()
         self.con = mujoco.MjrContext(m, 1)
         # TODO: disable shadows
-        self.scene = mujoco.MjvScene(m, maxgeom=500, shadow=0)
+        self.scene = mujoco.MjvScene(m, maxgeom=500)
+        self.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
         self.viewport = mujoco.MjrRect(0, 0, w, h)
         self.cam = mujoco.MjvCamera()
-        self.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
-        self.cam.trackbodyid = self.m.body(trackbody_name).id
-        self.cam.distance = 3.0
-        self.cam.azimuth = 35
+        self.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+        self.cam.fixedcamid = 0
         self.img = np.zeros([h, w, 3], dtype=np.uint8)
         self.writer = None
 

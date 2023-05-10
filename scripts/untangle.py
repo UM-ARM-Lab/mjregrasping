@@ -38,7 +38,7 @@ def main():
     mujoco.mj_forward(m, d)
     mjviz.viz(m, d)
     p = Params()
-    viz = Viz(rviz=mjviz, mjrr=MjReRun(), tfw=tfw, p=p)
+    viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
     goal_rng = np.random.RandomState(0)
 
@@ -98,10 +98,9 @@ def activate_and_settle(m, d, viz, sub_time_s):
     # Activate the connect constraint between the rope and the gripper to
     activate_eq(m, 'right')
     # settle
-    for _ in range(25):
+    for _ in range(100):
         viz.viz(m, d)
         control_step(m, d, np.zeros(m.nu), sub_time_s=sub_time_s)
-        rospy.sleep(0.01)
 
 
 if __name__ == "__main__":
