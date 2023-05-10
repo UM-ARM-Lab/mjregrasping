@@ -16,6 +16,20 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
 
+def names(geom_bodyid, model):
+    parent_bodyid = geom_bodyid
+    parent_names = []
+    while True:
+        parent_bodyid = model.body_parentid[parent_bodyid]
+        parent_name = mj_id2name(model, mju_str2Type("body"), parent_bodyid)
+        parent_names.append(parent_name)
+        if parent_bodyid == 0:
+            break
+    body_name = mj_id2name(model, mju_str2Type("body"), geom_bodyid)
+    entity_name = body_name.split("/")[0]
+    return entity_name, parent_names
+
+
 class MjRViz:
     def __init__(self, xml_path: str, tfw: Optional[TF2Wrapper] = None):
         self.tfw = tfw
@@ -34,7 +48,7 @@ class MjRViz:
         geom_markers_msg = MarkerArray()
         for geom_id in range(model.ngeom):
             geom_bodyid = model.geom_bodyid[geom_id]
-            entity_name, parent_names = self.names(geom_bodyid, model)
+            entity_name, parent_names = names(geom_bodyid, model)
 
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
@@ -220,19 +234,6 @@ class MjRViz:
         clear_contact_markers.markers.append(Marker(action=Marker.DELETEALL))
         self.contacts_pub.publish(clear_contact_markers)
         self.contacts_pub.publish(contact_markers)
-
-    def names(self, geom_bodyid, model):
-        parent_bodyid = geom_bodyid
-        parent_names = []
-        while True:
-            parent_bodyid = model.body_parentid[parent_bodyid]
-            parent_name = mj_id2name(model, mju_str2Type("body"), parent_bodyid)
-            parent_names.append(parent_name)
-            if parent_bodyid == 0:
-                break
-        body_name = mj_id2name(model, mju_str2Type("body"), geom_bodyid)
-        entity_name = body_name.split("/")[0]
-        return entity_name, parent_names
 
 
 def plot_sphere_rviz(

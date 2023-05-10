@@ -10,7 +10,8 @@ class MjMovieMaker:
         self.gl_ctx = mujoco.GLContext(w, h)
         self.gl_ctx.make_current()
         self.con = mujoco.MjrContext(m, 1)
-        self.scene = mujoco.MjvScene(m, maxgeom=500)
+        # TODO: disable shadows
+        self.scene = mujoco.MjvScene(m, maxgeom=500, shadow=0)
         self.viewport = mujoco.MjrRect(0, 0, w, h)
         self.cam = mujoco.MjvCamera()
         self.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
