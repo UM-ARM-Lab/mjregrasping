@@ -49,29 +49,9 @@ def main():
 
             mjrr.viz(m, d)
 
-            # iterate over each sensor and compute external torque
-            external_torques = []
-            for buffer in buffers:
-                sensor = m.sensor(buffer.sensor_name)
-                torque_rpy = d.sensor(sensor.name).data
-                # convention that torque sensors start with the name of the joint they are attached to
-                joint = m.joint(buffer.joint_name)
-                qv_idx = joint_to_qv_map[joint.id]
-                current_torque = joint.axis @ torque_rpy
-                buffer.insert(current_torque)
-                torque = np.mean(buffer.data)
-                external_torque = torque - d.qfrc_bias[qv_idx]
-                external_torques.append(external_torque)
-                rr.log_scalar(f'qfrc_bias/{joint.name}', d.qfrc_bias[qv_idx])
-                rr.log_scalar(f'external_torque/{joint.name}', external_torque)
-
-            # FIXME: buffer is for the wrong variable
-            external_torques = np.array(external_torques)
-            if all([b.full() for b in buffers]) and np.any(np.abs(external_torques) > 3.0):
-                print("High torque!")
-                qpos_indices_for_sensor = np.array([m.joint(b.joint_name).qposadr[0] for b in buffers])
-                qpos_for_sensors = d.qpos[qpos_indices_for_sensor]
-                d.act = qpos_for_sensors + np.clip(d.act - qpos_for_sensors, -0.01, 0.01)
+            qpos_indices_for_act = np.array([m.actuator(i).actadr[0] for i in range(m.na)])
+            qpos_for_act = d.qpos[qpos_indices_for_act]
+            d.act = qpos_for_act + np.clip(d.act - qpos_for_act, -0.01, 0.01)
 
             mujoco.mj_step(m, d, nstep=10)
             sleep(0.05)
