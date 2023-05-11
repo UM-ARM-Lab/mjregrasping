@@ -218,6 +218,8 @@ class GraspBodyGoal(MPPIGoal):
         left_tool_pos = result[0]
         right_tool_pos = result[1]
         self.viz_ee_lines(left_tool_pos, right_tool_pos, idx, scale, color)
+        rope_pos = np.array(result[3])
+        self.viz_rope_lines(rope_pos, idx, scale, color='y')
 
     def get_body_pos(self, data):
         body_pos = data.xpos[self.body_id_to_grasp]

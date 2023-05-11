@@ -18,7 +18,19 @@ def get_grasp_constraints(model):
     return [model.eq('left'), model.eq('right')]
 
 
+def change_eq(m, eq_name, obj2id):
+    eq = m.eq(eq_name)
+    eq.obj2id = obj2id
+    eq.active = 1
+    eq.data[3:6] = 0
+
+
 def activate_eq(m, eq_name):
+    eq = m.eq(eq_name)
+    eq.active = 1
+    eq.data[3:6] = 0
+
+
+def deactivate_eq(m, eq_name):
     eq_idx = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_EQUALITY, eq_name)
-    m.eq_active[eq_idx] = 1
-    m.eq_data[eq_idx][3:6] = 0
+    m.eq_active[eq_idx] = 0

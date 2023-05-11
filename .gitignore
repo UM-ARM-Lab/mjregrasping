@@ -6,4 +6,6 @@ __pycache__
 venv
 MUJOCO_LOG.TXT
 *.*prof
-
+outcmaes
+wandb
+*.pkl

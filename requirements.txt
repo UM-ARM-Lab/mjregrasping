@@ -7,3 +7,6 @@ cffi
 transformations
 numpy==1.23  #the ROS1 point_cloud python package is incompatible with 1.24
 scipy>=1.7.0
+pyribs
+ray[tune]
+cma

@@ -6,7 +6,6 @@ import numpy as np
 import rerun as rr
 from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
-from scipy.spatial.transform import Rotation
 from trimesh.creation import box, cylinder, capsule
 
 from mjregrasping.rviz import names, MujocoXmlMeshParser
@@ -51,7 +50,7 @@ class MjReRun:
             entity_name = f"{parent_names[0]}/{body_name}"
 
             if geom_type == mjtGeom.mjGEOM_BOX:
-                log_box(entity_name, m.geom(geom_id), d.geom(geom_id))
+                log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_CYLINDER:
                 log_cylinder(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_CAPSULE:
@@ -80,7 +79,7 @@ class MjReRun:
                 continue
 
 
-def name(*names):
+def make_entity_path(*names):
     """ joins names with slashes but ignores empty names """
     return '/'.join([name for name in names if name])
 
@@ -96,7 +95,7 @@ def get_transform(data: _MjDataGeomViews):
 def log_plane(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     transform = get_transform(data)
     mesh = box(np.array([model.size[0], model.size[1], 0.001]), transform)
-    rr.log_mesh(entity_path=name(body_name, model.name),
+    rr.log_mesh(entity_path=make_entity_path(body_name, model.name),
                 positions=mesh.vertices,
                 indices=mesh.faces,
                 albedo_factor=model.rgba)
@@ -105,22 +104,23 @@ def log_plane(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
 def log_capsule(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     transform = get_transform(data)
     mesh = capsule(radius=model.size[0], height=2 * model.size[1], transform=transform, count=[6, 6])
-    rr.log_mesh(entity_path=name(body_name, model.name),
+    rr.log_mesh(entity_path=make_entity_path(body_name, model.name),
                 positions=mesh.vertices,
                 indices=mesh.faces,
                 albedo_factor=model.rgba)
 
+
 def log_cylinder(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     transform = get_transform(data)
     mesh = cylinder(radius=model.size[0], height=2 * model.size[1], transform=transform, sections=16)
-    rr.log_mesh(entity_path=name(body_name, model.name),
+    rr.log_mesh(entity_path=make_entity_path(body_name, model.name),
                 positions=mesh.vertices,
                 indices=mesh.faces,
                 albedo_factor=model.rgba)
 
 
 def log_sphere(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
-    rr.log_point(entity_path=name(body_name, model.name),
+    rr.log_point(entity_path=make_entity_path(body_name, model.name),
                  position=data.xpos,
                  radius=model.size[0],
                  color=tuple(model.rgba))
@@ -130,19 +130,24 @@ def log_mesh(body_name, model, data, mesh_file):
     transform = get_transform(data)
     with open(mesh_file, 'rb') as f:
         contents = f.read()
-    rr.log_mesh_file(entity_path=name(body_name, model.name),
+    rr.log_mesh_file(entity_path=make_entity_path(body_name, model.name),
                      mesh_format=rr.MeshFormat.GLB,
                      mesh_file=contents,
                      transform=transform[:3, :])
 
 
-def log_box(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
+def log_box_from_geom(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     transform = get_transform(data)
-    mesh = box(model.size * 2, transform)
-    rr.log_mesh(entity_path=name(body_name, model.name),
+
+    log_box(make_entity_path(body_name, model.name), model.size * 2, transform, model.rgba)
+
+
+def log_box(entity_path, size, transform, color):
+    mesh = box(size, transform)
+    rr.log_mesh(entity_path=entity_path,
                 positions=mesh.vertices,
                 indices=mesh.faces,
-                albedo_factor=model.rgba)
+                albedo_factor=color)
 
 
 def log_rotational_velocity(entity_name,
