@@ -152,12 +152,14 @@ class GripperPointGoal(MPPIGoal):
         return gripper_point
 
 
-class GraspBodyGoal(MPPIGoal):
+class GraspRopeGoal(MPPIGoal):
 
-    def __init__(self, model, body_id_to_grasp: int, goal_radius: float, gripper_idx: int, objects: Objects,
+    def __init__(self, model, body_id_to_grasp: int, offset: float, goal_radius: float, gripper_idx: int,
+                 objects: Objects,
                  viz: Viz):
         super().__init__(model, viz)
         self.body_id_to_grasp = body_id_to_grasp
+        self.offset = offset
         self.goal_radius = goal_radius
         self.gripper_idx = gripper_idx
         self.objects = objects
@@ -223,7 +225,9 @@ class GraspBodyGoal(MPPIGoal):
 
     def get_body_pos(self, data):
         body_pos = data.xpos[self.body_id_to_grasp]
-        return body_pos
+        # add offset
+        body_x_axis_in_world_frame = data.xmat[self.body_id_to_grasp].reshape(3, 3)[:, 0]
+        return body_pos + self.offset * body_x_axis_in_world_frame
 
     def choose_gripper_pos(self, left_gripper_pos, right_gripper_pos):
         if self.gripper_idx == 0:

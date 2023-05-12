@@ -18,13 +18,6 @@ def get_grasp_constraints(model):
     return [model.eq('left'), model.eq('right')]
 
 
-def change_eq(m, eq_name, obj2id):
-    eq = m.eq(eq_name)
-    eq.obj2id = obj2id
-    eq.active = 1
-    eq.data[3:6] = 0
-
-
 def activate_eq(m, eq_name):
     eq = m.eq(eq_name)
     eq.active = 1

@@ -44,10 +44,6 @@ def main():
 
         d = load_data_and_eq(m)
 
-        mov = MjMovieMaker(m, "rack1")
-        mov_path = root / f'untangle_{seed}.mp4'
-        mov.start(mov_path, fps=12)
-
         goal = ObjectPointGoal(model=m,
                                viz=viz,
                                goal_point=np.array([0.78, 0.04, 1.27]),
@@ -56,7 +52,7 @@ def main():
                                objects=objects)
 
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-            mpc = RegraspMPC(m, pool, viz, goal, objects=objects, seed=seed, mov=mov)
+            mpc = RegraspMPC(m, pool, viz, goal, objects=objects, seed=seed, mov=None)
             mpc.compute_new_grasp(d)
 
 

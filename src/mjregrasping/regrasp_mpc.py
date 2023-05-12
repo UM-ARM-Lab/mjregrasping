@@ -14,8 +14,10 @@ from matplotlib import cm
 import rospy
 from mjregrasping.body_with_children import Objects
 from mjregrasping.buffer import Buffer
-from mjregrasping.goals import ObjectPointGoal, GraspBodyGoal
-from mjregrasping.grasping import get_grasp_indices, get_grasp_constraints, deactivate_eq, change_eq
+from mjregrasping.change_grasp_eq import change_eq
+from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal
+from mjregrasping.grasp_state import GraspState
+from mjregrasping.grasping import get_grasp_constraints, deactivate_eq
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.rerun_visualizer import log_box
@@ -47,8 +49,8 @@ class Result:
         return str(self)
 
 
-def gripper_idx_to_eq_name(i):
-    return 'left' if i == 0 else 'right'
+def gripper_idx_to_eq_name(gripper_idx):
+    return 'left' if gripper_idx == 0 else 'right'
 
 
 def compute_grasp_error(d_before, d_after):
@@ -59,24 +61,17 @@ def compute_grasp_error(d_before, d_after):
     return grasp_error
 
 
-def vis_regrasp_solutions_and_costs(cma_idx, costs, costs_lists, rope_indices, solutions, all_queries, all_costs):
-    # Images representing the cost surface
+def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_locations, all_queries, all_costs):
+    # something representing the cost surface?
     cost_surface_map = {}
     n_g = int(len(all_queries[0]) // 2)
     for query, cost in zip(all_queries, all_costs):
-        y = (0 if query[0] == 0 else int(query[2]) - rope_indices.min())
-        x = (0 if query[1] == 0 else int(query[3]) - rope_indices.min())
+        x = query[1]
+        y = query[0]
         z = cost / 1000
         if (x, y) not in cost_surface_map:
             cost_surface_map[x, y] = []
         cost_surface_map[x, y].append(z)
-    cost_surface_mean_array = np.zeros([len(rope_indices) + 1, len(rope_indices) + 1])
-    cost_surface_std_array = np.zeros([len(rope_indices) + 1, len(rope_indices) + 1])
-    for (x, y), zs in cost_surface_map.items():
-        cost_surface_mean_array[x, y] = np.mean(zs)
-        cost_surface_std_array[x, y] = np.std(zs)
-    rr.log_image('regrasp_cost_surface/mean', cost_surface_mean_array)
-    rr.log_image('regrasp_cost_surface/std', cost_surface_std_array)
 
     # histograms
     width = 0.1
@@ -99,25 +94,21 @@ def vis_regrasp_solutions_and_costs(cma_idx, costs, costs_lists, rope_indices, s
         T[2, 3] = p[2]
         return T
 
-    for i, (costs_i, viz_solution) in enumerate(zip(costs_lists, solutions)):
-        grasp_indices, is_grasping = remap_solution_to_params(n_g, viz_solution)
+    for i, (costs_i, locations) in enumerate(zip(costs_lists, candidate_grasp_locations)):
+        # TODO: draw one big outline box around the total cost for each solution
         z_offset = 0
         for cost_i, name, color_i in zip(costs_i, cost_names, cost_colors):
             z_i = np.clip(cost_i * cost_to_meters, 1e-3, 1e3)  # ensure non-zero
-            box_entity_path = f'regrasp_costs/{cma_idx}/{i}/{name}'
+            box_entity_path = f'regrasp_costs/{i}/{name}'
             log_box(box_entity_path, np.array([width, depth, z_i]),
-                    pos_transform([width * i, (2 * depth) * cma_idx, z_i / 2 + z_offset]), color=color_i)
-            ext = {f'grasp {gripper_idx_to_eq_name(i)}': -1 if not is_grasping[i] else grasp_indices[i] for i in range(n_g)}
+                    pos_transform([width * i, 0, z_i / 2 + z_offset]),
+                    color=color_i)
+            ext = {f'grasp {gripper_idx_to_eq_name(k)}': locations[k] for k in range(n_g)}
             ext['real cost'] = cost_i
             ext['total cost'] = sum(costs_i)
+            ext['is_grasping'] = is_grasping
             rr.log_extension_components(box_entity_path, ext)
             z_offset += z_i
-
-
-def remap_solution_to_params(n_g, solution):
-    is_grasping = np.round(solution[:n_g]).astype(int) % 2
-    grasp_indices = np.round(solution[n_g:]).astype(int)
-    return grasp_indices, is_grasping
 
 
 class RegraspMPC:
@@ -139,10 +130,9 @@ class RegraspMPC:
                                horizon=horizon, lambda_=lambda_)
         self.buffer = Buffer(5)
         self.max_dq = 0
-        self.regrasp_idx = 0
 
     def run(self, data):
-        for i in range(self.p.iters):
+        for self.iter in range(self.p.iters):
             if rospy.is_shutdown():
                 if self.mov is not None:
                     self.mov.close()
@@ -221,22 +211,11 @@ class RegraspMPC:
 
     def regrasp(self, data):
         sub_time_s = self.p.grasp_sub_time_s
-        current_grasp = get_grasp_indices(self.model)
-        new_grasp = self.compute_new_grasp(data)
-        self.regrasp_idx += 1
+        new_is_grasping, new_grasp_location = self.compute_new_grasp(data)
+        # FIXME: to actually execute a new grasp we need a multi-step process
+        #        which is actually the same procedure used inside `compute_new_grasp`, just on the "real" model/data
 
-        if np.all(new_grasp == current_grasp):
-            logger.info(Fore.GREEN + "No need to regrasp!" + Fore.RESET)
-            return
-        elif np.all(new_grasp != current_grasp) and np.all(new_grasp != -1):
-            raise NotImplementedError("Cannot regrasp with both grippers at once")
-        elif new_grasp[0] != -1:
-            gripper_idx = 0
-        else:
-            gripper_idx = 1
-
-        rope_body_to_grasp = self.model.body(new_grasp[gripper_idx])
-        # NOTE: why does body.pos give the wrong value?
+        rope_body_to_grasp = self.model.body(new_grasp[gripper_idx])  # NOTE: why does body.pos give the wrong value?
         logger.info(f"grasping {rope_body_to_grasp.name}")
 
         warmstart_count = 0
@@ -249,9 +228,10 @@ class RegraspMPC:
                 return Result(Status.SHUTDOWN, "ROS shutdown")
 
             # recreate the goal at each time step so the goal point is updated
-            regrasp_goal = GraspBodyGoal(model=self.model,
+            regrasp_goal = GraspRopeGoal(model=self.model,
                                          body_id_to_grasp=rope_body_to_grasp.id,
                                          goal_radius=0.015,
+                                         offset=0,
                                          gripper_idx=gripper_idx,
                                          viz=self.viz,
                                          objects=self.objects)
@@ -281,6 +261,7 @@ class RegraspMPC:
                 return Result(Status.FAILED, f"Failed to regrasp after {regrasp_iters} iters")
 
         # change the mujoco grasp constraints
+        # TODO: account for offset? can we reuse other functions here?
         for eq, grasp_idx in zip(get_grasp_constraints(self.model), new_grasp):
             if grasp_idx == -1:
                 eq.active[:] = 0
@@ -288,6 +269,7 @@ class RegraspMPC:
                 eq.obj2id = grasp_idx
                 eq.active[:] = 1
                 eq.data[3:6] = 0
+        settle(self.model, data, self.p.grasp_sub_time_s, self.viz)
 
         return Result(Status.MOVE_TO_GOAL)
 
@@ -310,108 +292,119 @@ class RegraspMPC:
         goal.viz_result(cmd_rollout_results, i, color='b', scale=0.004)
 
     def compute_new_grasp(self, data):
-        # run CMA-ES to find the best grasp
-        # where the objective function comes from solving a series of planning problems with MPPI
-        current_grasp = get_grasp_indices(self.model)
-        n_g = len(current_grasp)
-        is_grasping0 = (current_grasp != -1)
-        rope_indices = np.array(self.objects.rope.body_indices)
-        # replace -1 with rope_indices.min() since -1 is not a valid index,
-        # and we're representing grasping with a separate binary variable
-        grasp_indices0 = np.maximum(current_grasp, rope_indices.min())
-        x0 = np.concatenate([is_grasping0, grasp_indices0])
-        # in order to sample a binary variable, we set the bounds to be from 0 to 10 and then round and mod by 2
-        lower_bounds = np.concatenate([np.zeros(n_g), np.full(n_g, rope_indices.min())])
-        upper_bounds = np.concatenate([np.ones(n_g) * 10, np.full(n_g, rope_indices.max())])
-        sigma0 = np.concatenate([np.ones(n_g), np.full(n_g, 5)])
-        es = cma.CMAEvolutionStrategy(x0=x0, sigma0=3.33, inopts={
-            'CMA_stds':          sigma0,
-            'popsize':           10,
-            'integer_variables': range(2 * n_g),
-            'bounds':            [lower_bounds, upper_bounds],
-            'seed':              1})
+        rope_body_indices = np.array(self.objects.rope.body_indices)
+        grasp0 = GraspState.from_mujoco(rope_body_indices, self.model)
+        n_g = 2  # FIXME: don't hardcode this
+        all_binary_grasps = np.array([
+            [1, 1],
+            [1, 0],
+            [0, 1],
+            [0, 0],
+        ])
 
-        cma_idx = 0
-        all_queries = []
-        all_costs = []
-        while not es.stop():
-            if rospy.is_shutdown():
-                raise RuntimeError("ROS shutdown")
+        overall_fbest = 1e9
+        overall_xbest = grasp0.locations
+        overall_is_grasping = None
+        for is_grasping in all_binary_grasps:
+            logger.info(f'is_grasping={is_grasping}')
+            # Run CMA-ES to find the best grasp given the specific binary grasp state.
+            # The objective function consists of solving a series of planning problems with MPPI.
+            cma_idx = 0
+            all_queries = []
+            all_costs = []
+            es = cma.CMAEvolutionStrategy(x0=grasp0.locations, sigma0=0.3, inopts={
+                'popsize':   3,
+                'bounds':    [0, 1],
+                'seed':      1,
+                'tolx':      1e-2,  # 1cm
+                'maxfevals': 12,
+                'tolfun':    100})
 
-            solutions = es.ask()
-            # costs = self.compute_grasp_costs(solutions, is_grasping0, grasp_indices0, data0)
-            costs_lists = []
-            costs = []
-            for solution in solutions:
-                from time import perf_counter
-                t0 = perf_counter()
-                # copy since each solution should be different/independent
-                d = copy(data)
-                m = copy(self.model)
-                grasp_indices, is_grasping = remap_solution_to_params(n_g, solution)
-                print(is_grasping, grasp_indices)
+            while not es.stop():
+                if rospy.is_shutdown():
+                    raise RuntimeError("ROS shutdown")
 
-                same = np.logical_or(np.logical_and(np.logical_not(is_grasping0), np.logical_not(is_grasping)),
-                                     np.logical_and(is_grasping0,
-                                                    np.logical_and(is_grasping, (grasp_indices0 == grasp_indices))))
-                f_is_same = 1000 if np.all(same) else 0
-                f_news = []
-                f_new_mms = []
-                f_diffs = []
-                f_diff_mms = []
-                # For each gripper, if it needs a _new_ grasp, run MPPI to try to find a grasp and add the cost
-                for i in range(n_g):
-                    new_grasp = not is_grasping0[i] and is_grasping[i]
-                    if new_grasp:
-                        # plan the grasp
-                        f_news.append(self.plan_grasp(m, d, is_grasping, grasp_indices, i))
-                        # activate new grasp
-                        change_eq(m, gripper_idx_to_eq_name(i), grasp_indices[i])
-                        d_before = copy(d)
-                        settle(d, m, self.p.grasp_sub_time_s, self.viz)
-                        # add error for the grasp changing the state a lot, or for the eq cosntraint not being met
-                        f_new_mms.append(compute_grasp_error(d_before, d))
-                # deactivate
-                for i in range(n_g):
-                    diff_grasp = is_grasping0[i] and is_grasping[i] and grasp_indices0[i] != grasp_indices[i]
-                    release = is_grasping0[i] and not is_grasping[i]
-                    if release or diff_grasp:
-                        deactivate_eq(m, gripper_idx_to_eq_name(i))
-                        settle(d, m, self.p.grasp_sub_time_s, self.viz)
-                # For each gripper, if it needs a _different_ grasp, run MPPI to try to find a grasp and add the cost
-                for i in range(n_g):
-                    diff_grasp = is_grasping0[i] and is_grasping[i] and grasp_indices0[i] != grasp_indices[i]
-                    if diff_grasp:
-                        f_diffs.append(self.plan_grasp(m, d, is_grasping, grasp_indices, i))
-                        change_eq(m, gripper_idx_to_eq_name(i), grasp_indices[i])
-                        d_before = copy(d)
-                        settle(d, m, self.p.grasp_sub_time_s, self.viz)
-                        f_diff_mms.append(compute_grasp_error(d_before, d))
-                # Finally, MPPI to the goal
-                f_goal = self.plan_to_goal(m, d) * 0.01
+                candidate_grasp_locations = es.ask()  # from 0 to 1
+                costs_lists = []
+                costs = []
+                for grasp_locations in candidate_grasp_locations:
+                    grasp = GraspState(rope_body_indices, grasp_locations)
+                    grasp.set_is_grasping(is_grasping)
+                    logger.info(f'evaluating {grasp=}')
+                    from time import perf_counter
+                    t0 = perf_counter()
+                    # copy model and data since each solution should be different/independent
+                    d = copy(data)
+                    m = copy(self.model)
 
-                f_new = sum(f_news)
-                f_new_mm = sum(f_new_mms)
-                f_diff = sum(f_diffs)
-                f_diff_mm = sum(f_diff_mms)
-                costs_i = [f_is_same, f_new, f_new_mm, f_diff, f_diff_mm, f_goal]
-                total_cost = sum(costs_i)
-                print(total_cost)
+                    is_new = grasp0.is_new(grasp)
+                    is_diff = grasp0.is_diff(grasp)
+                    needs_release = grasp0.needs_release(grasp)
 
-                costs.append(total_cost)
-                costs_lists.append(costs_i)
-                print(f"eval one solution's cost dt: {perf_counter() - t0:.4f}")
+                    f_is_same = 1000 if grasp0 == grasp else 0
+                    f_news = []
+                    f_new_mms = []
+                    f_diffs = []
+                    f_diff_mms = []
+                    # For each gripper, if it needs a _new_ grasp, run MPPI to try to find a grasp and add the cost
+                    # NOTE: technically "order" of which gripper we consider first matters, we should in theory try all
+                    for gripper_idx in range(n_g):
+                        if is_new[gripper_idx]:
+                            # plan the grasp
+                            f_news.append(self.plan_grasp(m, d, grasp, gripper_idx))
+                            # activate new grasp, if we're close enough
+                            change_eq(m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
+                                      rope_body_indices)
+                            d_before = copy(d)
+                            settle(d, m, self.p.grasp_sub_time_s, self.viz)
+                            # add error for the grasp changing the state a lot, or for the eq cosntraint not being met
+                            f_new_mms.append(compute_grasp_error(d_before, d))
+                    # deactivate
+                    for gripper_idx in range(n_g):
+                        if is_diff[gripper_idx] or needs_release[gripper_idx]:
+                            deactivate_eq(m, gripper_idx_to_eq_name(gripper_idx))
+                            settle(d, m, self.p.grasp_sub_time_s, self.viz)
+                    # For each gripper, if it needs a different grasp, run MPPI to try to find a grasp and add the cost
+                    for gripper_idx in range(n_g):
+                        if is_diff[gripper_idx]:
+                            f_diffs.append(self.plan_grasp(m, d, grasp, gripper_idx))
+                            change_eq(m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
+                                      rope_body_indices)
+                            d_before = copy(d)
+                            settle(d, m, self.p.grasp_sub_time_s, self.viz)
+                            f_diff_mms.append(compute_grasp_error(d_before, d))
+                    # Finally, MPPI to the goal
+                    f_goal = self.plan_to_goal(m, d) * 0.01
 
-            # Visualize!
-            all_queries.extend(solutions)
-            all_costs.extend(costs)
-            vis_regrasp_solutions_and_costs(cma_idx, costs, costs_lists, rope_indices, solutions, all_queries, all_costs)
-            es.tell(solutions, costs)
-            print(es.result_pretty())
+                    f_new = sum(f_news)
+                    f_new_mm = sum(f_new_mms)
+                    f_diff = sum(f_diffs)
+                    f_diff_mm = sum(f_diff_mms)
+                    costs_i = [f_is_same, f_new, f_new_mm, f_diff, f_diff_mm, f_goal]
+                    total_cost = sum(costs_i)
+                    print(total_cost)
 
-            cma_idx += 1
+                    costs.append(total_cost)
+                    costs_lists.append(costs_i)
+                    print(f"eval one solution's cost dt: {perf_counter() - t0:.1f}s")
 
-        return es.result.xbest
+                # Visualize!
+                all_queries.extend(candidate_grasp_locations)
+                all_costs.extend(costs)
+                vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_locations, all_queries,
+                                                all_costs)
+                es.tell(candidate_grasp_locations, costs)
+                print(es.result_pretty())
+
+                cma_idx += 1
+
+            if es.result.fbest < overall_fbest:
+                overall_fbest = es.result.fbest
+                overall_xbest = es.result.xbest
+                overall_is_grasping = is_grasping
+
+        logger.info(Fore.GREEN + f"Best grasp: {overall_is_grasping=}, {overall_xbest=}, {overall_fbest=}" + Fore.RESET)
+        return overall_is_grasping, overall_xbest
         #####################################
         # NOTE: just using for testing
         # if self.regrasp_idx % 2 == 0:
@@ -419,12 +412,14 @@ class RegraspMPC:
         # else:
         #     return np.array([-1, 61])
 
-    def compute_grasp_costs(self, solutions: List[np.ndarray], is_grasping0, grasp_indices0, data0: mujoco.MjData):
+    def evaluate_grasps(self, solutions: List[np.ndarray], is_grasping0, grasp_indices0, data0: mujoco.MjData):
         pass
 
-    def plan_grasp(self, m, d, is_grasping, grasp_indices, i):
-        rope_body_to_grasp = m.body(grasp_indices[i])
-        logger.info(f"considering grasping {rope_body_to_grasp.name} with {gripper_idx_to_eq_name(i)} gripper")
+    def plan_grasp(self, m, d, grasp: GraspState, gripper_idx: int):
+        offset = grasp.offsets[gripper_idx]
+        rope_body_to_grasp = m.body(grasp.indices[gripper_idx])
+        logger.info(
+            f"considering grasping {rope_body_to_grasp.name} with {gripper_idx_to_eq_name(gripper_idx)} gripper")
 
         self.mppi.reset()
         self.buffer.reset()
@@ -432,10 +427,11 @@ class RegraspMPC:
 
         warmstart_count = 0
         cumulative_cost = 0
-        regrasp_goal = GraspBodyGoal(model=m,
+        regrasp_goal = GraspRopeGoal(model=m,
                                      body_id_to_grasp=rope_body_to_grasp.id,
                                      goal_radius=0.015,
-                                     gripper_idx=i,
+                                     offset=offset,
+                                     gripper_idx=gripper_idx,
                                      viz=self.viz,
                                      objects=self.objects)
         for grasp_iter in range(self.p.max_regrasp_iters):
@@ -463,6 +459,7 @@ class RegraspMPC:
         return cumulative_cost
 
     def plan_to_goal(self, m, d):
+        logger.info("planning to goal for hypothetical regrasp")
         self.mppi.reset()
         self.buffer.reset()
         self.viz.viz(m, d)
