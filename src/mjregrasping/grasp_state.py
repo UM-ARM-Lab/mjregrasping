@@ -2,6 +2,8 @@
 A grasp "location" is from 0 to 1.
 A grasp "index" is from n to m, and matches the body ids of the rope bodies in mujoco.
 """
+from typing import Optional
+
 import mujoco
 import numpy as np
 
@@ -28,9 +30,11 @@ def grasp_offset(grasp_index, grasp_location, rope_body_indices):
 
 class GraspState:
 
-    def __init__(self, rope_body_indices: np.ndarray, locations: np.ndarray):
+    def __init__(self, rope_body_indices: np.ndarray, locations: np.ndarray, is_grasping: Optional[np.ndarray] = None):
         self.rope_body_indices = rope_body_indices
         self.locations = locations
+        if is_grasping is not None:
+            self.set_is_grasping(is_grasping)
 
     @staticmethod
     def from_mujoco(rope_body_indices: np.ndarray, m: mujoco.MjModel):

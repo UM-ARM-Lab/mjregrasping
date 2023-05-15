@@ -34,8 +34,6 @@ def main():
     p = Params()
     viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
-    goal_rng = np.random.RandomState(0)
-
     root = Path("results")
     root.mkdir(exist_ok=True)
 
@@ -53,7 +51,7 @@ def main():
 
         goal = ObjectPointGoal(model=m,
                                viz=viz,
-                               goal_point=np.array([0.78, 0.04, 1.27]) + goal_rng.uniform(-0.05, 0.05, size=3),
+                               goal_point=np.array([0.73, 0.04, 1.25]),
                                body_idx=-1,
                                goal_radius=0.05,
                                objects=objects)

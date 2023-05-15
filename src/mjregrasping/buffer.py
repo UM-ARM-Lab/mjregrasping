@@ -20,3 +20,6 @@ class Buffer:
 
     def reset(self):
         self.data = []
+
+    def __len__(self):
+        return len(self.data)

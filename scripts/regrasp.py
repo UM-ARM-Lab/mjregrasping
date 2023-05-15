@@ -53,7 +53,7 @@ def main():
 
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
             mpc = RegraspMPC(m, pool, viz, goal, objects=objects, seed=seed, mov=None)
-            mpc.compute_new_grasp(d)
+            mpc.compute_new_grasp(m, d)
 
 
 if __name__ == "__main__":

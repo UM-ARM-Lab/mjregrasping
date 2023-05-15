@@ -108,9 +108,9 @@ class GripperPointGoal(MPPIGoal):
         cost += dist_cost
         cost += action_cost
 
-        rr.log_scalar('costs/pred_contact', pred_contact_cost.mean())
-        rr.log_scalar('costs/action', action_cost.mean())
-        rr.log_scalar('costs/dist', dist_cost.mean())
+        rr.log_scalar('gripper_point_goal/pred_contact', pred_contact_cost.mean())
+        rr.log_scalar('gripper_point_goal/action', action_cost.mean())
+        rr.log_scalar('gripper_point_goal/dist', dist_cost.mean())
 
         return cost
 
@@ -184,9 +184,9 @@ class GraspRopeGoal(MPPIGoal):
         cost += dist_cost
         cost += action_cost
 
-        rr.log_scalar('costs/pred_contact', pred_contact_cost.mean())
-        rr.log_scalar('costs/action', action_cost.mean())
-        rr.log_scalar('costs/dist', dist_cost.mean())
+        rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean())
+        rr.log_scalar('grasp_rope_goal/action', action_cost.mean())
+        rr.log_scalar('grasp_rope_goal/dist', dist_cost.mean())
 
         return cost
 
@@ -262,6 +262,7 @@ class ObjectPointGoal(MPPIGoal):
         pred_point_dist = point_dist[:, 1:]
         gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
         pred_gripper_points = gripper_points[:, 1:]
+        pred_joint_positions = joint_positions[:, 1:]
 
         initial_point_dist = point_dist[:, 0]
         final_point_dist = point_dist[:, -1]
@@ -277,7 +278,7 @@ class ObjectPointGoal(MPPIGoal):
         # negative dot product between:
         # 1. the direction from the specified point to the goal
         # 2. the direction the gripper is moving
-        gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir)  # [b, horizon, 2]
+        gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir) # [b, horizon, 2]
         # since the dot product is bounded from -1 to 1,
         # add 1 and divide by 2 to make it a little easier to compare to the other costs
         gripper_direction_cost = (gripper_direction_cost + 1) / 2
@@ -304,7 +305,7 @@ class ObjectPointGoal(MPPIGoal):
             no_points_useful_cost = self.p.no_points_useful
             cost += no_points_useful_cost
 
-        # add cost for grippers that are not grasping
+        # Add cost for grippers that are not grasping
         # that encourages them to remain close to the rope
         # [b, horizon, n_rope_points, n_grippers]
         rope_gripper_dists = np.linalg.norm(
@@ -317,17 +318,33 @@ class ObjectPointGoal(MPPIGoal):
         min_nongrasping_cost = min_nongrasping_dists * self.p.min_nongrasping_rope_gripper_dists
         cost += min_nongrasping_cost
 
+        # Add a cost that non-grasping grippers should try to return to a "home" position.
+        # Home is assumed to be 0, so penalize the distance from 0.
+        # FIXME: doesn't generalize, hard-coded for Val
+        arm_gripper_matrix = np.zeros([20, 2])
+        left_joint_indices = np.arange(2, 2+9)
+        right_joint_indices = np.arange(11, 11+9)
+        arm_gripper_matrix[left_joint_indices, 0] = 1
+        arm_gripper_matrix[right_joint_indices, 1] = 1
+        home_cost_joints = np.abs(pred_joint_positions)  # [b, horizon, n_joints]
+        home_cost_grippers = home_cost_joints @ arm_gripper_matrix
+        nongrasping_home_cost = np.sum(home_cost_grippers * pred_is_not_grasping, -1)  # [b, horizon]
+        nongrasping_home_cost = nongrasping_home_cost * self.p.nongrasping_home
+        cost += nongrasping_home_cost
+
+        # Add an action cost
         action_cost = get_action_cost(joint_positions, self.p)
         cost += action_cost
 
         # keep track of this in a member variable, so we can detect when it's value has changed
-        rr.log_scalar('costs/any_points_useful', self.any_points_useful, color=[255, 0, 0])
-        rr.log_scalar('costs/cannot_progress', cannot_progress.mean(), color=[0, 255, 0])
-        rr.log_scalar('costs/points', point_dist.mean(), color=[0, 0, 255])
-        rr.log_scalar('costs/gripper_dir', grasping_gripper_direction_cost.mean(), color=[255, 0, 255])
-        rr.log_scalar('costs/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
-        rr.log_scalar('costs/min_nongrasping', min_nongrasping_cost.mean(), color=[0, 255, 255])
-        rr.log_scalar('costs/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('object_point_goal/any_points_useful', self.any_points_useful, color=[255, 0, 0])
+        rr.log_scalar('object_point_goal/cannot_progress', cannot_progress.mean(), color=[0, 255, 0])
+        rr.log_scalar('object_point_goal/points', point_dist.mean(), color=[0, 0, 255])
+        rr.log_scalar('object_point_goal/gripper_dir', grasping_gripper_direction_cost.mean(), color=[255, 0, 255])
+        rr.log_scalar('object_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('object_point_goal/min_nongrasping', min_nongrasping_cost.mean(), color=[0, 255, 255])
+        rr.log_scalar('object_point_goal/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('object_point_goal/home', nongrasping_home_cost.mean(), color=[128, 0, 0])
 
         return cost  # [b, horizon]
 
