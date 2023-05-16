@@ -4,6 +4,7 @@ from copy import copy
 import mujoco
 import numpy as np
 import rerun as rr
+from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
 from mjregrasping.params import Params
@@ -101,7 +102,7 @@ class GripperPointGoal(MPPIGoal):
         left_gripper_pos, right_gripper_pos, joint_positions, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
-        dist_cost = np.linalg.norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
+        dist_cost = norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
         action_cost = get_action_cost(joint_positions, self.p)
 
         cost = copy(pred_contact_cost)
@@ -116,7 +117,7 @@ class GripperPointGoal(MPPIGoal):
 
     def satisfied(self, data):
         gripper_pos = self.choose_gripper_pos(data.site('left_tool').xpos, data.site('right_tool').xpos)
-        distance = np.linalg.norm(self.goal_point - gripper_pos, axis=-1)
+        distance = norm(self.goal_point - gripper_pos, axis=-1)
         return distance < self.goal_radius
 
     def viz_goal(self, d):
@@ -177,7 +178,7 @@ class GraspRopeGoal(MPPIGoal):
         left_gripper_pos, right_gripper_pos, joint_positions, body_pos, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
-        dist_cost = np.linalg.norm(body_pos - gripper_point, axis=-1)[:, 1:]
+        dist_cost = norm(body_pos - gripper_point, axis=-1)[:, 1:]
         action_cost = get_action_cost(joint_positions, self.p)
 
         cost = copy(pred_contact_cost)
@@ -193,7 +194,7 @@ class GraspRopeGoal(MPPIGoal):
     def satisfied(self, data):
         body_pos = self.get_body_pos(data)
         gripper_pos = self.choose_gripper_pos(data.site('left_tool').xpos, data.site('right_tool').xpos)
-        distance = np.linalg.norm(body_pos - gripper_pos, axis=-1)
+        distance = norm(body_pos - gripper_pos, axis=-1)
         return distance < self.goal_radius
 
     def viz_goal(self, d):
@@ -248,12 +249,8 @@ class ObjectPointGoal(MPPIGoal):
         self.goal_radius = goal_radius
         self.objects = objects
         self.p = self.viz.p
-        self.last_any_points_useful = True
-        self.any_points_useful = True
 
     def cost(self, results):
-        self.last_any_points_useful = self.any_points_useful
-
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
 
         pred_rope_points = rope_points[:, 1:]
@@ -270,7 +267,6 @@ class ObjectPointGoal(MPPIGoal):
         points_can_progress = (final_point_dist + near_threshold) < initial_point_dist
         points_near_goal = initial_point_dist < (2 * near_threshold)
         points_useful = np.logical_or(points_can_progress, points_near_goal)
-        self.any_points_useful = points_useful.any()
         gripper_dir = (gripper_points[:, 1:] - gripper_points[:, :-1])  # [b, horizon, 2, 3]
         pred_is_grasping = is_grasping[:, 1:]  # skip t=0
         specified_points = pred_rope_points[..., 0, self.body_idx, :]
@@ -278,7 +274,7 @@ class ObjectPointGoal(MPPIGoal):
         # negative dot product between:
         # 1. the direction from the specified point to the goal
         # 2. the direction the gripper is moving
-        gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir) # [b, horizon, 2]
+        gripper_direction_cost = -np.einsum('abcd,ad->abc', gripper_dir, specified_point_to_goal_dir)  # [b, horizon, 2]
         # since the dot product is bounded from -1 to 1,
         # add 1 and divide by 2 to make it a little easier to compare to the other costs
         gripper_direction_cost = (gripper_direction_cost + 1) / 2
@@ -290,27 +286,18 @@ class ObjectPointGoal(MPPIGoal):
         cannot_progress = np.logical_or(np.all(is_grasping0, axis=-1), np.all(np.logical_not(is_grasping0), axis=-1))
         cannot_progress_penalty = cannot_progress * self.p.cannot_progress
 
-        logger.debug(f"{self.any_points_useful=}")
-        # copy because we want to be able to plot the original value of this later
-        if self.any_points_useful:
-            cost = copy(pred_point_dist)
-        else:
-            cost = copy(grasping_gripper_direction_cost)
+        cost = copy(pred_point_dist)
+
+        cost += grasping_gripper_direction_cost
 
         cost += np.expand_dims(cannot_progress_penalty, -1)
 
         cost += pred_contact_cost
 
-        if not self.any_points_useful:
-            no_points_useful_cost = self.p.no_points_useful
-            cost += no_points_useful_cost
-
         # Add cost for grippers that are not grasping
         # that encourages them to remain close to the rope
         # [b, horizon, n_rope_points, n_grippers]
-        rope_gripper_dists = np.linalg.norm(
-            np.expand_dims(pred_gripper_points, -3) - np.expand_dims(pred_rope_points, -2),
-            axis=-1)
+        rope_gripper_dists = norm(pred_gripper_points[..., None, :, :, :] - pred_rope_points[..., None, :, :], axis=-1)
         pred_is_not_grasping = 1 - pred_is_grasping
         min_nongrasping_dists = np.sum(np.min(rope_gripper_dists, -2) * pred_is_not_grasping, -1)  # [b, horizon]
         min_nongrasping_dists = np.sqrt(np.maximum(min_nongrasping_dists - self.p.nongrasping_close, 0))
@@ -322,8 +309,8 @@ class ObjectPointGoal(MPPIGoal):
         # Home is assumed to be 0, so penalize the distance from 0.
         # FIXME: doesn't generalize, hard-coded for Val
         arm_gripper_matrix = np.zeros([20, 2])
-        left_joint_indices = np.arange(2, 2+9)
-        right_joint_indices = np.arange(11, 11+9)
+        left_joint_indices = np.arange(2, 2 + 9)
+        right_joint_indices = np.arange(11, 11 + 9)
         arm_gripper_matrix[left_joint_indices, 0] = 1
         arm_gripper_matrix[right_joint_indices, 1] = 1
         home_cost_joints = np.abs(pred_joint_positions)  # [b, horizon, n_joints]
@@ -337,7 +324,7 @@ class ObjectPointGoal(MPPIGoal):
         cost += action_cost
 
         # keep track of this in a member variable, so we can detect when it's value has changed
-        rr.log_scalar('object_point_goal/any_points_useful', self.any_points_useful, color=[255, 0, 0])
+        rr.log_scalar('object_point_goal/any_points_useful', any_points_useful, color=[255, 0, 0])
         rr.log_scalar('object_point_goal/cannot_progress', cannot_progress.mean(), color=[0, 255, 0])
         rr.log_scalar('object_point_goal/points', point_dist.mean(), color=[0, 0, 255])
         rr.log_scalar('object_point_goal/gripper_dir', grasping_gripper_direction_cost.mean(), color=[255, 0, 255])
@@ -355,14 +342,14 @@ class ObjectPointGoal(MPPIGoal):
 
     def gripper_dists_to_specified_point(self, left_tool_pos, right_tool_pos):
         gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
-        gripper_distances = np.linalg.norm((gripper_points - self.goal_point[None, None, None]), axis=-1)
+        gripper_distances = norm((gripper_points - self.goal_point[None, None, None]), axis=-1)
         return gripper_distances
 
     def min_dist_to_specified_point(self, points):
         return self.min_dist_from_points_to_specified_point(points[..., self.body_idx, :])
 
     def min_dist_from_points_to_specified_point(self, points):
-        return np.linalg.norm((points - self.goal_point), axis=-1)
+        return norm((points - self.goal_point), axis=-1)
 
     def viz_result(self, result, idx: int, scale, color):
         left_tool_pos = result[2]

@@ -1,8 +1,11 @@
+from typing import Optional
+
 import numpy as np
 
 from mjregrasping.grasping import activate_eq
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
+from mjregrasping.viz import Viz
 
 
 def setup_tangled_scene(m, d, viz):
@@ -29,16 +32,14 @@ def setup_untangled_scene(m, d, viz):
     activate_and_settle(m, d, viz, sub_time_s=DEFAULT_SUB_TIME_S)
 
 
-def activate_and_settle(m, d, viz, sub_time_s):
+def activate_and_settle(m, d, viz, sub_time_s, is_planning=False):
     # Activate the connect constraint between the rope and the gripper to
     activate_eq(m, 'right')
     # settle
-    settle(d, m, sub_time_s, viz)
+    settle(d, m, sub_time_s, viz, is_planning)
 
 
-def settle(d, m, sub_time_s, viz):
-    for _ in range(100):
-        viz.viz(m, d)
+def settle(d, m, sub_time_s, viz: Viz, is_planning, settle_steps=50):
+    for _ in range(settle_steps):
+        viz.viz(m, d, is_planning)
         control_step(m, d, np.zeros(m.nu), sub_time_s=sub_time_s)
-
-

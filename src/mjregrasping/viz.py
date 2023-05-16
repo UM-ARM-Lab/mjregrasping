@@ -40,8 +40,12 @@ class Viz:
         self.tfw.send_transform(translation, quat_xyzw, parent=parent, child=child)
         # TODO: also show in rerun
 
-    def viz(self, m: mujoco.MjModel, d: mujoco.MjData):
+    def viz(self, m: mujoco.MjModel, d: mujoco.MjData, is_planning: bool = False):
         if self.p.rviz:
-            self.rviz.viz(m, d)
+            if is_planning:
+                if self.p.viz_planning:
+                    self.rviz.viz(m, d, is_planning, alpha=self.p.is_planning_alpha)
+            else:
+                self.rviz.viz(m, d, is_planning, alpha=1.0)
         if self.p.rr:
             self.mjrr.viz(m, d)

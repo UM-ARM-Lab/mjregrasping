@@ -35,15 +35,12 @@ class MjRViz:
         self.tfw = tfw
         self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
 
-        self.eq_constraints_pub = rospy.Publisher(
-            "eq_constraints", MarkerArray, queue_size=1000, latch=False
-        )
-        self.contacts_pub = rospy.Publisher(
-            "contacts", MarkerArray, queue_size=1000, latch=False
-        )
-        self.pub = rospy.Publisher('all', MarkerArray, queue_size=1000, latch=False)
+        self.eq_constraints_pub = rospy.Publisher("eq_constraints", MarkerArray, queue_size=10)
+        self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
+        self.pub = rospy.Publisher('all', MarkerArray, queue_size=10)
+        self.planning_markers_pub = rospy.Publisher('planning', MarkerArray, queue_size=10)
 
-    def viz(self, model, data, alpha=1, idx=0):
+    def viz(self, model, data, is_planning: bool, alpha=1):
         # 3D viz in rviz
         geom_markers_msg = MarkerArray()
         for geom_id in range(model.ngeom):
@@ -53,8 +50,8 @@ class MjRViz:
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
             geom_marker_msg.header.frame_id = "world"
-            geom_marker_msg.ns = "/".join(parent_names)
-            geom_marker_msg.id = idx * 10000 + geom_id
+            geom_marker_msg.ns = f"{parent_names[-1]}/{parent_names[0]}"
+            geom_marker_msg.id = geom_id
 
             geom_type = model.geom_type[geom_id]
             body_pos = data.xpos[geom_bodyid]
@@ -167,7 +164,10 @@ class MjRViz:
 
             geom_markers_msg.markers.append(geom_marker_msg)
 
-        self.pub.publish(geom_markers_msg)
+        if is_planning:
+            self.planning_markers_pub.publish(geom_markers_msg)
+        else:
+            self.pub.publish(geom_markers_msg)
 
         for body_id in range(model.nbody):
             name = mj_id2name(model, mju_str2Type("body"), body_id)

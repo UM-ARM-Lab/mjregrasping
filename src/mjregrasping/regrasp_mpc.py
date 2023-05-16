@@ -131,7 +131,7 @@ class RegraspMPC:
         lambda_ = self.p.lambda_
         self.mppi = MujocoMPPI(pool, self.m, seed=seed, num_samples=n_samples, noise_sigma=np.deg2rad(8),
                                horizon=horizon, lambda_=lambda_)
-        self.buffer = Buffer(10)
+        self.dq_buffer = Buffer(12)
         self.max_dq = 0
 
         self.regrasp_idx = 0
@@ -142,7 +142,8 @@ class RegraspMPC:
                 self.close()
                 return Result(Status.SHUTDOWN, "ROS shutdown", np.inf)
 
-            move_result = self.move_to_goal(self.m, d, self.p.max_move_to_goal_iters, self.mov)
+            move_result = self.move_to_goal(self.m, d, self.p.max_move_to_goal_iters, is_planning=False)
+            self.max_dq = 0  # reset "stuck" detection
 
             if move_result.status in [Status.SUCCESS, Status.FAILED, Status.SHUTDOWN]:
                 self.close()
@@ -150,7 +151,8 @@ class RegraspMPC:
 
             grasp = self.compute_new_grasp(self.m, d)
             grasp_result = self.do_multi_gripper_regrasp(self.m, d, grasp, max_iters=self.p.max_grasp_iters,
-                                                         stop_if_failed=True, mov=self.mov)
+                                                         stop_if_failed=True, is_planning=False)
+            self.max_dq = 0  # reset "stuck" detection
             if grasp_result.status in [Status.FAILED, Status.SHUTDOWN]:
                 self.close()
                 return grasp_result
@@ -158,21 +160,21 @@ class RegraspMPC:
             self.regrasp_idx += 1
 
     def check_needs_regrasp(self, data):
-        self.buffer.insert(data.qpos[self.objects.val.qpos_indices])
-        qposs = np.array(self.buffer.data)
+        self.dq_buffer.insert(data.qpos[self.objects.val.qpos_indices])
+        qposs = np.array(self.dq_buffer.data)
         if len(qposs) < 2:
             dq = 0
         else:
-            dq = (np.abs(qposs[-1] - qposs[0]) / len(self.buffer)).mean()
+            dq = (np.abs(qposs[-1] - qposs[0]) / len(self.dq_buffer)).mean()
         self.max_dq = max(self.max_dq, dq)
         has_not_moved = dq < self.p.frac_max_dq * self.max_dq
-        needs_regrasp = self.buffer.full() and has_not_moved
+        needs_regrasp = self.dq_buffer.full() and has_not_moved
         rr.log_scalar('needs_regrasp/dq', dq)
         rr.log_scalar('needs_regrasp/max_dq', self.max_dq)
         return needs_regrasp
 
-    def do_multi_gripper_regrasp(self, m, d, grasp, max_iters, stop_if_failed=False,
-                                 mov: Optional[MjMovieMaker] = None):
+    def do_multi_gripper_regrasp(self, m, d, grasp, max_iters, is_planning: bool, stop_if_failed=False):
+        settle_steps = self.p.plan_settle_steps if is_planning else self.p.settle_steps
         grasp0 = GraspState.from_mujoco(self.rope_body_indices, m)
         is_new = grasp0.is_new(grasp)
         is_diff = grasp0.is_diff(grasp)
@@ -186,14 +188,14 @@ class RegraspMPC:
         for gripper_idx in range(self.n_g):
             if is_new[gripper_idx]:
                 # plan the grasp
-                f_new_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, mov)
+                f_new_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, is_planning)
                 if f_new_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_new_result
                 f_news.append(f_new_result.cost)
                 # activate new grasp
                 change_eq(m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
                           self.rope_body_indices)
-                settle(d, m, self.p.grasp_sub_time_s, self.viz)
+                settle(d, m, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
                 # add error for the grasp changing the state a lot, or for the eq cosntraint not being met
                 f_new_mm_i = compute_grasp_error(m, d)
                 f_new_mms.append(f_new_mm_i)
@@ -201,17 +203,17 @@ class RegraspMPC:
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx] or needs_release[gripper_idx]:
                 deactivate_eq(m, gripper_idx_to_eq_name(gripper_idx))
-                settle(d, m, self.p.grasp_sub_time_s, self.viz)
+                settle(d, m, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
         # For each gripper, if it needs a different grasp, run MPPI to try to find a grasp and add the cost
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx]:
-                f_diff_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, mov)
+                f_diff_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, is_planning)
                 if f_diff_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_diff_result
                 f_diffs.append(f_diff_result.cost)
                 change_eq(m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
                           self.rope_body_indices)
-                settle(d, m, self.p.grasp_sub_time_s, self.viz)
+                settle(d, m, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
                 f_diff_mm_i = compute_grasp_error(m, d)
                 f_diff_mms.append(f_diff_mm_i)
 
@@ -271,11 +273,12 @@ class RegraspMPC:
                     logger.info(f'evaluating {grasp=}')
 
                     f_is_same = 1000 if grasp0 == grasp else 0
-                    regrasp_result = self.do_multi_gripper_regrasp(m, d, grasp, self.p.max_grasp_iters)
+                    regrasp_result = self.do_multi_gripper_regrasp(m, d, grasp, self.p.max_grasp_plan_iters,
+                                                                   is_planning=True)
                     f_news, f_new_mms, f_diffs, f_diff_mms = regrasp_result.cost
 
                     # Finally, MPPI to the goal
-                    move_result = self.move_to_goal(m, d, self.p.max_plan_to_goal_iters)
+                    move_result = self.move_to_goal(m, d, self.p.max_plan_to_goal_iters, is_planning=True)
                     f_goal = move_result.cost * 0.01
 
                     f_new = sum(f_news)
@@ -307,15 +310,15 @@ class RegraspMPC:
         logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {f_best=}" + Fore.RESET)
         return grasp_best
 
-    def do_single_gripper_grasp(self, m, d, grasp: GraspState, gripper_idx: int, max_iters: int, mov):
+    def do_single_gripper_grasp(self, m, d, grasp: GraspState, gripper_idx: int, max_iters: int, is_planning: bool):
         offset = grasp.offsets[gripper_idx]
         rope_body_to_grasp = m.body(grasp.indices[gripper_idx])
         logger.info(
             f"considering grasping {rope_body_to_grasp.name} with {gripper_idx_to_eq_name(gripper_idx)} gripper")
 
         self.mppi.reset()
-        self.buffer.reset()
-        self.viz.viz(m, d)
+        self.dq_buffer.reset()
+        self.viz.viz(m, d, is_planning)
 
         warmstart_count = 0
         cumulative_cost = 0
@@ -343,9 +346,9 @@ class RegraspMPC:
             self.mppi_viz(grasp_goal, m, d, command, self.p.grasp_sub_time_s)
 
             control_step(m, d, command, sub_time_s=self.p.grasp_sub_time_s)
-            self.viz.viz(m, d)
-            if mov is not None:
-                mov.render(d)
+            self.viz.viz(m, d, is_planning)
+            if not is_planning:
+                self.mov.render(d)
             self.mppi.roll()
 
             if grasp_iter > max_iters:
@@ -354,10 +357,10 @@ class RegraspMPC:
             grasp_iter += 1
             cumulative_cost += self.mppi.cost.min()
 
-    def move_to_goal(self, m, d, max_iters, mov: Optional[MjMovieMaker] = None):
+    def move_to_goal(self, m, d, max_iters, is_planning: bool):
         self.mppi.reset()
-        self.buffer.reset()
-        self.viz.viz(m, d)
+        self.dq_buffer.reset()
+        self.viz.viz(m, d, is_planning)
         warmstart_count = 0
         cumulative_cost = 0
         move_iter = 0
@@ -370,8 +373,6 @@ class RegraspMPC:
             if self.goal.satisfied(d):
                 return Result(Status.SUCCESS, "Goal reached!", cumulative_cost)
 
-            # if self.goal.last_any_points_useful != self.goal.any_points_useful:
-            #     warmstart_count = 0
             while warmstart_count < self.p.warmstart:
                 command = self.mppi.command(m, d, self.goal.get_results, self.goal.cost, self.p.grasp_sub_time_s)
                 self.mppi_viz(self.goal, m, d, command, self.p.grasp_sub_time_s)
@@ -380,9 +381,9 @@ class RegraspMPC:
             self.mppi_viz(self.goal, m, d, command, self.p.grasp_sub_time_s)
 
             control_step(m, d, command, self.p.grasp_sub_time_s)
-            self.viz.viz(m, d)
-            if mov is not None:
-                mov.render(d)
+            self.viz.viz(m, d, is_planning)
+            if not is_planning:
+                self.mov.render(d)
 
             self.mppi.roll()
 

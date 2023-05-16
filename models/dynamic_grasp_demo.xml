@@ -1,0 +1,28 @@
+<mujoco model="untangle">
+    <worldbody>
+        <body pos="0 0 0" name="floor">
+            <geom type="plane" name="floor" size="10 10 0.1"/>
+        </body>
+        <body pos="0 0.1 0.01" euler="0 0 -1.5707" name="rope">
+            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
+            <composite type="cable" curve="s" count="12 1 1" size="1 0.22 1">
+                <joint kind="main" damping=".015"/>
+                <geom type="capsule" size=".01" rgba=".8 .2 .1 1" condim="1"/>
+            </composite>
+            <joint type="free"/>
+        </body>
+        <body pos="0 -0.1 0.06" name="gripper">
+            <geom type="box" name="gripper" size="0.02 0.02 0.02" rgba="0.2 0.8 0.2 1"/>
+            <site name="gripper" pos="0 0 -0.04"/>  <!-- just to visually show where the grasp "anchor" is -->
+            <joint type="slide" axis="1 0 0" name="gripper_x" damping="5"/>
+            <joint type="slide" axis="0 1 0" name="gripper_y" damping="5"/>
+        </body>
+    </worldbody>
+    <actuator>
+        <position ctrllimited="true" ctrlrange="-1 1" joint="gripper_x" kp="50"/>
+        <position ctrllimited="true" ctrlrange="-1 1" joint="gripper_y" kp="50"/>
+    </actuator>
+    <equality>
+        <connect body1="gripper" body2="B_first" anchor="0 0 -0.04" name="grasp" active="false"/>
+    </equality>
+</mujoco>

@@ -5,7 +5,6 @@ from time import sleep
 import mujoco
 import numpy as np
 import rerun as rr
-from mujoco import viewer
 
 from mjregrasping.buffer import Buffer
 from mjregrasping.rerun_visualizer import MjReRun

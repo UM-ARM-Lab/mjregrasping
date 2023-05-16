@@ -37,7 +37,8 @@ def main():
     root = Path("results")
     root.mkdir(exist_ok=True)
 
-    for seed in range(p.n_seeds):
+    n_seeds = 5
+    for seed in range(n_seeds):
         m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
         objects = Objects(m)
         d = mujoco.MjData(m)
