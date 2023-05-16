@@ -150,7 +150,7 @@ class RegraspMPC:
 
             grasp = self.compute_new_grasp(self.m, d)
             grasp_result = self.do_multi_gripper_regrasp(self.m, d, grasp, max_iters=self.p.max_grasp_iters,
-                                                         stop_if_failed=True)
+                                                         stop_if_failed=True, mov=self.mov)
             if grasp_result.status in [Status.FAILED, Status.SHUTDOWN]:
                 self.close()
                 return grasp_result
@@ -171,7 +171,8 @@ class RegraspMPC:
         rr.log_scalar('needs_regrasp/max_dq', self.max_dq)
         return needs_regrasp
 
-    def do_multi_gripper_regrasp(self, m, d, grasp, max_iters, stop_if_failed=False):
+    def do_multi_gripper_regrasp(self, m, d, grasp, max_iters, stop_if_failed=False,
+                                 mov: Optional[MjMovieMaker] = None):
         grasp0 = GraspState.from_mujoco(self.rope_body_indices, m)
         is_new = grasp0.is_new(grasp)
         is_diff = grasp0.is_diff(grasp)
@@ -185,7 +186,7 @@ class RegraspMPC:
         for gripper_idx in range(self.n_g):
             if is_new[gripper_idx]:
                 # plan the grasp
-                f_new_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters)
+                f_new_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, mov)
                 if f_new_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_new_result
                 f_news.append(f_new_result.cost)
@@ -204,7 +205,7 @@ class RegraspMPC:
         # For each gripper, if it needs a different grasp, run MPPI to try to find a grasp and add the cost
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx]:
-                f_diff_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters)
+                f_diff_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, mov)
                 if f_diff_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_diff_result
                 f_diffs.append(f_diff_result.cost)
@@ -306,7 +307,7 @@ class RegraspMPC:
         logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {f_best=}" + Fore.RESET)
         return grasp_best
 
-    def do_single_gripper_grasp(self, m, d, grasp: GraspState, gripper_idx: int, max_iters: int):
+    def do_single_gripper_grasp(self, m, d, grasp: GraspState, gripper_idx: int, max_iters: int, mov):
         offset = grasp.offsets[gripper_idx]
         rope_body_to_grasp = m.body(grasp.indices[gripper_idx])
         logger.info(
@@ -343,6 +344,8 @@ class RegraspMPC:
 
             control_step(m, d, command, sub_time_s=self.p.grasp_sub_time_s)
             self.viz.viz(m, d)
+            if mov is not None:
+                mov.render(d)
             self.mppi.roll()
 
             if grasp_iter > max_iters:
