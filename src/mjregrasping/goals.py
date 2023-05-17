@@ -83,6 +83,7 @@ class GripperPointGoal(MPPIGoal):
         """
         left_gripper_pos, right_gripper_pos, joint_positions, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
+        pred_contact_cost *= self.p.contact_cost
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
         action_cost = get_action_cost(joint_positions, self.p)
@@ -142,6 +143,7 @@ class GraspRopeGoal(MPPIGoal):
         self.gripper_idx = gripper_idx
         self.objects = objects
         self.p = self.viz.p
+        self.initial_body_pos = None
 
     def cost(self, results):
         """
@@ -154,15 +156,22 @@ class GraspRopeGoal(MPPIGoal):
         """
         left_gripper_pos, right_gripper_pos, joint_positions, body_pos, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
+        pred_contact_cost *= self.p.contact_cost
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(body_pos - gripper_point, axis=-1)[:, 1:]
         action_cost = get_action_cost(joint_positions, self.p)
 
+        if self.initial_body_pos is None:
+            self.initial_body_pos = body_pos
+        rope_motion_cost = norm(body_pos - self.initial_body_pos, axis=-1)[:, 1:]
+
         cost = copy(pred_contact_cost)
         cost += dist_cost
         cost += action_cost
+        cost += rope_motion_cost
 
         rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean())
+        rr.log_scalar('grasp_rope_goal/rope_motion', rope_motion_cost.mean())
         rr.log_scalar('grasp_rope_goal/action', action_cost.mean())
         rr.log_scalar('grasp_rope_goal/dist', dist_cost.mean())
 
@@ -227,6 +236,7 @@ class ObjectPointGoal(MPPIGoal):
 
         pred_rope_points = rope_points[:, 1:]
         pred_contact_cost = contact_cost[:, 1:]
+        pred_contact_cost *= self.p.contact_cost
         point_dist = self.min_dist_to_specified_point(rope_points)
         pred_point_dist = point_dist[:, 1:]
         gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
@@ -343,7 +353,8 @@ def get_contact_cost(phy: Physics, objects: Objects, p: Params):
         geom_name1 = phy.m.geom(contact.geom1).name
         geom_name2 = phy.m.geom(contact.geom2).name
         if (geom_name1 in objects.obstacle.geom_names and geom_name2 in objects.val.geom_names) or \
-                (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val.geom_names):
+                (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val.geom_names) or \
+                (geom_name1 in objects.val.geom_names and geom_name2 in objects.val.geom_names):
             contact_cost += 1
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts

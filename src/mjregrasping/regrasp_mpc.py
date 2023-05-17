@@ -165,6 +165,8 @@ class RegraspMPC:
         if len(qposs) < 2:
             dq = 0
         else:
+            # distance between the newest and oldest q in the buffer
+            # the mean takes the average across joints.
             dq = (np.abs(qposs[-1] - qposs[0]) / len(self.dq_buffer)).mean()
         self.max_dq = max(self.max_dq, dq)
         has_not_moved = dq < self.p.frac_max_dq * self.max_dq
