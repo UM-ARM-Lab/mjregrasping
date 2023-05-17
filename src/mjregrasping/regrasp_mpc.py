@@ -332,8 +332,8 @@ class RegraspMPC:
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")
 
-            grasp_goal.viz_goal(phy.d)
-            if grasp_goal.satisfied(phy.d):
+            grasp_goal.viz_goal(phy)
+            if grasp_goal.satisfied(phy):
                 return Result(Status.SUCCESS, f"Grasp successful", cumulative_cost)
 
             while warmstart_count < self.p.warmstart:
