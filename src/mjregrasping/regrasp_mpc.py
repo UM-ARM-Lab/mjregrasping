@@ -5,7 +5,6 @@ from enum import Enum, auto
 from typing import Optional
 
 import cma
-import mujoco
 import numpy as np
 import rerun as rr
 from colorama import Fore
@@ -20,6 +19,7 @@ from mjregrasping.grasp_state import GraspState
 from mjregrasping.grasping import deactivate_eq
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_mppi import MujocoMPPI
+from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import log_box
 from mjregrasping.rollout import control_step, rollout
 from mjregrasping.scenes import settle
@@ -54,11 +54,11 @@ def gripper_idx_to_eq_name(gripper_idx):
     return 'left' if gripper_idx == 0 else 'right'
 
 
-def compute_grasp_error(m, d):
+def compute_grasp_error(phy):
     grasp_errors = []
-    for i in range(m.neq):
-        eq = m.eq(i)
-        grasp_errors.append(np.sum(np.square(d.body(eq.obj2id).xpos - d.body(eq.obj1id).xpos)))
+    for i in range(phy.m.neq):
+        eq = phy.m.eq(i)
+        grasp_errors.append(np.sum(np.square(phy.d.body(eq.obj2id).xpos - phy.d.body(eq.obj1id).xpos)))
     return sum(grasp_errors) * 10
 
 
@@ -136,21 +136,21 @@ class RegraspMPC:
 
         self.regrasp_idx = 0
 
-    def run(self, d):
+    def run(self, phy):
         for self.iter in range(self.p.iters):
             if rospy.is_shutdown():
                 self.close()
                 return Result(Status.SHUTDOWN, "ROS shutdown", np.inf)
 
-            move_result = self.move_to_goal(self.m, d, self.p.max_move_to_goal_iters, is_planning=False)
+            move_result = self.move_to_goal(phy, self.p.max_move_to_goal_iters, is_planning=False)
             self.max_dq = 0  # reset "stuck" detection
 
             if move_result.status in [Status.SUCCESS, Status.FAILED, Status.SHUTDOWN]:
                 self.close()
                 return move_result
 
-            grasp = self.compute_new_grasp(self.m, d)
-            grasp_result = self.do_multi_gripper_regrasp(self.m, d, grasp, max_iters=self.p.max_grasp_iters,
+            grasp = self.compute_new_grasp(phy)
+            grasp_result = self.do_multi_gripper_regrasp(phy, grasp, max_iters=self.p.max_grasp_iters,
                                                          stop_if_failed=True, is_planning=False)
             self.max_dq = 0  # reset "stuck" detection
             if grasp_result.status in [Status.FAILED, Status.SHUTDOWN]:
@@ -173,9 +173,9 @@ class RegraspMPC:
         rr.log_scalar('needs_regrasp/max_dq', self.max_dq)
         return needs_regrasp
 
-    def do_multi_gripper_regrasp(self, m, d, grasp, max_iters, is_planning: bool, stop_if_failed=False):
+    def do_multi_gripper_regrasp(self, phy, grasp, max_iters, is_planning: bool, stop_if_failed=False):
         settle_steps = self.p.plan_settle_steps if is_planning else self.p.settle_steps
-        grasp0 = GraspState.from_mujoco(self.rope_body_indices, m)
+        grasp0 = GraspState.from_mujoco(self.rope_body_indices, phy)
         is_new = grasp0.is_new(grasp)
         is_diff = grasp0.is_diff(grasp)
         needs_release = grasp0.needs_release(grasp)
@@ -188,49 +188,49 @@ class RegraspMPC:
         for gripper_idx in range(self.n_g):
             if is_new[gripper_idx]:
                 # plan the grasp
-                f_new_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, is_planning)
+                f_new_result = self.do_single_gripper_grasp(phy, grasp, gripper_idx, max_iters, is_planning)
                 if f_new_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_new_result
                 f_news.append(f_new_result.cost)
                 # activate new grasp
-                change_eq(m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
+                change_eq(phy.m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
                           self.rope_body_indices)
-                settle(d, m, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
+                settle(phy, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
                 # add error for the grasp changing the state a lot, or for the eq cosntraint not being met
-                f_new_mm_i = compute_grasp_error(m, d)
+                f_new_mm_i = compute_grasp_error(phy)
                 f_new_mms.append(f_new_mm_i)
         # deactivate
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx] or needs_release[gripper_idx]:
-                deactivate_eq(m, gripper_idx_to_eq_name(gripper_idx))
-                settle(d, m, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
+                deactivate_eq(phy.m, gripper_idx_to_eq_name(gripper_idx))
+                settle(phy, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
         # For each gripper, if it needs a different grasp, run MPPI to try to find a grasp and add the cost
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx]:
-                f_diff_result = self.do_single_gripper_grasp(m, d, grasp, gripper_idx, max_iters, is_planning)
+                f_diff_result = self.do_single_gripper_grasp(phy, grasp, gripper_idx, max_iters, is_planning)
                 if f_diff_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_diff_result
                 f_diffs.append(f_diff_result.cost)
-                change_eq(m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
+                change_eq(phy.m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
                           self.rope_body_indices)
-                settle(d, m, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
-                f_diff_mm_i = compute_grasp_error(m, d)
+                settle(phy, self.p.grasp_sub_time_s, self.viz, is_planning, settle_steps)
+                f_diff_mm_i = compute_grasp_error(phy)
                 f_diff_mms.append(f_diff_mm_i)
 
         return Result(Status.SUCCESS, cost=(f_news, f_new_mms, f_diffs, f_diff_mms))
 
-    def compute_new_grasp(self, real_m: mujoco.MjModel, data: mujoco.MjData):
+    def compute_new_grasp(self, phy: Physics):
         #####################################
         # NOTE: just using for testing
         if self.regrasp_idx % 2 == 0:
-            return GraspState(self.rope_body_indices, np.array([0.48, 0.0]), np.array([1, 0]))
+            return GraspState(self.rope_body_indices, np.array([0.49, 0.0]), np.array([1, 0]))
         else:
-            return GraspState(self.rope_body_indices, np.array([0.0, 0.98]), np.array([0, 1]))
+            return GraspState(self.rope_body_indices, np.array([0.0, 0.95]), np.array([0, 1]))
 
         # TODO: use `Physics`
         # real_m is the model we use for executing the simulation.
         # m is the model we use for planning.
-        grasp0 = GraspState.from_mujoco(self.rope_body_indices, real_m)
+        grasp0 = GraspState.from_mujoco(self.rope_body_indices, phy.m)
         all_binary_grasps = np.array([
             [1, 0],
             [0, 1],
@@ -266,19 +266,18 @@ class RegraspMPC:
                     from time import perf_counter
                     t0 = perf_counter()
                     # copy model and data since each solution should be different/independent
-                    d = copy(data)
-                    m = copy(real_m)
+                    candidate_phy = copy(phy)
 
                     grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping)
                     logger.info(f'evaluating {grasp=}')
 
                     f_is_same = 1000 if grasp0 == grasp else 0
-                    regrasp_result = self.do_multi_gripper_regrasp(m, d, grasp, self.p.max_grasp_plan_iters,
+                    regrasp_result = self.do_multi_gripper_regrasp(candidate_phy, grasp, self.p.max_grasp_plan_iters,
                                                                    is_planning=True)
                     f_news, f_new_mms, f_diffs, f_diff_mms = regrasp_result.cost
 
                     # Finally, MPPI to the goal
-                    move_result = self.move_to_goal(m, d, self.p.max_plan_to_goal_iters, is_planning=True)
+                    move_result = self.move_to_goal(candidate_phy, self.p.max_plan_to_goal_iters, is_planning=True)
                     f_goal = move_result.cost * 0.01
 
                     f_new = sum(f_news)
@@ -310,21 +309,20 @@ class RegraspMPC:
         logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {f_best=}" + Fore.RESET)
         return grasp_best
 
-    def do_single_gripper_grasp(self, m, d, grasp: GraspState, gripper_idx: int, max_iters: int, is_planning: bool):
+    def do_single_gripper_grasp(self, phy, grasp: GraspState, gripper_idx: int, max_iters: int, is_planning: bool):
         offset = grasp.offsets[gripper_idx]
-        rope_body_to_grasp = m.body(grasp.indices[gripper_idx])
+        rope_body_to_grasp = phy.m.body(grasp.indices[gripper_idx])
         logger.info(
             f"considering grasping {rope_body_to_grasp.name} with {gripper_idx_to_eq_name(gripper_idx)} gripper")
 
         self.mppi.reset()
         self.dq_buffer.reset()
-        self.viz.viz(m, d, is_planning)
+        self.viz.viz(phy, is_planning)
 
         warmstart_count = 0
         cumulative_cost = 0
         grasp_iter = 0
-        grasp_goal = GraspRopeGoal(model=m,
-                                   body_id_to_grasp=rope_body_to_grasp.id,
+        grasp_goal = GraspRopeGoal(body_id_to_grasp=rope_body_to_grasp.id,
                                    goal_radius=0.015,
                                    offset=offset,
                                    gripper_idx=gripper_idx,
@@ -334,21 +332,21 @@ class RegraspMPC:
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")
 
-            grasp_goal.viz_goal(d)
-            if grasp_goal.satisfied(d):
+            grasp_goal.viz_goal(phy.d)
+            if grasp_goal.satisfied(phy.d):
                 return Result(Status.SUCCESS, f"Grasp successful", cumulative_cost)
 
             while warmstart_count < self.p.warmstart:
-                command = self.mppi.command(m, d, grasp_goal.get_results, grasp_goal.cost, self.p.grasp_sub_time_s)
-                self.mppi_viz(grasp_goal, m, d, command, self.p.grasp_sub_time_s)
+                command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, self.p.grasp_sub_time_s)
+                self.mppi_viz(grasp_goal, phy, command, self.p.grasp_sub_time_s)
                 warmstart_count += 1
-            command = self.mppi.command(m, d, grasp_goal.get_results, grasp_goal.cost, self.p.grasp_sub_time_s)
-            self.mppi_viz(grasp_goal, m, d, command, self.p.grasp_sub_time_s)
+            command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, self.p.grasp_sub_time_s)
+            self.mppi_viz(grasp_goal, phy, command, self.p.grasp_sub_time_s)
 
-            control_step(m, d, command, sub_time_s=self.p.grasp_sub_time_s)
-            self.viz.viz(m, d, is_planning)
+            control_step(phy, command, sub_time_s=self.p.grasp_sub_time_s)
+            self.viz.viz(phy, is_planning)
             if not is_planning:
-                self.mov.render(d)
+                self.mov.render(phy.d)
             self.mppi.roll()
 
             if grasp_iter > max_iters:
@@ -357,10 +355,10 @@ class RegraspMPC:
             grasp_iter += 1
             cumulative_cost += self.mppi.cost.min()
 
-    def move_to_goal(self, m, d, max_iters, is_planning: bool):
+    def move_to_goal(self, phy, max_iters, is_planning: bool):
         self.mppi.reset()
         self.dq_buffer.reset()
-        self.viz.viz(m, d, is_planning)
+        self.viz.viz(phy, is_planning)
         warmstart_count = 0
         cumulative_cost = 0
         move_iter = 0
@@ -369,25 +367,25 @@ class RegraspMPC:
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")
 
-            self.goal.viz_goal(d)
-            if self.goal.satisfied(d):
+            self.goal.viz_goal(phy)
+            if self.goal.satisfied(phy):
                 return Result(Status.SUCCESS, "Goal reached!", cumulative_cost)
 
             while warmstart_count < self.p.warmstart:
-                command = self.mppi.command(m, d, self.goal.get_results, self.goal.cost, self.p.grasp_sub_time_s)
-                self.mppi_viz(self.goal, m, d, command, self.p.grasp_sub_time_s)
+                command = self.mppi.command(phy, self.goal.get_results, self.goal.cost, self.p.grasp_sub_time_s)
+                self.mppi_viz(self.goal, phy, command, self.p.grasp_sub_time_s)
                 warmstart_count += 1
-            command = self.mppi.command(m, d, self.goal.get_results, self.goal.cost, self.p.grasp_sub_time_s)
-            self.mppi_viz(self.goal, m, d, command, self.p.grasp_sub_time_s)
+            command = self.mppi.command(phy, self.goal.get_results, self.goal.cost, self.p.grasp_sub_time_s)
+            self.mppi_viz(self.goal, phy, command, self.p.grasp_sub_time_s)
 
-            control_step(m, d, command, self.p.grasp_sub_time_s)
-            self.viz.viz(m, d, is_planning)
+            control_step(phy, command, self.p.grasp_sub_time_s)
+            self.viz.viz(phy, is_planning)
             if not is_planning:
-                self.mov.render(d)
+                self.mov.render(phy.d)
 
             self.mppi.roll()
 
-            needs_regrasp = self.check_needs_regrasp(d)
+            needs_regrasp = self.check_needs_regrasp(phy.d)
             if needs_regrasp:
                 return Result(Status.REGRASP, "Needs regrasp", cumulative_cost)
 
@@ -397,7 +395,7 @@ class RegraspMPC:
             cumulative_cost += self.mppi.cost.min()
             move_iter += 1
 
-    def mppi_viz(self, goal, m, d, command, sub_time_s):
+    def mppi_viz(self, goal, phy, command, sub_time_s):
         if not self.p.mppi_rollouts:
             return
 
@@ -413,8 +411,7 @@ class RegraspMPC:
             goal.viz_result(result_i, i, color=c, scale=0.002)
             rospy.sleep(0.01)
 
-        cmd_rollout_results = rollout(m, copy(d), command[None], sub_time_s,
-                                      get_result_func=goal.get_results)
+        cmd_rollout_results = rollout(copy(phy), command[None], sub_time_s, get_result_func=goal.get_results)
 
         goal.viz_result(cmd_rollout_results, i, color='b', scale=0.004)
 

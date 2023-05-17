@@ -8,6 +8,7 @@ import mujoco
 import numpy as np
 
 from mjregrasping.grasping import get_grasp_constraints
+from mjregrasping.physics import Physics
 
 
 def grasp_location_to_indices(grasp_locations, rope_body_indices):
@@ -37,12 +38,12 @@ class GraspState:
             self.set_is_grasping(is_grasping)
 
     @staticmethod
-    def from_mujoco(rope_body_indices: np.ndarray, m: mujoco.MjModel):
-        eqs = get_grasp_constraints(m)
+    def from_mujoco(rope_body_indices: np.ndarray, phy: Physics):
+        eqs = get_grasp_constraints(phy.m)
         locations = []
         for eq in eqs:
             if eq.active:
-                b_id = m.body(eq.obj2id).id
+                b_id = phy.m.body(eq.obj2id).id
                 loc_floor = (b_id - rope_body_indices.min()) / (1 + rope_body_indices.max() - rope_body_indices.min())
                 offset = np.linalg.norm(eq.data[3:6])
                 loc = loc_floor + offset

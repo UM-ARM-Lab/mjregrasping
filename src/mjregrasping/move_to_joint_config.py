@@ -1,22 +1,23 @@
 import numpy as np
 
 from mjregrasping.get_result_functions import get_q_current
+from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
 from mjregrasping.rollout import control_step
 
 
-def pid_to_joint_config(viz: Viz, model, data, q_target, sub_time_s):
+def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
     kP = 5.0
-    q_prev = get_q_current(model, data)
+    q_prev = get_q_current(phy)
     for i in range(200):
-        viz.viz(model, data)
-        q_current = get_q_current(model, data)
+        viz.viz(phy)
+        q_current = get_q_current(phy)
         command = kP * (q_target - q_current)
 
-        control_step(model, data, command, sub_time_s=sub_time_s)
+        control_step(phy, command, sub_time_s=sub_time_s)
 
         # get the new current q
-        q_current = get_q_current(model, data)
+        q_current = get_q_current(phy)
 
         error = np.abs(q_current - q_target)
         max_joint_error = np.max(error)
@@ -31,7 +32,7 @@ def pid_to_joint_config(viz: Viz, model, data, q_target, sub_time_s):
         q_prev = q_current
 
     if not reached:
-        reason = f"Joint {model.joint(offending_q_idx).name} is {np.rad2deg(max_joint_error)} away from target."
+        reason = f"Joint {phy.m.joint(offending_q_idx).name} is {np.rad2deg(max_joint_error)} away from target."
     else:
-        reason = f"Joint {model.joint(offending_qvel_idx).name} is still moving too fast."
+        reason = f"Joint {phy.m.joint(offending_qvel_idx).name} is still moving too fast."
     raise RuntimeError(f"PID failed to converge. {reason}")

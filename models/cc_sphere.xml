@@ -1,0 +1,9 @@
+<mujoco model="floor">
+    <worldbody>
+        <body pos="0 0 0" name="cc_sphere">
+            <!-- To get the most precise results, the size here should be half of the resolution of the voxelgrid -->
+            <geom type="sphere" name="cc_sphere" size="0.01"/>
+            <joint type="free" name="cc_sphere"/>
+        </body>
+    </worldbody>
+</mujoco>

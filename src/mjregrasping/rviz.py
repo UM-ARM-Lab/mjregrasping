@@ -12,22 +12,23 @@ import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
+from mjregrasping.physics import Physics
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
 
-def names(geom_bodyid, model):
+def names(geom_bodyid: int, m: mujoco.MjModel):
     parent_bodyid = geom_bodyid
-    parent_names = []
+    body_name = mj_id2name(m, mju_str2Type("body"), geom_bodyid)
+    entity_name = body_name.split("/")[0]
+    parent_name = entity_name
     while True:
-        parent_bodyid = model.body_parentid[parent_bodyid]
-        parent_name = mj_id2name(model, mju_str2Type("body"), parent_bodyid)
-        parent_names.append(parent_name)
+        parent_bodyid = m.body_parentid[parent_bodyid]
+        _parent_name = mj_id2name(m, mju_str2Type("body"), parent_bodyid)
         if parent_bodyid == 0:
             break
-    body_name = mj_id2name(model, mju_str2Type("body"), geom_bodyid)
-    entity_name = body_name.split("/")[0]
-    return entity_name, parent_names
+        parent_name = _parent_name
+    return entity_name, parent_name
 
 
 class MjRViz:
@@ -40,31 +41,32 @@ class MjRViz:
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=10)
         self.planning_markers_pub = rospy.Publisher('planning', MarkerArray, queue_size=10)
 
-    def viz(self, model, data, is_planning: bool, alpha=1):
+    def viz(self, phy: Physics, is_planning: bool, alpha=1):
         # 3D viz in rviz
         geom_markers_msg = MarkerArray()
-        for geom_id in range(model.ngeom):
-            geom_bodyid = model.geom_bodyid[geom_id]
-            entity_name, parent_names = names(geom_bodyid, model)
+        for geom_id in range(phy.m.ngeom):
+            geom_bodyid = phy.m.geom_bodyid[geom_id]
+            entity_name, parent_names = names(geom_bodyid, phy.m)
 
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
             geom_marker_msg.header.frame_id = "world"
+            # FIXME: parent name is unhelpful, it's always 'world'
             geom_marker_msg.ns = f"{parent_names[-1]}/{parent_names[0]}"
             geom_marker_msg.id = geom_id
 
-            geom_type = model.geom_type[geom_id]
-            body_pos = data.xpos[geom_bodyid]
-            body_xmat = data.xmat[geom_bodyid]
+            geom_type = phy.m.geom_type[geom_id]
+            body_pos = phy.d.xpos[geom_bodyid]
+            body_xmat = phy.d.xmat[geom_bodyid]
             body_xquat = np.zeros(4)
             mju_mat2Quat(body_xquat, body_xmat)
-            geom_pos = data.geom_xpos[geom_id]
-            geom_xmat = data.geom_xmat[geom_id]
+            geom_pos = phy.d.geom_xpos[geom_id]
+            geom_xmat = phy.d.geom_xmat[geom_id]
             geom_xquat = np.zeros(4)
             mju_mat2Quat(geom_xquat, geom_xmat)
-            geom_size = model.geom_size[geom_id]
-            geom_rgba = model.geom_rgba[geom_id]
-            geom_meshid = model.geom_dataid[geom_id]
+            geom_size = phy.m.geom_size[geom_id]
+            geom_rgba = phy.m.geom_rgba[geom_id]
+            geom_meshid = phy.m.geom_dataid[geom_id]
 
             geom_marker_msg.pose.position.x = geom_pos[0]
             geom_marker_msg.pose.position.y = geom_pos[1]
@@ -133,9 +135,9 @@ class MjRViz:
                 geom_marker_msg.scale.z = geom_size[0] * 2
             elif geom_type == mjtGeom.mjGEOM_MESH:
                 mesh_name = mj_id2name(
-                    model, mju_str2Type("mesh"), geom_meshid
+                    phy.m, mju_str2Type("mesh"), geom_meshid
                 )
-                # skip the model prefix, e.g. val/my_mesh
+                # skip the phy.m prefix, e.g. val/my_mesh
                 if '/' in mesh_name:
                     mesh_name = mesh_name.split("/")[1]
                 geom_marker_msg.type = Marker.MESH_RESOURCE
@@ -169,10 +171,10 @@ class MjRViz:
         else:
             self.pub.publish(geom_markers_msg)
 
-        for body_id in range(model.nbody):
-            name = mj_id2name(model, mju_str2Type("body"), body_id)
-            pos = data.xpos[body_id]
-            mat = data.xmat[body_id]
+        for body_id in range(phy.m.nbody):
+            name = mj_id2name(phy.m, mju_str2Type("body"), body_id)
+            pos = phy.d.xpos[body_id]
+            mat = phy.d.xmat[body_id]
             quat = np.zeros(4)
             mujoco.mju_mat2Quat(mat=mat, quat=quat)
             if self.tfw:
@@ -182,10 +184,10 @@ class MjRViz:
                     parent="world",
                     child=name + "_body",
                 )
-        for geom_id in range(model.ngeom):
-            name = mj_id2name(model, mju_str2Type("geom"), geom_id)
-            pos = data.geom_xpos[geom_id]
-            mat = data.geom_xmat[geom_id]
+        for geom_id in range(phy.m.ngeom):
+            name = mj_id2name(phy.m, mju_str2Type("geom"), geom_id)
+            pos = phy.d.geom_xpos[geom_id]
+            mat = phy.d.geom_xmat[geom_id]
             quat = np.zeros(4)
             mujoco.mju_mat2Quat(mat=mat, quat=quat)
             if self.tfw:
@@ -195,10 +197,10 @@ class MjRViz:
                     parent="world",
                     child=name + "_geom",
                 )
-        for site_id in range(model.nsite):
-            name = mj_id2name(model, mju_str2Type("site"), site_id)
-            pos = data.site_xpos[site_id]
-            mat = data.site_xmat[site_id]
+        for site_id in range(phy.m.nsite):
+            name = mj_id2name(phy.m, mju_str2Type("site"), site_id)
+            pos = phy.d.site_xpos[site_id]
+            mat = phy.d.site_xmat[site_id]
             quat = np.zeros(4)
             mujoco.mju_mat2Quat(mat=mat, quat=quat)
             if self.tfw:
@@ -210,9 +212,9 @@ class MjRViz:
                 )
 
         contact_markers = MarkerArray()
-        for contact_idx, contact in enumerate(data.contact):
-            geom1_name = mj_id2name(model, mju_str2Type("geom"), contact.geom1)
-            geom2_name = mj_id2name(model, mju_str2Type("geom"), contact.geom2)
+        for contact_idx, contact in enumerate(phy.d.contact):
+            geom1_name = mj_id2name(phy.m, mju_str2Type("geom"), contact.geom1)
+            geom2_name = mj_id2name(phy.m, mju_str2Type("geom"), contact.geom2)
 
             contact_marker = Marker()
             contact_marker.action = Marker.ADD

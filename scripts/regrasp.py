@@ -18,6 +18,7 @@ from mjregrasping.params import Params
 from mjregrasping.regrasp_mpc import RegraspMPC
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz
+from mjregrasping.sdf import make_sdf
 from mjregrasping.viz import Viz
 
 logger = logging.getLogger(f'rosout.{__name__}')
@@ -44,7 +45,10 @@ def main():
 
         d = load_data_and_eq(m)
 
+        sdf = make_sdf(m, d)
+
         goal = ObjectPointGoal(model=m,
+                               sdf=sdf,
                                viz=viz,
                                goal_point=np.array([0.78, 0.04, 1.27]),
                                body_idx=-1,

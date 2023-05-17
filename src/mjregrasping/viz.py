@@ -3,6 +3,7 @@ import mujoco
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.params import Params
+from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz
 from visualization_msgs.msg import MarkerArray
@@ -40,12 +41,12 @@ class Viz:
         self.tfw.send_transform(translation, quat_xyzw, parent=parent, child=child)
         # TODO: also show in rerun
 
-    def viz(self, m: mujoco.MjModel, d: mujoco.MjData, is_planning: bool = False):
+    def viz(self, phy: Physics, is_planning: bool = False):
         if self.p.rviz:
             if is_planning:
                 if self.p.viz_planning:
-                    self.rviz.viz(m, d, is_planning, alpha=self.p.is_planning_alpha)
+                    self.rviz.viz(phy, is_planning, alpha=self.p.is_planning_alpha)
             else:
-                self.rviz.viz(m, d, is_planning, alpha=1.0)
+                self.rviz.viz(phy, is_planning, alpha=1.0)
         if self.p.rr:
-            self.mjrr.viz(m, d)
+            self.mjrr.viz(phy)

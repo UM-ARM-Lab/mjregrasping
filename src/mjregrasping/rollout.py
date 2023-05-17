@@ -5,17 +5,19 @@ from concurrent.futures import ThreadPoolExecutor
 import mujoco
 import numpy as np
 
+from mjregrasping.physics import Physics
+
 MAX_VEL_TILL_ERROR_RAD = np.deg2rad(3)
 DEFAULT_SUB_TIME_S = 0.1
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
 
-def rollout(model, data, controls, sub_time_s, get_result_func=None):
+def rollout(phy, controls, sub_time_s, get_result_func=None):
     # run for the initial data, so that the current state is returned in the output
     results_lists = None
     if get_result_func is not None:
-        result_tuple = get_result_tuple(data, get_result_func, model)
+        result_tuple = get_result_tuple(get_result_func, phy)
 
         if results_lists is None:
             results_lists = tuple([] for _ in result_tuple)
@@ -26,10 +28,10 @@ def rollout(model, data, controls, sub_time_s, get_result_func=None):
     for t in range(controls.shape[0]):
         qvel_target = controls[t]
 
-        control_step(model, data, qvel_target, sub_time_s=sub_time_s)
+        control_step(phy, qvel_target, sub_time_s=sub_time_s)
 
         if get_result_func is not None:
-            result_tuple = get_result_tuple(data, get_result_func, model)
+            result_tuple = get_result_tuple(get_result_func, phy)
 
             if results_lists is None:
                 results_lists = tuple([] for _ in result_tuple)
@@ -45,8 +47,8 @@ def rollout(model, data, controls, sub_time_s, get_result_func=None):
     return results_lists
 
 
-def get_result_tuple(data, get_result_func, model):
-    result_tuple = get_result_func(model, data)
+def get_result_tuple(get_result_func, phy):
+    result_tuple = get_result_func(phy)
     if not isinstance(result_tuple, tuple):
         result_tuple = (result_tuple,)
 
@@ -56,7 +58,10 @@ def get_result_tuple(data, get_result_func, model):
     return result_tuple
 
 
-def control_step(m, d, qvel_target, sub_time_s: float):
+def control_step(phy: Physics, qvel_target, sub_time_s: float):
+    m = phy.m
+    d = phy.d
+
     if qvel_target is not None:
         np.copyto(d.ctrl, qvel_target)
     else:
@@ -68,19 +73,19 @@ def control_step(m, d, qvel_target, sub_time_s: float):
     d.ctrl[m.actuator('rightgripper_vel').id] = 0
     d.ctrl[m.actuator('rightgripper2_vel').id] = 0
 
-    limit_actuator_windup(d, m)
+    limit_actuator_windup(phy)
 
     mujoco.mj_step(m, d, nstep=n_sub_time)
 
 
-def limit_actuator_windup(d, m):
-    qpos_indices_for_act = np.array([m.actuator(i).actadr[0] for i in range(m.na)])
-    qpos_for_act = d.qpos[qpos_indices_for_act]
-    d.act = qpos_for_act + np.clip(d.act - qpos_for_act, -0.01, 0.01)
+def limit_actuator_windup(phy):
+    qpos_indices_for_act = np.array([phy.m.actuator(i).actadr[0] for i in range(phy.m.na)])
+    qpos_for_act = phy.d.qpos[qpos_indices_for_act]
+    phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -0.01, 0.01)
 
 
-def parallel_rollout(pool: ThreadPoolExecutor, model, data, controls_samples, sub_time_s, get_result_func=None):
-    args_sets = [(model, copy.copy(data), controls, sub_time_s, get_result_func) for controls in controls_samples]
+def parallel_rollout(pool: ThreadPoolExecutor, phy, controls_samples, sub_time_s, get_result_func=None):
+    args_sets = [(copy.copy(phy), controls, sub_time_s, get_result_func) for controls in controls_samples]
     futures = [pool.submit(rollout, *args) for args in args_sets]
 
     results = [f.result() for f in futures]

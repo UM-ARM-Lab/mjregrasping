@@ -8,6 +8,7 @@ from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
 from trimesh.creation import box, cylinder, capsule
 
+from mjregrasping.physics import Physics
 from mjregrasping.rviz import names, MujocoXmlMeshParser
 
 logger = logging.getLogger(f'rosout.{__name__}')
@@ -23,20 +24,20 @@ class MjReRun:
         rr.log_arrow('world_y', [0, 0, 0], [0, 1, 0], color=(0, 255, 0), width_scale=0.02)
         rr.log_arrow('world_z', [0, 0, 0], [0, 0, 1], color=(0, 0, 255), width_scale=0.02)
 
-    def viz(self, m: mujoco.MjModel, d: mujoco.MjData):
-        rr.set_time_seconds('sim_time', d.time)
+    def viz(self, phy: Physics):
+        rr.set_time_seconds('sim_time', phy.d.time)
 
         # 2D viz in rerun
-        for sensor_idx in range(m.nsensor):
-            sensor = m.sensor(sensor_idx)
+        for sensor_idx in range(phy.m.nsensor):
+            sensor = phy.m.sensor(sensor_idx)
             if sensor.type in [mjtSensor.mjSENS_TORQUE, mjtSensor.mjSENS_FORCE]:
-                rr.log_scalar(f'sensor/{sensor.name}', float(d.sensordata[sensor.adr]))
-        for joint_idx in range(m.njnt):
-            joint = m.joint(joint_idx)
+                rr.log_scalar(f'sensor/{sensor.name}', float(phy.d.sensordata[sensor.adr]))
+        for joint_idx in range(phy.m.njnt):
+            joint = phy.m.joint(joint_idx)
             if joint.type == mujoco.mjtJoint.mjJNT_HINGE:
-                rr.log_scalar(f'qpos/{joint.name}', float(d.qpos[joint.qposadr]))
+                rr.log_scalar(f'qpos/{joint.name}', float(phy.d.qpos[joint.qposadr]))
 
-        rr.log_scalar(f'contact/num_contacts', len(d.contact))
+        rr.log_scalar(f'contact/num_contacts', len(phy.d.contact))
 
         # FIXME: slow?
         # self.viz_bodies(m, d)
