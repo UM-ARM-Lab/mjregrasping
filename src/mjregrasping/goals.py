@@ -251,7 +251,7 @@ class ObjectPointGoal(MPPIGoal):
 
         # Get the potential field gradient at the specified points
         gripper_dfield = self.dfield.get_costs(pred_gripper_points)  # [b, h, 2]
-        gripper_dfield *= self.p.gripper_dir
+        gripper_dfield *= self.p.gripper_dfield
         grasping_gripper_dfield = np.sum(gripper_dfield * pred_is_grasping, -1)  # [b, horizon]
 
         cost = copy(pred_point_dist)
@@ -354,7 +354,7 @@ def get_contact_cost(phy: Physics, objects: Objects, p: Params):
         geom_name2 = phy.m.geom(contact.geom2).name
         if (geom_name1 in objects.obstacle.geom_names and geom_name2 in objects.val.geom_names) or \
                 (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val.geom_names) or \
-                (geom_name1 in objects.val.geom_names and geom_name2 in objects.val.geom_names):
+                val_self_collision(geom_name1, geom_name2, objects):
             contact_cost += 1
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts
@@ -362,6 +362,10 @@ def get_contact_cost(phy: Physics, objects: Objects, p: Params):
     contact_cost = min(np.power(contact_cost, p.contact_exponent),
                        p.max_contact_cost)
     return contact_cost
+
+
+def val_self_collision(geom_name1, geom_name2, objects: Objects):
+    return geom_name1 in objects.val_self_collision_geom_names and geom_name2 in objects.val_self_collision_geom_names
 
 
 def get_action_cost(joint_positions, p: Params):

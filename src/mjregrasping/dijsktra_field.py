@@ -1,3 +1,6 @@
+import pickle
+from pathlib import Path
+
 import numpy as np
 
 import rospy
@@ -108,4 +111,18 @@ def make_dfield(phy: Physics, extents_2d, res, goal_point):
     t0 = perf_counter()
     dfield = DField(VoxelGrid(phy, res, extents_2d), goal_point)
     print(f'dfield took {perf_counter() - t0:.1f}s to make.')
+    return dfield
+
+
+def save_load_dfield(phy, goal_point):
+    dfield_path = Path("models/dfield.pkl")
+    if dfield_path.exists():
+        with dfield_path.open('rb') as f:
+            dfield = pickle.load(f)
+    else:
+        res = 0.02
+        extents_2d = np.array([[0.6, 1.4], [-0.7, 0.4], [0.2, 1.3]])
+        dfield = make_dfield(phy, extents_2d, res, goal_point)
+        with dfield_path.open('wb') as f:
+            pickle.dump(dfield, f)
     return dfield

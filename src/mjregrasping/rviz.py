@@ -17,18 +17,18 @@ from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
 
-def names(geom_bodyid: int, m: mujoco.MjModel):
+def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
     parent_bodyid = geom_bodyid
     body_name = mj_id2name(m, mju_str2Type("body"), geom_bodyid)
-    entity_name = body_name.split("/")[0]
-    parent_name = entity_name
+    child_name = body_name.split("/")[0]
+    parent_name = child_name
     while True:
         parent_bodyid = m.body_parentid[parent_bodyid]
         _parent_name = mj_id2name(m, mju_str2Type("body"), parent_bodyid)
         if parent_bodyid == 0:
             break
         parent_name = _parent_name
-    return entity_name, parent_name
+    return parent_name, child_name
 
 
 class MjRViz:
@@ -46,13 +46,13 @@ class MjRViz:
         geom_markers_msg = MarkerArray()
         for geom_id in range(phy.m.ngeom):
             geom_bodyid = phy.m.geom_bodyid[geom_id]
-            entity_name, parent_names = names(geom_bodyid, phy.m)
+            parent_name, child_name = get_parent_child_names(geom_bodyid, phy.m)
 
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
             geom_marker_msg.header.frame_id = "world"
             # FIXME: parent name is unhelpful, it's always 'world'
-            geom_marker_msg.ns = f"{parent_names[-1]}/{parent_names[0]}"
+            geom_marker_msg.ns = f"{parent_name}/{child_name}"
             geom_marker_msg.id = geom_id
 
             geom_type = phy.m.geom_type[geom_id]

@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import logging
 import multiprocessing
-import pickle
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -12,7 +11,7 @@ import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.body_with_children import Objects
-from mjregrasping.dijsktra_field import make_dfield
+from mjregrasping.dijsktra_field import save_load_dfield
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import Params
@@ -66,23 +65,9 @@ def main():
                                objects=objects)
 
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-            mpc = RegraspMPC(phy.m, pool, viz, goal, objects=objects, seed=seed, mov=mov)
+            mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=viz, goal=goal, objects=objects, seed=seed, mov=mov)
             result = mpc.run(phy)
             logger.info(f"{seed=} {result=}")
-
-
-def save_load_dfield(phy, goal_point):
-    dfield_path = Path("models/dfield.pkl")
-    if dfield_path.exists():
-        with dfield_path.open('rb') as f:
-            dfield = pickle.load(f)
-    else:
-        res = 0.02
-        extents_2d = np.array([[0.6, 1.4], [-0.7, 0.4], [0.2, 1.3]])
-        dfield = make_dfield(phy, extents_2d, res, goal_point)
-        with dfield_path.open('wb') as f:
-            pickle.dump(dfield, f)
-    return dfield
 
 
 if __name__ == "__main__":

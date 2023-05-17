@@ -14,7 +14,7 @@ def softmax(x, temp):
 
 class MujocoMPPI:
 
-    def __init__(self, pool, model, seed, num_samples, horizon, noise_sigma, lambda_=1., gamma=0.9):
+    def __init__(self, pool, nu, seed, num_samples, horizon, noise_sigma, lambda_=1., gamma=0.9):
         # TODO: make params like horizon and num_samples dynamic
         self.pool = pool
         self.num_samples = num_samples
@@ -24,7 +24,6 @@ class MujocoMPPI:
         # dimensions of state and control
         self.lambda_ = lambda_
 
-        nu = model.nu
         self.noise_sigma = np.ones(nu) * noise_sigma
         self.noise_rng = np.random.RandomState(seed)
 

@@ -9,7 +9,7 @@ from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
 from trimesh.creation import box, cylinder, capsule
 
 from mjregrasping.physics import Physics
-from mjregrasping.rviz import names, MujocoXmlMeshParser
+from mjregrasping.rviz import get_parent_child_names, MujocoXmlMeshParser
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
@@ -47,8 +47,8 @@ class MjReRun:
             geom = m.geom(geom_id)
             geom_type = geom.type
             geom_bodyid = geom.bodyid
-            body_name, parent_names = names(geom_bodyid, m)
-            entity_name = f"{parent_names[0]}/{body_name}"
+            parent_name, child_name = get_parent_child_names(geom_bodyid, m)
+            entity_name = f"{parent_name}/{child_name}"
 
             if geom_type == mjtGeom.mjGEOM_BOX:
                 log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))

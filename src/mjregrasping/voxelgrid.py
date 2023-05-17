@@ -42,7 +42,6 @@ def set_cc_sphere_pos(phy, xyz):
 class VoxelGrid:
 
     def __init__(self, phy: Physics, res, extends_2d):
-        pub = rospy.Publisher("dfield", MarkerArray, queue_size=10)
         self.objects = Objects(phy.m)
         self.res = res
         self.extents_2d = extends_2d

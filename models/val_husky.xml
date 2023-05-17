@@ -149,7 +149,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="leftgripper_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="leftgripper_mesh"
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="leftgripper"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                 </body>
                                                 <body name="leftgripper2_link" pos="0 -0.0135 0.068553"
@@ -158,7 +158,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="leftgripper2_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="leftgripper2_mesh"
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="leftgripper2"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                 </body>
                                             </body>
@@ -252,7 +252,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="rightgripper_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="rightgripper_geom"
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="rightgripper"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                 </body>
                                                 <body name="rightgripper2_link" pos="0 -0.0135 0.068553"
@@ -261,7 +261,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="rightgripper2_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="rightgripper2_geom"
+                                                    <geom type="mesh" mesh="PINCER_FINGER2" name="rightgripper2"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                 </body>
                                             </body>

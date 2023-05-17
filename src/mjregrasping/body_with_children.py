@@ -60,3 +60,9 @@ class Objects:
         self.val = Object(model, "val_base")
         self.rope = Object(model, "rope")
         self.obstacle = Object(model, obstacle_name)
+
+        self.val_self_collision_geom_names = self.val.geom_names
+        self.val_self_collision_geom_names.remove('leftgripper')
+        self.val_self_collision_geom_names.remove('leftgripper2')
+        self.val_self_collision_geom_names.remove('rightgripper')
+        self.val_self_collision_geom_names.remove('rightgripper2')
