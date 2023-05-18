@@ -346,6 +346,7 @@ class ObjectPointGoal(MPPIGoal):
 
 
 def get_contact_cost(phy: Physics, objects: Objects, p: Params):
+    # TODO: use SDF to compute near-contact cost to avoid getting too close
     # doing the contact cost calculation here means we don't need to return the entire data.contact array,
     # which makes things simpler and possibly faster, since this operation can't be easily vectorized.
     contact_cost = 0

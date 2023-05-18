@@ -15,6 +15,7 @@ def save_data_and_eq(phy: Physics):
         data_and_eq['eq'][eq_idx] = {
             'active': eq.active.copy(),
             'data':   eq.data.copy(),
+            'obj2id': eq.obj2id.copy(),
         }
     with open("data_and_eq.pkl", "wb") as f:
         pickle.dump(data_and_eq, f)
@@ -28,4 +29,6 @@ def load_data_and_eq(m: mujoco.MjModel):
         eq = m.eq(eq_idx)
         eq.active[:] = data_and_eq['eq'][eq_idx]['active']
         eq.data[:] = data_and_eq['eq'][eq_idx]['data']
+        eq.obj2id[:] = data_and_eq['eq'][eq_idx]['obj2id']
+    mujoco.mj_forward(m, data_and_eq['data'])
     return data_and_eq['data']

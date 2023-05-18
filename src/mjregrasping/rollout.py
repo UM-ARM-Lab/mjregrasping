@@ -1,4 +1,4 @@
-import copy
+from copy import copy
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
@@ -85,7 +85,8 @@ def limit_actuator_windup(phy):
 
 
 def parallel_rollout(pool: ThreadPoolExecutor, phy, controls_samples, sub_time_s, get_result_func=None):
-    args_sets = [(copy.copy(phy), controls, sub_time_s, get_result_func) for controls in controls_samples]
+    # within a rollout you're not changing the _model_, so we use copy_data since it's faster
+    args_sets = [(phy.copy_data(), controls, sub_time_s, get_result_func) for controls in controls_samples]
     futures = [pool.submit(rollout, *args) for args in args_sets]
 
     results = [f.result() for f in futures]

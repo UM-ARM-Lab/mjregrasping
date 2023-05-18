@@ -40,7 +40,7 @@ def main():
     root.mkdir(exist_ok=True)
 
     goal_point = np.array([0.73, 0.04, 1.25])
-    n_seeds = 5
+    n_seeds = 1
     for seed in range(n_seeds):
         m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
         objects = Objects(m)

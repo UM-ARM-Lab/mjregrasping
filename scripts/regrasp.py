@@ -2,7 +2,6 @@
 import logging
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -13,11 +12,10 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.body_with_children import Objects
 from mjregrasping.dijsktra_field import save_load_dfield
 from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.grasp_state import GraspState
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_mpc import RegraspMPC, vis_regrasp_solutions_and_costs
+from mjregrasping.regrasp_mpc import RegraspMPC
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz
 from mjregrasping.viz import Viz
@@ -59,24 +57,24 @@ def main():
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         mpc = RegraspMPC(mppi_nu=m.nu, pool=pool, viz=viz, goal=goal, objects=objects, seed=seed, mov=None)
 
-        gs = np.array([
-            [0, 1.0],
-            [0, 0.4],
-            [0, 0.5],
-            [0, 0.6],
-            [0, 0.7],
-            [0, 0.8],
-            [0, 0.9],
-        ])
-        is_grasping = np.array([0, 1])
-        grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
-        costs_lists = mpc.score_grasp_locations(gs, grasp0, is_grasping, phy)
-        costs = [sum(costs_i) for costs_i in costs_lists]
-        vis_regrasp_solutions_and_costs(is_grasping, costs_lists, gs, gs, costs)
-        print(costs)
-        print("done")
+        # gs = np.array([
+        #     [0, 1.0],
+        #     [0, 0.4],
+        #     [0, 0.5],
+        #     [0, 0.6],
+        #     [0, 0.7],
+        #     [0, 0.8],
+        #     [0, 0.9],
+        # ])
+        # is_grasping = np.array([1, 0])
+        # grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
+        # costs_lists = mpc.score_grasp_locations(gs, grasp0, is_grasping, phy)
+        # costs = [sum(costs_i) for costs_i in costs_lists]
+        # vis_regrasp_solutions_and_costs(is_grasping, costs_lists, gs)
+        # print(costs)
+        # print("done")
 
-        # mpc.compute_new_grasp(phy)
+        mpc.compute_new_grasp(phy)
 
 
 if __name__ == "__main__":

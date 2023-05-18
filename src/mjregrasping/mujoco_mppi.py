@@ -32,6 +32,7 @@ class MujocoMPPI:
 
         # sampled results from last command
         self.cost = None
+        self.costs = None
         self.cost_normalized = None
         self.rollout_results = None
         self.actions = None
@@ -65,14 +66,21 @@ class MujocoMPPI:
         noise = self.noise_rng.randn(self.num_samples, self.horizon, self.noise_sigma.shape[0]) * self.noise_sigma
         perturbed_action = self.U + noise
 
+        lower = phy.m.actuator_ctrlrange[:, 0]
+        upper = phy.m.actuator_ctrlrange[:, 1]
+        # NOTE: We clip the absolute action, then recompute the noise
+        #  so that later when we weight noise, we're weighting the bounded noise.
+        perturbed_action = np.clip(perturbed_action, lower, upper)
+        noise = perturbed_action - self.U
+
         results = parallel_rollout(self.pool, phy, perturbed_action, sub_time_s, get_result_func)
 
         self.rollout_results = results
         self.actions = perturbed_action
-        costs = cost_func(results)
+        self.costs = cost_func(results)
 
         gammas = np.power(self.gamma, np.arange(self.horizon))[None]
-        self.cost = np.sum(gammas * costs, axis=-1)
+        self.cost = np.sum(gammas * self.costs, axis=-1)
 
         self.cost_normalized = (self.cost - self.cost.min()) / (self.cost.max() - self.cost.min())
 
@@ -91,3 +99,11 @@ class MujocoMPPI:
         Resets the control samples.
         """
         self.U = np.zeros([self.horizon, self.noise_sigma.shape[0]])
+
+    def get_min_terminal_cost(self):
+        """ Returns the minimum cost of the last time step """
+        return self.costs[:, -1].min()
+
+    def get_first_step_cost(self):
+        """ Returns the minimum cost of the first time step """
+        return self.costs[:, 0].min()
