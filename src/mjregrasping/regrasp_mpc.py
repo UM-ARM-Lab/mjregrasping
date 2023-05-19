@@ -1,4 +1,5 @@
 import logging
+from time import perf_counter
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, auto
 from typing import Optional
@@ -33,8 +34,6 @@ class Status(Enum):
     SUCCESS = auto()
     REGRASP = auto()
     FAILED = auto()
-    SHUTDOWN = auto()
-    MOVE_TO_GOAL = auto()
 
 
 class Result:
@@ -79,15 +78,15 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
     width = 0.1
     cost_to_meters = 0.5
     depth = 0.05
-    cost_colors = [
-        [128, 128, 128],
-        [128, 128, 128],
-        [255, 255, 0],
-        [255, 0, 0],
-        [0, 0, 255],
-        [255, 0, 0],
-        [0, 255, 0],
-    ]
+    cost_colors = {
+        'f_is_same':     [128, 0, 128],
+        'f_all_0':       [128, 0, 128],
+        'f_goal':        [0, 255, 0],
+        'f_new':         [0, 0, 255],
+        'f_diff':        [0, 0, 255],
+        'f_new_eq_err':  [255, 0, 0],
+        'f_diff_eq_err': [255, 0, 0],
+    }
 
     def pos_transform(p):
         T = np.eye(4)
@@ -99,7 +98,8 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
     for i, (costs_i, locations) in enumerate(zip(costs_lists, candidate_grasp_locations)):
         # TODO: draw one big outline box around the total cost for each solution
         z_offset = 0
-        for name, cost_i, color_i in zip(costs_i.keys(), costs_i.values(), cost_colors):
+        for name, cost_i in costs_i.items():
+            color_i = cost_colors[name]
             z_i = np.clip(cost_i * cost_to_meters, 1e-3, 1e3)  # ensure non-zero
             box_entity_path = f'regrasp_costs/{i}/{name}'
             log_box(box_entity_path, np.array([width, depth, z_i]),
@@ -125,7 +125,6 @@ class RegraspMPC:
         self.n_g = 2
         self.mov = mov
 
-        n_samples = self.p.n_samples
         horizon = self.p.horizon
         lambda_ = self.p.lambda_
         self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(8), horizon=horizon,
@@ -139,7 +138,7 @@ class RegraspMPC:
         for self.iter in range(self.p.iters):
             if rospy.is_shutdown():
                 self.close()
-                return Result(Status.SHUTDOWN, "ROS shutdown", np.inf)
+                raise RuntimeError("ROS shutdown")
 
             logger.info(Fore.BLUE + f"Moving to goal" + Fore.RESET)
             t0 = perf_counter()
@@ -148,20 +147,21 @@ class RegraspMPC:
             print(f"move: {perf_counter() - t0:.2f}")
             self.max_dq = 0  # reset "stuck" detection
 
-            if move_result.status in [Status.SUCCESS, Status.FAILED, Status.SHUTDOWN]:
+            if move_result.status in [Status.SUCCESS]:
                 self.close()
                 return move_result
 
-            logger.info(Fore.BLUE + f"Computing New Grasp" + Fore.RESET)
-            grasp = self.compute_new_grasp(phy)
-            logger.info(Fore.BLUE + f"Grasping {grasp}" + Fore.RESET)
-            grasp_result = self.do_multi_gripper_regrasp(phy, grasp, max_iters=self.p.max_grasp_iters,
-                                                         is_planning=False, sub_time_s=self.p.grasp_sub_time_s,
-                                                         stop_if_failed=True)
-            self.max_dq = 0  # reset "stuck" detection
-            if grasp_result.status in [Status.FAILED, Status.SHUTDOWN]:
-                self.close()
-                return grasp_result
+            while True:
+                # NOTE: currently testing what happens if we let it regrasp if a grasp fails
+                logger.info(Fore.BLUE + f"Computing New Grasp" + Fore.RESET)
+                grasp = self.compute_new_grasp(phy)
+                logger.info(Fore.BLUE + f"Grasping {grasp}" + Fore.RESET)
+                grasp_result = self.do_multi_gripper_regrasp(phy, grasp, max_iters=self.p.max_grasp_iters,
+                                                             is_planning=False, sub_time_s=self.p.grasp_sub_time_s,
+                                                             stop_if_failed=True)
+                self.max_dq = 0  # reset "stuck" detection
+                if grasp_result.status == Status.SUCCESS:
+                    break
 
             self.regrasp_idx += 1
 
@@ -217,7 +217,10 @@ class RegraspMPC:
                 candidate_grasp_locations = es.ask()  # from 0 to 1
                 costs_lists = []
                 for grasp_locations in candidate_grasp_locations:
-                    costs_i = self.score_grasp_location(grasp_locations, grasp0, is_grasping, phy)
+                    grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping)
+                    costs_i = self.score_grasp_location(phy, grasp0, grasp)
+                    total_cost = sum(costs_i.values())
+                    logger.info(f'{grasp=} {total_cost=}')
                     costs_lists.append(costs_i)
                 costs = [sum(costs_i.values()) for costs_i in costs_lists]
 
@@ -235,11 +238,9 @@ class RegraspMPC:
         logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {f_best=:.2f}" + Fore.RESET)
         return grasp_best
 
-    def score_grasp_location(self, grasp_locations, grasp0, is_grasping, phy):
+    def score_grasp_location(self, phy: Physics, grasp0: GraspState, grasp: GraspState):
         # copy model and data since each solution should be different/independent
         candidate_phy = phy.copy_all()
-
-        grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping)  # TODO: move outside func
 
         if np.all(np.logical_not(grasp.is_grasping)):
             return {'f_all_0': 1000}
@@ -263,17 +264,13 @@ class RegraspMPC:
         f_diff = sum(f_diffs) * self.p.f_grasp_weight
         f_diff_eq_err = sum(f_diff_eq_errs) * self.p.f_eq_err_weight
 
-        costs_i = {
+        return {
             'f_new':         f_new,
             'f_new_eq_err':  f_new_eq_err,
             'f_diff':        f_diff,
             'f_diff_eq_err': f_diff_eq_err,
             'f_goal':        f_goal,
         }
-        total_cost = sum(costs_i.values())
-        logger.info(f'{grasp=} {total_cost=}')
-
-        return costs_i
 
     def do_multi_gripper_regrasp(self, phy, grasp, max_iters, is_planning: bool, sub_time_s: float,
                                  stop_if_failed=False):
@@ -294,7 +291,7 @@ class RegraspMPC:
                 t0 = perf_counter()
                 f_new_result = self.do_single_gripper_grasp(phy, grasp, gripper_idx, max_iters, is_planning, sub_time_s)
                 print(f"grasp: {perf_counter() - t0:.2f}")
-                if f_new_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
+                if f_new_result.status in [Status.FAILED] and stop_if_failed:
                     return f_new_result
                 f_news.append(f_new_result.cost)
                 # activate new grasp
@@ -317,7 +314,7 @@ class RegraspMPC:
                 f_diff_result = self.do_single_gripper_grasp(phy, grasp, gripper_idx, max_iters, is_planning,
                                                              sub_time_s)
                 print(f"grasp: {perf_counter() - t0:.2f}")
-                if f_diff_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
+                if f_diff_result.status in [Status.FAILED] and stop_if_failed:
                     return f_diff_result
                 f_diffs.append(f_diff_result.cost)
                 change_eq(phy.m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
