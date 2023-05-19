@@ -13,6 +13,7 @@ from matplotlib import cm
 import rospy
 from mjregrasping.body_with_children import Objects
 from mjregrasping.buffer import Buffer
+from time import perf_counter
 from mjregrasping.change_grasp_eq import change_eq
 from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal
 from mjregrasping.grasp_state import GraspState
@@ -106,7 +107,7 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
                     color=color_i)
             ext = {f'grasp {gripper_idx_to_eq_name(k)}': locations[k] for k in range(n_g)}
             ext[name] = f'{cost_i:.3f}'
-            ext['total cost'] = sum(costs_i)
+            ext['total cost'] = sum(costs_i.values())
             ext['is_grasping'] = ' '.join([str(g) for g in is_grasping])
             rr.log_extension_components(box_entity_path, ext)
             z_offset += z_i
@@ -141,8 +142,10 @@ class RegraspMPC:
                 return Result(Status.SHUTDOWN, "ROS shutdown", np.inf)
 
             logger.info(Fore.BLUE + f"Moving to goal" + Fore.RESET)
+            t0 = perf_counter()
             move_result = self.move_to_goal(phy, self.p.max_move_to_goal_iters, is_planning=False,
                                             sub_time_s=self.p.move_sub_time_s)
+            print(f"move: {perf_counter() - t0:.2f}")
             self.max_dq = 0  # reset "stuck" detection
 
             if move_result.status in [Status.SUCCESS, Status.FAILED, Status.SHUTDOWN]:
@@ -249,8 +252,10 @@ class RegraspMPC:
         f_news, f_new_eq_errs, f_diffs, f_diff_eq_errs = regrasp_result.cost
 
         # Finally, MPPI to the goal
+        t0 = perf_counter()
         move_result = self.move_to_goal(candidate_phy, self.p.max_plan_to_goal_iters, is_planning=True,
                                         sub_time_s=self.p.plan_sub_time_s)
+        print(f"move: {perf_counter() - t0:.2f}")
 
         f_goal = move_result.cost * self.p.f_goal_weight
         f_new = sum(f_news) * self.p.f_grasp_weight
@@ -286,7 +291,9 @@ class RegraspMPC:
         for gripper_idx in range(self.n_g):
             if is_new[gripper_idx]:
                 # plan the grasp
+                t0 = perf_counter()
                 f_new_result = self.do_single_gripper_grasp(phy, grasp, gripper_idx, max_iters, is_planning, sub_time_s)
+                print(f"grasp: {perf_counter() - t0:.2f}")
                 if f_new_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_new_result
                 f_news.append(f_new_result.cost)
@@ -306,8 +313,10 @@ class RegraspMPC:
         # For each gripper, if it needs a different grasp, run MPPI to try to find a grasp and add the cost
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx]:
+                t0 = perf_counter()
                 f_diff_result = self.do_single_gripper_grasp(phy, grasp, gripper_idx, max_iters, is_planning,
                                                              sub_time_s)
+                print(f"grasp: {perf_counter() - t0:.2f}")
                 if f_diff_result.status in [Status.FAILED, Status.SHUTDOWN] and stop_if_failed:
                     return f_diff_result
                 f_diffs.append(f_diff_result.cost)
@@ -356,7 +365,7 @@ class RegraspMPC:
 
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy, is_planning)
-            if not is_planning:
+            if not is_planning and self.mov:
                 self.mov.render(phy.d)
             self.mppi.roll()
 
@@ -393,7 +402,7 @@ class RegraspMPC:
 
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy, is_planning)
-            if not is_planning:
+            if not is_planning and self.mov:
                 self.mov.render(phy.d)
 
             self.mppi.roll()

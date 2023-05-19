@@ -50,9 +50,17 @@ def main():
         # setup_untangled_scene(phy, mjviz)
         setup_tangled_scene(phy, viz)
 
-        mov = MjMovieMaker(m, "rack1")
-        mov_path = root / f'untangle_{seed}.mp4'
-        mov.start(mov_path, fps=12)
+        perf = True  # TODO: make this a param
+        if perf:
+            p.rviz = False
+            p.rr = False
+            p.mppi_rollouts = False
+            p.viz_planning = False
+            mov = None
+        else:
+            mov = MjMovieMaker(m, "rack1")
+            mov_path = root / f'untangle_{seed}.mp4'
+            mov.start(mov_path, fps=12)
 
         # store and load from disk to save time?
         dfield = save_load_dfield(phy, goal_point)

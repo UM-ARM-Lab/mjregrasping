@@ -9,3 +9,4 @@ MUJOCO_LOG.TXT
 outcmaes
 wandb
 *.pkl
+*.swp
