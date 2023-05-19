@@ -9,6 +9,9 @@ Create a catkin workspace and clone the repository:
 mkdir -p ~/catkin_ws/src
 cd ~/catkin_ws/src
 git clone git@github.com:UM-ARM-Lab/mjregrasping.git
+wstool init
+cp mjregrasping/mjregrasping.rosinstall .rosinstall
+wstool update
 ```
 
 Install dependencies:
@@ -25,7 +28,7 @@ source venv/bin/activate
 # Python dependencies
 cd ~/catkin_ws/src/mjregrasping
 pip install --upgrade pip
-pip install -r requirements.txt
+pip install --ignore-installed -r requirements.txt  # use ignore-installed because we want to override things like numpy/scipy that may be installed system-wide
 ```
 
 Build the workspace:

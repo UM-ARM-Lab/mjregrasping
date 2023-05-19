@@ -78,8 +78,9 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
     width = 0.1
     cost_to_meters = 0.5
     depth = 0.05
-    cost_names = ['f_new', 'f_new_eq_err', 'f_diff', 'f_diff_eq_err', 'f_goal']
     cost_colors = [
+        [128, 128, 128],
+        [128, 128, 128],
         [255, 255, 0],
         [255, 0, 0],
         [0, 0, 255],
@@ -97,7 +98,7 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
     for i, (costs_i, locations) in enumerate(zip(costs_lists, candidate_grasp_locations)):
         # TODO: draw one big outline box around the total cost for each solution
         z_offset = 0
-        for cost_i, name, color_i in zip(costs_i, cost_names, cost_colors):
+        for name, cost_i, color_i in zip(costs_i.keys(), costs_i.values(), cost_colors):
             z_i = np.clip(cost_i * cost_to_meters, 1e-3, 1e3)  # ensure non-zero
             box_entity_path = f'regrasp_costs/{i}/{name}'
             log_box(box_entity_path, np.array([width, depth, z_i]),
@@ -188,7 +189,7 @@ class RegraspMPC:
             [1, 0],
             [0, 1],
             [1, 1],
-            [0, 0], # not very useful :)
+            [0, 0],  # not very useful :)
         ])
 
         f_best = 1e9
@@ -215,7 +216,7 @@ class RegraspMPC:
                 for grasp_locations in candidate_grasp_locations:
                     costs_i = self.score_grasp_location(grasp_locations, grasp0, is_grasping, phy)
                     costs_lists.append(costs_i)
-                costs = [sum(costs_i) for costs_i in costs_lists]
+                costs = [sum(costs_i.values()) for costs_i in costs_lists]
 
                 # Visualize!
                 vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_locations)
@@ -235,13 +236,13 @@ class RegraspMPC:
         # copy model and data since each solution should be different/independent
         candidate_phy = phy.copy_all()
 
-        grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping) # TODO: move outside func
+        grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping)  # TODO: move outside func
 
         if np.all(np.logical_not(grasp.is_grasping)):
-            return 1000
+            return {'f_all_0': 1000}
 
         if grasp0 == grasp:
-            return 1000
+            return {'f_is_same': 1000}
 
         regrasp_result = self.do_multi_gripper_regrasp(candidate_phy, grasp, self.p.max_grasp_plan_iters,
                                                        is_planning=True, sub_time_s=self.p.plan_sub_time_s)
@@ -257,8 +258,14 @@ class RegraspMPC:
         f_diff = sum(f_diffs) * self.p.f_grasp_weight
         f_diff_eq_err = sum(f_diff_eq_errs) * self.p.f_eq_err_weight
 
-        costs_i = [f_new, f_new_eq_err, f_diff, f_diff_eq_err, f_goal]
-        total_cost = sum(costs_i)
+        costs_i = {
+            'f_new':         f_new,
+            'f_new_eq_err':  f_new_eq_err,
+            'f_diff':        f_diff,
+            'f_diff_eq_err': f_diff_eq_err,
+            'f_goal':        f_goal,
+        }
+        total_cost = sum(costs_i.values())
         logger.info(f'{grasp=} {total_cost=}')
 
         return costs_i
