@@ -127,7 +127,7 @@ class RegraspMPC:
 
         horizon = self.p.horizon
         lambda_ = self.p.lambda_
-        self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(8), horizon=horizon,
+        self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(4), horizon=horizon,
                                lambda_=lambda_)
         self.dq_buffer = Buffer(12)
         self.max_dq = 0

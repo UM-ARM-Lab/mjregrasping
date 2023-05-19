@@ -49,14 +49,23 @@ def main():
 
     setup_tangled_scene(phy, viz)
 
-    robot_q1 = np.array([
-        -0.7, 0.1,  # torso
-        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
-        0, 0,  # left gripper
-        0.0, -0.2, 0, -0.30, 0, -0.2, 0,  # right arm
-        0, 0,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, robot_q1, sub_time_s=DEFAULT_SUB_TIME_S)
+    for _ in range(3):
+        robot_q1 = np.array([
+            -0.7, -0.8,  # torso
+            -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+            0, 0,  # left gripper
+            -0.9, -0.2, 0, 0.30, 0, -0.2, 0,  # right arm
+            0, 0,  # right gripper
+        ])
+        pid_to_joint_config(phy, viz, robot_q1, sub_time_s=DEFAULT_SUB_TIME_S)
+        robot_q1 = np.array([
+            -0.7, 0.8,  # torso
+            -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+            0, 0,  # left gripper
+            -0.9, -0.2, 0, 0.30, 0, -0.2, 0,  # right arm
+            0, 0,  # right gripper
+        ])
+        pid_to_joint_config(phy, viz, robot_q1, sub_time_s=DEFAULT_SUB_TIME_S)
 
     activate_eq(phy.m, 'left')
     deactivate_eq(phy.m, 'right')

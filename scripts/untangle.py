@@ -50,8 +50,7 @@ def main():
         # setup_untangled_scene(phy, mjviz)
         setup_tangled_scene(phy, viz)
 
-        perf = True  # TODO: make this a param
-        if perf:
+        if p.max_perf:
             p.rviz = False
             p.rr = False
             p.mppi_rollouts = False
