@@ -78,9 +78,8 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
     width = 0.1
     cost_to_meters = 0.5
     depth = 0.05
-    cost_names = ['f_is_same', 'f_new', 'f_new_eq_err', 'f_diff', 'f_diff_eq_err', 'f_goal']
+    cost_names = ['f_new', 'f_new_eq_err', 'f_diff', 'f_diff_eq_err', 'f_goal']
     cost_colors = [
-        [128, 128, 128],
         [255, 255, 0],
         [255, 0, 0],
         [0, 0, 255],
@@ -105,7 +104,7 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
                     pos_transform([width * i, 0, z_i / 2 + z_offset]),
                     color=color_i)
             ext = {f'grasp {gripper_idx_to_eq_name(k)}': locations[k] for k in range(n_g)}
-            ext['real cost'] = f'{cost_i:.2f}'
+            ext[name] = f'{cost_i:.3f}'
             ext['total cost'] = sum(costs_i)
             ext['is_grasping'] = ' '.join([str(g) for g in is_grasping])
             rr.log_extension_components(box_entity_path, ext)
@@ -127,8 +126,8 @@ class RegraspMPC:
         n_samples = self.p.n_samples
         horizon = self.p.horizon
         lambda_ = self.p.lambda_
-        self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, num_samples=n_samples, noise_sigma=np.deg2rad(8),
-                               horizon=horizon, lambda_=lambda_)
+        self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(8), horizon=horizon,
+                               lambda_=lambda_)
         self.dq_buffer = Buffer(12)
         self.max_dq = 0
 
@@ -189,7 +188,7 @@ class RegraspMPC:
             [1, 0],
             [0, 1],
             [1, 1],
-            # [0, 0], # not very useful :)
+            [0, 0], # not very useful :)
         ])
 
         f_best = 1e9
@@ -236,9 +235,14 @@ class RegraspMPC:
         # copy model and data since each solution should be different/independent
         candidate_phy = phy.copy_all()
 
-        grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping)
+        grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping) # TODO: move outside func
 
-        f_is_same = 1000 if grasp0 == grasp else 0
+        if np.all(np.logical_not(grasp.is_grasping)):
+            return 1000
+
+        if grasp0 == grasp:
+            return 1000
+
         regrasp_result = self.do_multi_gripper_regrasp(candidate_phy, grasp, self.p.max_grasp_plan_iters,
                                                        is_planning=True, sub_time_s=self.p.plan_sub_time_s)
         f_news, f_new_eq_errs, f_diffs, f_diff_eq_errs = regrasp_result.cost
@@ -253,7 +257,7 @@ class RegraspMPC:
         f_diff = sum(f_diffs) * self.p.f_grasp_weight
         f_diff_eq_err = sum(f_diff_eq_errs) * self.p.f_eq_err_weight
 
-        costs_i = [f_is_same, f_new, f_new_eq_err, f_diff, f_diff_eq_err, f_goal]
+        costs_i = [f_new, f_new_eq_err, f_diff, f_diff_eq_err, f_goal]
         total_cost = sum(costs_i)
         logger.info(f'{grasp=} {total_cost=}')
 
@@ -336,10 +340,11 @@ class RegraspMPC:
                 return Result(Status.SUCCESS, f"Grasp successful", execution_cost)
 
             while warmstart_count < self.p.warmstart:
-                command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, sub_time_s)
+                command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, sub_time_s,
+                                            self.p.num_samples)
                 self.mppi_viz(grasp_goal, phy, command, sub_time_s)
                 warmstart_count += 1
-            command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, sub_time_s)
+            command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, sub_time_s, self.p.num_samples)
             self.mppi_viz(grasp_goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s)
@@ -373,10 +378,10 @@ class RegraspMPC:
                 return Result(Status.SUCCESS, "Goal reached!", execution_cost)
 
             while warmstart_count < self.p.warmstart:
-                command = self.mppi.command(phy, self.goal.get_results, self.goal.cost, sub_time_s)
+                command = self.mppi.command(phy, self.goal.get_results, self.goal.cost, sub_time_s, self.p.num_samples)
                 self.mppi_viz(self.goal, phy, command, sub_time_s)
                 warmstart_count += 1
-            command = self.mppi.command(phy, self.goal.get_results, self.goal.cost, sub_time_s)
+            command = self.mppi.command(phy, self.goal.get_results, self.goal.cost, sub_time_s, self.p.num_samples)
             self.mppi_viz(self.goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s)
@@ -406,7 +411,8 @@ class RegraspMPC:
 
         # viz
         i = None
-        for i in range(min(self.mppi.num_samples, 10)):
+        num_samples = self.mppi.cost.shape[0]
+        for i in range(min(num_samples, 10)):
             sorted_traj_idx = sorted_traj_indices[i]
             cost_normalized = self.mppi.cost_normalized[sorted_traj_idx]
             c = cm.RdYlGn(1 - cost_normalized)

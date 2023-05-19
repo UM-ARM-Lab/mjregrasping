@@ -1,0 +1,9 @@
+- git:
+    local-name: arc_utilities
+    uri: git@github.com:UM-ARM-Lab/arc_utilities.git
+- git:
+    local-name: mjregrasping
+    uri: git@github.com:UM-ARM-Lab/mjregrasping.git
+- git:
+    local-name: sdf_tools
+    uri: git@github.com:UM-ARM-Lab/sdf_tools.git
