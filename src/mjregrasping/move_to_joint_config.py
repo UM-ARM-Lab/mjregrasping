@@ -4,12 +4,15 @@ from mjregrasping.get_result_functions import get_q_current
 from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
 from mjregrasping.rollout import control_step
+import logging
+
+logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
     kP = 5.0
     q_prev = get_q_current(phy)
-    for i in range(200):
+    for i in range(100):
         viz.viz(phy)
         q_current = get_q_current(phy)
         command = kP * (q_target - q_current)
@@ -24,8 +27,8 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
         offending_q_idx = np.argmax(error)
         abs_qvel = np.abs(q_prev - q_current)
         offending_qvel_idx = np.argmax(abs_qvel)
-        reached = np.rad2deg(max_joint_error) < 1.0
-        stopped = np.rad2deg(np.max(abs_qvel)) < 1.0
+        reached = np.rad2deg(max_joint_error) < 0.5
+        stopped = np.rad2deg(np.max(abs_qvel)) < 0.5
         if reached and stopped:
             return
 
@@ -35,4 +38,5 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
         reason = f"Joint {phy.m.joint(offending_q_idx).name} is {np.rad2deg(max_joint_error)} away from target."
     else:
         reason = f"Joint {phy.m.joint(offending_qvel_idx).name} is still moving too fast."
-    raise RuntimeError(f"PID failed to converge. {reason}")
+    # raise RuntimeError()
+    logger.error(f"PID failed to converge. {reason}")

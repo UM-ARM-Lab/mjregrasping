@@ -10,7 +10,6 @@ class MjMovieMaker:
         self.gl_ctx = mujoco.GLContext(w, h)
         self.gl_ctx.make_current()
         self.con = mujoco.MjrContext(m, 1)
-        # TODO: disable shadows
         self.scene = mujoco.MjvScene(m, maxgeom=500)
         self.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
         self.viewport = mujoco.MjrRect(0, 0, w, h)

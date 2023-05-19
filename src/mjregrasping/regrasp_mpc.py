@@ -2,7 +2,7 @@ import logging
 from time import perf_counter
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum, auto
-from typing import Optional
+from typing import Optional, Dict, List
 
 import cma
 import mujoco
@@ -72,7 +72,7 @@ def compute_eq_error(phy: Physics):
     return sum(eq_errs)
 
 
-def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_locations):
+def vis_regrasp_solutions_and_costs(costs_lists: List[Dict], candidate_grasps: List[GraspState]):
     # histograms
     n_g = 2
     width = 0.1
@@ -95,7 +95,7 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
         T[2, 3] = p[2]
         return T
 
-    for i, (costs_i, locations) in enumerate(zip(costs_lists, candidate_grasp_locations)):
+    for i, (costs_i, grasp) in enumerate(zip(costs_lists, candidate_grasps)):
         # TODO: draw one big outline box around the total cost for each solution
         z_offset = 0
         for name, cost_i in costs_i.items():
@@ -105,10 +105,10 @@ def vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_lo
             log_box(box_entity_path, np.array([width, depth, z_i]),
                     pos_transform([width * i, 0, z_i / 2 + z_offset]),
                     color=color_i)
-            ext = {f'grasp {gripper_idx_to_eq_name(k)}': locations[k] for k in range(n_g)}
+            ext = {f'grasp {gripper_idx_to_eq_name(k)}': grasp.locations[k] for k in range(n_g)}
             ext[name] = f'{cost_i:.3f}'
             ext['total cost'] = sum(costs_i.values())
-            ext['is_grasping'] = ' '.join([str(g) for g in is_grasping])
+            ext['is_grasping'] = ' '.join([str(g) for g in grasp.is_grasping])
             rr.log_extension_components(box_entity_path, ext)
             z_offset += z_i
 
@@ -216,8 +216,10 @@ class RegraspMPC:
 
                 candidate_grasp_locations = es.ask()  # from 0 to 1
                 costs_lists = []
+                candidate_grasps = []
                 for grasp_locations in candidate_grasp_locations:
                     grasp = GraspState(self.rope_body_indices, grasp_locations, is_grasping)
+                    candidate_grasps.append(grasp)
                     costs_i = self.score_grasp_location(phy, grasp0, grasp)
                     total_cost = sum(costs_i.values())
                     logger.info(f'{grasp=} {total_cost=}')
@@ -225,7 +227,7 @@ class RegraspMPC:
                 costs = [sum(costs_i.values()) for costs_i in costs_lists]
 
                 # Visualize!
-                vis_regrasp_solutions_and_costs(is_grasping, costs_lists, candidate_grasp_locations)
+                vis_regrasp_solutions_and_costs(costs_lists, candidate_grasps)
                 es.tell(candidate_grasp_locations, costs)
                 print(es.result_pretty())
 

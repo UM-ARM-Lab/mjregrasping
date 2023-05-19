@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from time import perf_counter
 import logging
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
@@ -57,18 +58,17 @@ def main():
 
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         mpc = RegraspMPC(mppi_nu=m.nu, pool=pool, viz=viz, goal=goal, objects=objects, seed=seed, mov=None)
+        t0 = perf_counter()
 
         # Debug why [0.0, 0.59] is better than [0.73, 0] for the first re-grasp???
-        grasp_locations1 = np.array([0.73, 0])
-        is_grasping = np.array([1, 0])
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
-        costs1 = mpc.score_grasp_location(grasp_locations1, grasp0, is_grasping, phy)
-        grasp_locations2 = np.array([0, 0.59])
-        is_grasping = np.array([0, 1])
-        costs2 = mpc.score_grasp_location(grasp_locations2, grasp0, is_grasping, phy)
+        grasp1 = GraspState(mpc.rope_body_indices, np.array([0.73, 0]), np.array([1, 0]))
+        costs1 = mpc.score_grasp_location(phy, grasp0, grasp1)
+        grasp2 = GraspState(mpc.rope_body_indices, np.array([0.0, 0.59]), np.array([1, 0]))
+        costs2 = mpc.score_grasp_location(phy, grasp0, grasp2)
         costs_lists = [costs1, costs2]
-        costs = [sum(costs_i) for costs_i in costs_lists]
-        vis_regrasp_solutions_and_costs(is_grasping, costs_lists, [grasp_locations1, grasp_locations2])
+        # vis_regrasp_solutions_and_costs(costs_lists, [grasp1, grasp2])
+        costs = [sum(costs_i.values()) for costs_i in costs_lists]
         print(costs)
 
         print("done")

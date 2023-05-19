@@ -1,6 +1,6 @@
-from copy import copy
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from time import perf_counter
 
 import mujoco
 import numpy as np
@@ -67,20 +67,19 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float):
     else:
         logger.warning("control is None!!!")
     n_sub_time = int(sub_time_s / m.opt.timestep)
-    # FIXME: don't move the grippers... horrible hack
-    d.ctrl[m.actuator('leftgripper_vel').id] = 0
-    d.ctrl[m.actuator('leftgripper2_vel').id] = 0
-    d.ctrl[m.actuator('rightgripper_vel').id] = 0
-    d.ctrl[m.actuator('rightgripper2_vel').id] = 0
 
     limit_actuator_windup(phy)
 
     mujoco.mj_step(m, d, nstep=n_sub_time)
 
 
+# Very small performance optimization to avoid re-computing these. We assume it's constant.
+_qpos_indices_for_act = None
 def limit_actuator_windup(phy):
-    qpos_indices_for_act = np.array([phy.m.actuator(i).actadr[0] for i in range(phy.m.na)])
-    qpos_for_act = phy.d.qpos[qpos_indices_for_act]
+    global _qpos_indices_for_act
+    if _qpos_indices_for_act is None:
+        _qpos_indices_for_act = np.array([phy.m.actuator(i).actadr[0] for i in range(phy.m.na)])
+    qpos_for_act = phy.d.qpos[_qpos_indices_for_act]
     phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -0.01, 0.01)
 
 
@@ -96,5 +95,4 @@ def parallel_rollout(pool: ThreadPoolExecutor, phy, controls_samples, sub_time_s
         results = tuple(np.array(result_i) for result_i in zip(*results))
     else:
         results = np.array(results)
-
     return results
