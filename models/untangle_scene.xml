@@ -13,12 +13,14 @@
     <worldbody>
         <!-- used for recording what happens in the simulation -->
         <body name="mycamera">
-            <camera mode="fixed" name="mycamera" xyaxes="0.2 -1 0 0.5 0 0.5" pos="-0.3 -0.5 2.0" />
+            <camera mode="fixed" name="mycamera" xyaxes="0.2 -1 0 0.5 0 0.5" pos="-0.3 -0.5 2.0"/>
         </body>
     </worldbody>
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
-        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181" active="false" solref="0.03 1"/>
-        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.181" active="false" solref="0.03 1"/>
+        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.16" active="false" solref="0.04 1"/>
+        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.16" active="false" solref="0.04 1"/>
+        <connect body1="drive50" body2="world" name="left_world" anchor="0 0 0.16" active="false" solref="0.04 1"/>
+        <connect body1="drive10" body2="world" name="right_world" anchor="0 0 0.16" active="false" solref="0.04 1"/>
     </equality>
 </mujoco>

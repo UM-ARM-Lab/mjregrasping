@@ -1,3 +1,5 @@
+from copy import copy
+
 import mujoco
 
 
@@ -61,7 +63,7 @@ class Objects:
         self.rope = Object(model, "rope")
         self.obstacle = Object(model, obstacle_name)
 
-        self.val_self_collision_geom_names = self.val.geom_names
+        self.val_self_collision_geom_names = copy(self.val.geom_names)
         self.val_self_collision_geom_names.remove('leftgripper')
         self.val_self_collision_geom_names.remove('leftgripper2')
         self.val_self_collision_geom_names.remove('rightgripper')

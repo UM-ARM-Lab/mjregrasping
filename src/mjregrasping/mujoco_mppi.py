@@ -80,7 +80,11 @@ class MujocoMPPI:
         gammas = np.power(self.gamma, np.arange(self.horizon))[None]
         self.cost = np.sum(gammas * self.costs, axis=-1)
 
-        self.cost_normalized = (self.cost - self.cost.min()) / (self.cost.max() - self.cost.min())
+        # normalized cost is only used for visualization, so we avoid numerical issues
+        cost_range = (self.cost.max() - self.cost.min())
+        if cost_range < 1e-6:
+            cost_range = 1.0
+        self.cost_normalized = (self.cost - self.cost.min()) / cost_range
 
         weights = softmax(-self.cost_normalized, self.lambda_)
         logger.debug(f'weights: std={float(np.std(weights)):.2f} max={float(np.max(weights)):.2f}')

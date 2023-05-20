@@ -60,20 +60,40 @@ def main():
         mpc = RegraspMPC(mppi_nu=m.nu, pool=pool, viz=viz, goal=goal, objects=objects, seed=seed, mov=None)
         t0 = perf_counter()
 
-        # Debug why [0.0, 0.59] is better than [0.73, 0] for the first re-grasp???
+        # mpc.compute_new_grasp(phy)
+
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
-        grasp1 = GraspState(mpc.rope_body_indices, np.array([0.73, 0]), np.array([1, 0]))
-        costs1 = mpc.score_grasp_location(phy, grasp0, grasp1)
-        grasp2 = GraspState(mpc.rope_body_indices, np.array([0.0, 0.59]), np.array([1, 0]))
-        costs2 = mpc.score_grasp_location(phy, grasp0, grasp2)
-        costs_lists = [costs1, costs2]
-        # vis_regrasp_solutions_and_costs(costs_lists, [grasp1, grasp2])
-        costs = [sum(costs_i.values()) for costs_i in costs_lists]
-        print(costs)
+
+        grasp_locations = [
+            np.array([0.0, 0.4]),
+            np.array([0.0, 0.5]),
+            np.array([0.0, 0.6]),
+            np.array([0.0, 0.7]),
+            np.array([0.0, 0.8]),
+            np.array([0.0, 0.9]),
+            np.array([0.0, 0.1]),
+            np.array([0.4, 0]),
+            np.array([0.5, 0]),
+            np.array([0.6, 0]),
+            np.array([0.7, 0]),
+            np.array([0.8, 0]),
+            np.array([0.9, 0]),
+            np.array([0.1, 0]),
+
+        ]
+        grasps = []
+        costs_dicts = []
+        for grasp_location in grasp_locations:
+            grasp = GraspState(mpc.rope_body_indices, grasp_location)
+            costs_dict = mpc.score_grasp_location(phy, grasp0, grasp)
+            print(grasp, sum(costs_dict.values()))
+            grasps.append(grasp)
+            costs_dicts.append(costs_dict)
+
+        costs = [sum(costs_i.values()) for costs_i in costs_dicts]
+        vis_regrasp_solutions_and_costs(costs_dicts, grasps)
 
         print("done")
-
-        mpc.compute_new_grasp(phy)
 
 
 if __name__ == "__main__":

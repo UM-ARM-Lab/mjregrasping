@@ -22,7 +22,7 @@ def setup_tangled_scene(phy: Physics, viz):
         -0.5, 0.4,  # torso
         -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
         0, 0,  # left gripper
-        1.2, -0.2, 0, -0.90, 0, -0.2, 0,  # right arm
+        1.2, -0.2, 0, -0.90, 0, -0.6, 0,  # right arm
         0, 0,  # right gripper
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)

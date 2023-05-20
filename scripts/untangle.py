@@ -39,7 +39,7 @@ def main():
     root = Path("results")
     root.mkdir(exist_ok=True)
 
-    goal_point = np.array([0.73, 0.04, 1.25])
+    goal_point = np.array([0.78, 0.04, 1.28])
     n_seeds = 1
     for seed in range(n_seeds):
         m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
@@ -72,8 +72,11 @@ def main():
                                objects=objects)
 
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
+            from time import perf_counter
+            t0 = perf_counter()
             mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=viz, goal=goal, objects=objects, seed=seed, mov=mov)
             result = mpc.run(phy)
+            logger.info(f'dt: {perf_counter() - t0:.4f}')
             logger.info(f"{seed=} {result=}")
 
 

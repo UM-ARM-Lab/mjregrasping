@@ -83,7 +83,6 @@ class GripperPointGoal(MPPIGoal):
         """
         left_gripper_pos, right_gripper_pos, joint_positions, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
-        pred_contact_cost *= self.p.contact_cost
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
         action_cost = get_action_cost(joint_positions, self.p)
@@ -156,7 +155,6 @@ class GraspRopeGoal(MPPIGoal):
         """
         left_gripper_pos, right_gripper_pos, joint_positions, body_pos, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
-        pred_contact_cost *= self.p.contact_cost
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(body_pos - gripper_point, axis=-1)[:, 1:]
         action_cost = get_action_cost(joint_positions, self.p)
@@ -236,7 +234,6 @@ class ObjectPointGoal(MPPIGoal):
 
         pred_rope_points = rope_points[:, 1:]
         pred_contact_cost = contact_cost[:, 1:]
-        pred_contact_cost *= self.p.contact_cost
         point_dist = self.min_dist_to_specified_point(rope_points)
         pred_point_dist = point_dist[:, 1:]
         gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
@@ -246,19 +243,15 @@ class ObjectPointGoal(MPPIGoal):
         pred_is_grasping = is_grasping[:, 1:]  # skip t=0
 
         is_grasping0 = is_grasping[:, 0]  # grasp state cannot change within a rollout
-        cannot_progress = np.logical_or(np.all(is_grasping0, axis=-1), np.all(np.logical_not(is_grasping0), axis=-1))
-        cannot_progress_penalty = cannot_progress * self.p.cannot_progress
 
         # Get the potential field gradient at the specified points
         gripper_dfield = self.dfield.get_costs(pred_gripper_points)  # [b, h, 2]
         gripper_dfield *= self.p.gripper_dfield
         grasping_gripper_dfield = np.sum(gripper_dfield * pred_is_grasping, -1)  # [b, horizon]
 
-        cost = copy(pred_point_dist)
+        cost = copy(pred_point_dist) * self.p.point_dist_weight
 
         cost += grasping_gripper_dfield
-
-        cost += np.expand_dims(cannot_progress_penalty, -1)
 
         cost += pred_contact_cost
 
@@ -292,8 +285,7 @@ class ObjectPointGoal(MPPIGoal):
         cost += action_cost
 
         # keep track of this in a member variable, so we can detect when it's value has changed
-        rr.log_scalar('object_point_goal/cannot_progress', cannot_progress.mean(), color=[0, 255, 0])
-        rr.log_scalar('object_point_goal/points', point_dist.mean(), color=[0, 0, 255])
+        rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
         rr.log_scalar('object_point_goal/grasping_gripper_dfield', grasping_gripper_dfield.mean(), color=[255, 0, 255])
         rr.log_scalar('object_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
         rr.log_scalar('object_point_goal/min_nongrasping', min_nongrasping_cost.mean(), color=[0, 255, 255])
@@ -360,8 +352,7 @@ def get_contact_cost(phy: Physics, objects: Objects, p: Params):
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts
     # clamp to be between 0 and 1, and more sensitive to just a few contacts
-    contact_cost = min(np.power(contact_cost, p.contact_exponent),
-                       p.max_contact_cost)
+    contact_cost = min(np.power(contact_cost, p.contact_exponent), p.max_contact_cost) * p.contact_cost
     return contact_cost
 
 

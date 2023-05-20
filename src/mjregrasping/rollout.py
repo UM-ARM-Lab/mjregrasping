@@ -1,10 +1,10 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from time import perf_counter
 
 import mujoco
 import numpy as np
 
+from mjregrasping.grasping import compute_eq_error, compute_eq_errors
 from mjregrasping.physics import Physics
 
 MAX_VEL_TILL_ERROR_RAD = np.deg2rad(3)
@@ -68,13 +68,25 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float):
         logger.warning("control is None!!!")
     n_sub_time = int(sub_time_s / m.opt.timestep)
 
+
+    slow_when_eqs_bad(phy)
+
     limit_actuator_windup(phy)
 
     mujoco.mj_step(m, d, nstep=n_sub_time)
 
 
+def slow_when_eqs_bad(phy):
+    eq_errors = compute_eq_errors(phy)
+    max_eq_err = np.max(eq_errors)
+    speed_factor = min(max(0.0005 * -np.exp(120 * max_eq_err) + 1, 0), 1)
+    phy.d.ctrl *= speed_factor
+
+
 # Very small performance optimization to avoid re-computing these. We assume it's constant.
 _qpos_indices_for_act = None
+
+
 def limit_actuator_windup(phy):
     global _qpos_indices_for_act
     if _qpos_indices_for_act is None:
