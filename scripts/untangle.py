@@ -26,7 +26,7 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def main():
-    np.set_printoptions(precision=3, suppress=True, linewidth=220)
+    np.set_printoptions(precision=5, suppress=True, linewidth=220)
     rr.init('mjregrasping')
     rr.connect()
     rospy.init_node("untangle")
@@ -50,7 +50,7 @@ def main():
         # setup_untangled_scene(phy, mjviz)
         setup_tangled_scene(phy, viz)
 
-        if p.max_perf:
+        if False:
             p.rviz = False
             p.rr = False
             p.mppi_rollouts = False

@@ -7,7 +7,7 @@ import rerun as rr
 from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
-from mjregrasping.params import Params
+from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
 
@@ -70,7 +70,6 @@ class GripperPointGoal(MPPIGoal):
         self.goal_radius = goal_radius
         self.gripper_idx = gripper_idx
         self.objects = objects
-        self.p = self.viz.p
 
     def cost(self, results):
         """
@@ -85,7 +84,7 @@ class GripperPointGoal(MPPIGoal):
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
-        action_cost = get_action_cost(joint_positions, self.p)
+        action_cost = get_action_cost(joint_positions)
 
         cost = copy(pred_contact_cost)
         cost += dist_cost
@@ -112,7 +111,7 @@ class GripperPointGoal(MPPIGoal):
         """
         joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
         joint_positions = phy.d.qpos[joint_indices_for_actuators]
-        contact_cost = get_contact_cost(phy, self.objects, self.p)
+        contact_cost = get_contact_cost(phy, self.objects)
         return phy.d.site('left_tool').xpos, phy.d.site('right_tool').xpos, joint_positions, contact_cost
 
     def viz_result(self, result, idx: int, scale, color):
@@ -141,7 +140,6 @@ class GraspRopeGoal(MPPIGoal):
         self.goal_radius = goal_radius
         self.gripper_idx = gripper_idx
         self.objects = objects
-        self.p = self.viz.p
         self.initial_body_pos = None
 
     def cost(self, results):
@@ -157,7 +155,7 @@ class GraspRopeGoal(MPPIGoal):
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(body_pos - gripper_point, axis=-1)[:, 1:]
-        action_cost = get_action_cost(joint_positions, self.p)
+        action_cost = get_action_cost(joint_positions)
 
         if self.initial_body_pos is None:
             self.initial_body_pos = body_pos
@@ -191,7 +189,7 @@ class GraspRopeGoal(MPPIGoal):
         """
         joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
         joint_positions = phy.d.qpos[joint_indices_for_actuators]
-        contact_cost = get_contact_cost(phy, self.objects, self.p)
+        contact_cost = get_contact_cost(phy, self.objects)
         body_pos = self.get_body_pos(phy.d)
         return phy.d.site('left_tool').xpos, phy.d.site('right_tool').xpos, joint_positions, body_pos, contact_cost
 
@@ -227,7 +225,6 @@ class ObjectPointGoal(MPPIGoal):
         self.body_idx = body_idx
         self.goal_radius = goal_radius
         self.objects = objects
-        self.p = self.viz.p
 
     def cost(self, results):
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
@@ -246,10 +243,10 @@ class ObjectPointGoal(MPPIGoal):
 
         # Get the potential field gradient at the specified points
         gripper_dfield = self.dfield.get_costs(pred_gripper_points)  # [b, h, 2]
-        gripper_dfield *= self.p.gripper_dfield
+        gripper_dfield *= hp['gripper_dfield']
         grasping_gripper_dfield = np.sum(gripper_dfield * pred_is_grasping, -1)  # [b, horizon]
 
-        cost = copy(pred_point_dist) * self.p.point_dist_weight
+        cost = copy(pred_point_dist) * hp['point_dist_weight']
 
         cost += grasping_gripper_dfield
 
@@ -261,9 +258,9 @@ class ObjectPointGoal(MPPIGoal):
         rope_gripper_dists = norm(pred_gripper_points[..., None, :, :] - pred_rope_points[..., None, :], axis=-1)
         pred_is_not_grasping = 1 - pred_is_grasping
         min_nongrasping_dists = np.sum(np.min(rope_gripper_dists, -2) * pred_is_not_grasping, -1)  # [b, horizon]
-        min_nongrasping_dists = np.sqrt(np.maximum(min_nongrasping_dists - self.p.nongrasping_close, 0))
+        min_nongrasping_dists = np.sqrt(np.maximum(min_nongrasping_dists - hp['nongrasping_close'], 0))
 
-        min_nongrasping_cost = min_nongrasping_dists * self.p.min_nongrasping_rope_gripper_dists
+        min_nongrasping_cost = min_nongrasping_dists * hp['min_nongrasping_rope_gripper_dists']
         cost += min_nongrasping_cost
 
         # Add a cost that non-grasping grippers should try to return to a "home" position.
@@ -277,11 +274,11 @@ class ObjectPointGoal(MPPIGoal):
         home_cost_joints = np.abs(pred_joint_positions)  # [b, horizon, n_joints]
         home_cost_grippers = home_cost_joints @ arm_gripper_matrix
         nongrasping_home_cost = np.sum(home_cost_grippers * pred_is_not_grasping, -1)  # [b, horizon]
-        nongrasping_home_cost = nongrasping_home_cost * self.p.nongrasping_home
+        nongrasping_home_cost = nongrasping_home_cost * hp['nongrasping_home']
         cost += nongrasping_home_cost
 
         # Add an action cost
-        action_cost = get_action_cost(joint_positions, self.p)
+        action_cost = get_action_cost(joint_positions)
         cost += action_cost
 
         # keep track of this in a member variable, so we can detect when it's value has changed
@@ -332,12 +329,12 @@ class ObjectPointGoal(MPPIGoal):
         ]
         is_grasping = phy.m.eq_active[eq_indices]
 
-        contact_cost = get_contact_cost(phy, self.objects, self.p)
+        contact_cost = get_contact_cost(phy, self.objects)
 
         return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
 
 
-def get_contact_cost(phy: Physics, objects: Objects, p: Params):
+def get_contact_cost(phy: Physics, objects: Objects):
     # TODO: use SDF to compute near-contact cost to avoid getting too close
     # doing the contact cost calculation here means we don't need to return the entire data.contact array,
     # which makes things simpler and possibly faster, since this operation can't be easily vectorized.
@@ -352,7 +349,7 @@ def get_contact_cost(phy: Physics, objects: Objects, p: Params):
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts
     # clamp to be between 0 and 1, and more sensitive to just a few contacts
-    contact_cost = min(np.power(contact_cost, p.contact_exponent), p.max_contact_cost) * p.contact_cost
+    contact_cost = min(np.power(contact_cost, hp['contact_exponent']), hp['max_contact_cost']) * hp['contact_cost']
     return contact_cost
 
 
@@ -360,7 +357,7 @@ def val_self_collision(geom_name1, geom_name2, objects: Objects):
     return geom_name1 in objects.val_self_collision_geom_names and geom_name2 in objects.val_self_collision_geom_names
 
 
-def get_action_cost(joint_positions, p: Params):
+def get_action_cost(joint_positions):
     action_cost = np.sum(np.abs(joint_positions[:, 1:] - joint_positions[:, :-1]), axis=-1)
-    action_cost *= p.action
+    action_cost *= hp['action']
     return action_cost

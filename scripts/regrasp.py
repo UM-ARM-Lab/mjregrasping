@@ -17,7 +17,7 @@ from mjregrasping.grasp_state import GraspState
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_mpc import RegraspMPC, vis_regrasp_solutions_and_costs
+from mjregrasping.regrasp_mpc import RegraspMPC, viz_regrasp_solutions_and_costs
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz
 from mjregrasping.viz import Viz
@@ -26,7 +26,7 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def main():
-    np.set_printoptions(precision=3, suppress=True, linewidth=220)
+    np.set_printoptions(precision=5, suppress=True, linewidth=220)
     rr.init('mjregrasping')
     rr.connect()
     rospy.init_node("regrasp")
@@ -36,14 +36,14 @@ def main():
     p = Params()
     viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
-    seed = 1
+    seed = 0
     m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
 
     objects = Objects(m)
 
-    d = load_data_and_eq(m)
+    d = load_data_and_eq(m, forward=False)
     phy = Physics(m, d)
-    goal_point = np.array([0.78, 0.04, 1.27])
+    goal_point = np.array([0.78, 0.04, 1.28])
     dfield = save_load_dfield(phy, goal_point)
 
     for _ in range(5):
@@ -51,7 +51,7 @@ def main():
 
     goal = ObjectPointGoal(dfield=dfield,
                            viz=viz,
-                           goal_point=np.array([0.78, 0.04, 1.27]),
+                           goal_point=goal_point,
                            body_idx=-1,
                            goal_radius=0.05,
                            objects=objects)
@@ -65,20 +65,11 @@ def main():
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
 
         grasp_locations = [
-            np.array([0.0, 0.4]),
-            np.array([0.0, 0.5]),
-            np.array([0.0, 0.6]),
-            np.array([0.0, 0.7]),
-            np.array([0.0, 0.8]),
-            np.array([0.0, 0.9]),
-            np.array([0.0, 0.1]),
-            np.array([0.4, 0]),
-            np.array([0.5, 0]),
-            np.array([0.6, 0]),
-            np.array([0.7, 0]),
-            np.array([0.8, 0]),
-            np.array([0.9, 0]),
-            np.array([0.1, 0]),
+            np.array([0., 0.726]),
+            np.array([0., 0.407]),
+            np.array([0, 0.591]),
+            np.array([0.596, 0]),
+            np.array([0.495, 0]),
 
         ]
         grasps = []
@@ -91,7 +82,7 @@ def main():
             costs_dicts.append(costs_dict)
 
         costs = [sum(costs_i.values()) for costs_i in costs_dicts]
-        vis_regrasp_solutions_and_costs(costs_dicts, grasps)
+        viz_regrasp_solutions_and_costs(costs_dicts, grasps)
 
         print("done")
 

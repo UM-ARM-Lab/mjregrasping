@@ -68,7 +68,6 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float):
         logger.warning("control is None!!!")
     n_sub_time = int(sub_time_s / m.opt.timestep)
 
-
     slow_when_eqs_bad(phy)
 
     limit_actuator_windup(phy)

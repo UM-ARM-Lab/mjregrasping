@@ -27,7 +27,7 @@ class DField:
         visited = set()
         goal_i = point_to_idx(goal, vg.origin_point, vg.res)
         queue = [goal_i]
-        self.dijsktra_field = np.ones_like(vg.vg) * 1000
+        self.dijsktra_field = np.ones_like(vg.vg) * 100
         self.dijsktra_field[tuple(goal_i)] = 0
         self.grad = np.zeros([vg.shape[0], vg.shape[1], vg.shape[2], 3])
 

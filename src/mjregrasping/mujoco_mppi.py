@@ -18,6 +18,7 @@ class MujocoMPPI:
         self.pool = pool
         self.horizon = horizon
         self.gamma = gamma
+        self.seed = seed
 
         # dimensions of state and control
         self.lambda_ = lambda_
@@ -101,6 +102,8 @@ class MujocoMPPI:
         Resets the control samples.
         """
         self.U = np.zeros([self.horizon, self.noise_sigma.shape[0]])
+        # resetting the RNG makes things a bit more deterministic, so easier for debugging
+        self.noise_rng = np.random.RandomState(self.seed)
 
     def get_min_terminal_cost(self):
         """ Returns the minimum cost of the last time step """

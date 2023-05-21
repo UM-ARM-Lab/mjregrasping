@@ -21,7 +21,7 @@ def save_data_and_eq(phy: Physics):
         pickle.dump(data_and_eq, f)
 
 
-def load_data_and_eq(m: mujoco.MjModel):
+def load_data_and_eq(m: mujoco.MjModel, forward=True):
     """ Modifies the model in place and returns a new instance of MjData """
     with open("data_and_eq.pkl", "rb") as f:
         data_and_eq = pickle.load(f)
@@ -30,5 +30,7 @@ def load_data_and_eq(m: mujoco.MjModel):
         eq.active[:] = data_and_eq['eq'][eq_idx]['active']
         eq.data[:] = data_and_eq['eq'][eq_idx]['data']
         eq.obj2id[:] = data_and_eq['eq'][eq_idx]['obj2id']
-    mujoco.mj_forward(m, data_and_eq['data'])
+    # NOTE: by doing this, we change the data. That means if you want perfect reproducibility you should skip this
+    if forward:
+        mujoco.mj_forward(m, data_and_eq['data'])
     return data_and_eq['data']

@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 import logging
-import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import mujoco
@@ -11,18 +9,14 @@ import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.body_with_children import Objects
-from mjregrasping.dijsktra_field import save_load_dfield
-from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import deactivate_eq, activate_eq
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_mpc import RegraspMPC, gripper_idx_to_eq_name
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenes import setup_tangled_scene, activate_and_settle, settle
+from mjregrasping.scenes import setup_tangled_scene, settle
 from mjregrasping.viz import Viz
 
 logger = logging.getLogger(f'rosout.{__name__}')
@@ -74,6 +68,7 @@ def main():
     settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False, settle_steps=100)
 
     pid_to_joint_config(phy, viz, robot_q1, sub_time_s=DEFAULT_SUB_TIME_S)
+
 
 if __name__ == "__main__":
     main()
