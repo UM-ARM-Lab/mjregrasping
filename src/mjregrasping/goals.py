@@ -90,8 +90,8 @@ class GripperPointGoal(MPPIGoal):
         cost += dist_cost
         cost += action_cost
 
-        rr.log_scalar('gripper_point_goal/pred_contact', pred_contact_cost.mean())
-        rr.log_scalar('gripper_point_goal/action', action_cost.mean())
+        rr.log_scalar('gripper_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('gripper_point_goal/action', action_cost.mean(), color=[255, 255, 255])
         rr.log_scalar('gripper_point_goal/dist', dist_cost.mean())
 
         return cost
@@ -159,17 +159,17 @@ class GraspRopeGoal(MPPIGoal):
 
         if self.initial_body_pos is None:
             self.initial_body_pos = body_pos
-        rope_motion_cost = norm(body_pos - self.initial_body_pos, axis=-1)[:, 1:]
+        rope_motion_cost = norm(body_pos - self.initial_body_pos, axis=-1)[:, 1:] * hp['rope_motion_weight']
 
         cost = copy(pred_contact_cost)
         cost += dist_cost
         cost += action_cost
         cost += rope_motion_cost
 
-        rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean())
-        rr.log_scalar('grasp_rope_goal/rope_motion', rope_motion_cost.mean())
-        rr.log_scalar('grasp_rope_goal/action', action_cost.mean())
-        rr.log_scalar('grasp_rope_goal/dist', dist_cost.mean())
+        rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('grasp_rope_goal/rope_motion', rope_motion_cost.mean(), color=[255, 0, 0])
+        rr.log_scalar('grasp_rope_goal/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('grasp_rope_goal/dist', dist_cost.mean(), color=[0, 255, 0])
 
         return cost
 

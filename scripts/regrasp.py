@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-from time import perf_counter
 import logging
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
+from time import perf_counter
 
 import mujoco
 import numpy as np
@@ -15,7 +15,7 @@ from mjregrasping.dijsktra_field import save_load_dfield
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_state import GraspState
 from mjregrasping.mjsaver import load_data_and_eq
-from mjregrasping.params import Params
+from mjregrasping.params import Params, hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_mpc import RegraspMPC, viz_regrasp_solutions_and_costs
 from mjregrasping.rerun_visualizer import MjReRun
@@ -26,7 +26,7 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def main():
-    np.set_printoptions(precision=5, suppress=True, linewidth=220)
+    np.set_printoptions(precision=3, suppress=True, linewidth=220)
     rr.init('mjregrasping')
     rr.connect()
     rospy.init_node("regrasp")
@@ -46,9 +46,6 @@ def main():
     goal_point = np.array([0.78, 0.04, 1.28])
     dfield = save_load_dfield(phy, goal_point)
 
-    for _ in range(5):
-        mjviz.viz(phy, is_planning=False)
-
     goal = ObjectPointGoal(dfield=dfield,
                            viz=viz,
                            goal_point=goal_point,
@@ -58,31 +55,31 @@ def main():
 
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         mpc = RegraspMPC(mppi_nu=m.nu, pool=pool, viz=viz, goal=goal, objects=objects, seed=seed, mov=None)
-        t0 = perf_counter()
+
+        # grasp = GraspState(mpc.rope_body_indices, np.array([0.68, 0.]))
+        # r = mpc.do_single_gripper_grasp(phy, grasp, gripper_idx=0, max_iters=100, is_planning=False,
+        #                                 sub_time_s=hp['grasp_sub_time_s'], num_samples=50)
+        # print(r)
 
         # mpc.compute_new_grasp(phy)
 
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
 
         grasp_locations = [
-            np.array([0., 0.726]),
-            np.array([0., 0.407]),
-            np.array([0, 0.591]),
-            np.array([0.596, 0]),
-            np.array([0.495, 0]),
-
+            np.array([0.69, 0.0]),
+            np.array([0.66, 0.0]),
+            np.array([0.63, 0.0]),
         ]
         grasps = []
         costs_dicts = []
         for grasp_location in grasp_locations:
             grasp = GraspState(mpc.rope_body_indices, grasp_location)
-            costs_dict = mpc.score_grasp_location(phy, grasp0, grasp)
+            costs_dict, status = mpc.score_grasp_location(phy, grasp0, grasp)
             print(grasp, sum(costs_dict.values()))
             grasps.append(grasp)
             costs_dicts.append(costs_dict)
 
-        costs = [sum(costs_i.values()) for costs_i in costs_dicts]
-        viz_regrasp_solutions_and_costs(costs_dicts, grasps)
+            viz_regrasp_solutions_and_costs(costs_dicts, grasps)
 
         print("done")
 

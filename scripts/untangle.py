@@ -26,7 +26,7 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def main():
-    np.set_printoptions(precision=5, suppress=True, linewidth=220)
+    np.set_printoptions(precision=3, suppress=True, linewidth=220)
     rr.init('mjregrasping')
     rr.connect()
     rospy.init_node("untangle")

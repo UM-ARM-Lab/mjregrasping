@@ -50,5 +50,5 @@ def compute_eq_error(phy, eq):
     mujoco.mju_trnVecPose(b1_offset_in_world, b1.xpos, b1.xquat, b1_offset)
     b2_offset_in_world = np.zeros(3)
     mujoco.mju_trnVecPose(b2_offset_in_world, b2.xpos, b2.xquat, b2_offset)
-    eq_err = np.linalg.norm(b1_offset_in_world - b2_offset_in_world)
+    eq_err = np.sum(np.square(b1_offset_in_world - b2_offset_in_world))
     return eq_err
