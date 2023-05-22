@@ -4,6 +4,7 @@ from enum import Enum, auto
 from typing import Optional, Dict, List
 
 import cma
+import mujoco
 import numpy as np
 import rerun as rr
 from colorama import Fore
@@ -110,14 +111,17 @@ def pull_gripper(phy, name, loc, rope_body_indices):
     grasp_eq = phy.m.eq(name)
     grasp_eq.obj2id = grasp_index
     grasp_eq.active = 1
-    grasp_eq.data[3:6] = np.array([x_offset, 0, 0])
+    offset_body = np.array([x_offset, 0, 0])
+    grasp_eq.data[3:6] = offset_body
 
     # pull the gripper that is grasping towards the position where the rope point it wants to grasp is currenty
     grasp_index = grasp_location_to_indices(loc, rope_body_indices)
     grasp_world_eq = phy.m.eq(f'{name}_world')
     grasp_world_eq.active = 1
     grasp_world_eq.data[0:3] = np.array([0, 0, 0.16])
-    grasp_world_eq.data[3:6] = phy.d.body(grasp_index).xpos
+    offset_world = np.zeros(3)
+    mujoco.mju_trnVecPose(offset_world, np.zeros(3), phy.d.body(grasp_index).xquat, offset_body)
+    grasp_world_eq.data[3:6] = phy.d.body(grasp_index).xpos + offset_world
 
     # keep the other gripper where it is
     other_name = 'left' if name == 'right' else 'right'

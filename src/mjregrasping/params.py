@@ -32,7 +32,7 @@ hp = {
     "contact_exponent":                   0.5,
     "max_contact_cost":                   1,
     "contact_cost":                       3.0,
-    "f_eq_err_weight":                    200.0,
+    "f_eq_err_weight":                    100.0,
     "f_grasp_weight":                     0.1,
     "f_goal_weight":                      0.8,
     "f_settle_weight":                    0.25,
