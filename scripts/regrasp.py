@@ -61,16 +61,14 @@ def main():
         #                                 sub_time_s=hp['grasp_sub_time_s'], num_samples=50)
         # print(r)
 
-        # mpc.compute_new_grasp(phy)
+        mpc.compute_new_grasp(phy)
 
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
 
         grasp_locations = [
-            np.array([0.72, 0.0]),
-            np.array([0.69, 0.0]),
-            np.array([0.66, 0.0]),
-            np.array([0.63, 0.0]),
-            np.array([0.55, 0.0]),
+            np.array([0.0, 0.99]),
+            np.array([0.0, 0.90]),
+            np.array([0.0, 0.35]),
         ]
         grasps = []
         costs_dicts = []

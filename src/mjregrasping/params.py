@@ -41,13 +41,12 @@ hp = {
     "point_dist_weight":                  2.0,
     "needs_regrasp_again":                10,
     "frac_max_dq":                        0.2,
-    "cma_sigma":                          0.33,
+    "cma_sigma":                          0.3,
     "cma_opts":                           {
         'popsize':   5,
         'seed':      1,
-        'maxfevals': 100,
+        'maxfevals': 25,
         'tolx':      1e-2,
-        'tolfun':    1,
         'bounds':    [0, 1],
     }
 }

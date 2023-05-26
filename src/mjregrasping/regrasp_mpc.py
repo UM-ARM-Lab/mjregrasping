@@ -148,6 +148,7 @@ class RegraspMPC:
 
     def __init__(self, mppi_nu: int, pool: ThreadPoolExecutor, viz: Viz, goal: ObjectPointGoal, objects: Objects,
                  seed: int = 1, mov: Optional[MjMovieMaker] = None):
+        self.max_dq = None
         self.viz = viz
         self.goal = goal
         self.objects = objects
@@ -158,10 +159,14 @@ class RegraspMPC:
 
         self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(4), horizon=hp['horizon'],
                                lambda_=hp['lambda'])
-        self.dq_buffer = Buffer(12)
-        self.max_dq = 0
+        self.state_history = Buffer(12)
+        self.reset_trap_detection()
 
         self.regrasp_idx = 0
+
+    def reset_trap_detection(self):
+        self.state_history.reset()
+        self.max_dq = 0
 
     def run(self, phy):
         for self.iter in range(hp['iters']):
@@ -172,7 +177,6 @@ class RegraspMPC:
             logger.info(Fore.BLUE + f"Moving to goal" + Fore.RESET)
             move_result = self.move_to_goal(phy, hp['max_move_to_goal_iters'], is_planning=False,
                                             sub_time_s=hp['move_sub_time_s'], num_samples=hp['num_samples'])
-            self.max_dq = 0  # reset "stuck" detection
 
             if move_result.status in [Status.SUCCESS]:
                 self.close()
@@ -187,26 +191,27 @@ class RegraspMPC:
                 grasp_result = self.do_multi_gripper_regrasp(phy, grasp, max_iters=hp['max_grasp_iters'],
                                                              is_planning=False, sub_time_s=hp['grasp_sub_time_s'],
                                                              stop_if_failed=True, num_samples=hp['num_samples'])
-                self.max_dq = 0  # reset "stuck" detection
                 if grasp_result.status == Status.SUCCESS:
                     break
 
             self.regrasp_idx += 1
 
     def check_needs_regrasp(self, data):
-        self.dq_buffer.insert(data.qpos[self.objects.val.qpos_indices])
-        qposs = np.array(self.dq_buffer.data)
-        if len(qposs) < 2:
+        latest_q = data.qpos[self.objects.rope.qpos_indices]
+        self.state_history.insert(latest_q)
+        qs = np.array(self.state_history.data)
+        if len(qs) < 2:
             dq = 0
         else:
             # distance between the newest and oldest q in the buffer
             # the mean takes the average across joints.
-            dq = (np.abs(qposs[-1] - qposs[0]) / len(self.dq_buffer)).mean()
+            dq = (np.abs(qs[-1] - qs[0]) / len(self.state_history)).mean()
         self.max_dq = max(self.max_dq, dq)
         has_not_moved = dq < hp['frac_max_dq'] * self.max_dq
-        needs_regrasp = self.dq_buffer.full() and has_not_moved
-        rr.log_scalar('needs_regrasp/dq', dq)
-        rr.log_scalar('needs_regrasp/max_dq', self.max_dq)
+        needs_regrasp = self.state_history.full() and has_not_moved
+        rr.log_scalar('needs_regrasp/dq', dq, color=[0, 255, 0])
+        rr.log_scalar('needs_regrasp/max_dq', self.max_dq, color=[0, 0, 255])
+        rr.log_scalar('needs_regrasp/dq_threshold', self.max_dq * hp['frac_max_dq'], color=[255, 0, 0])
         return needs_regrasp
 
     def compute_new_grasp(self, phy: Physics):
@@ -217,10 +222,14 @@ class RegraspMPC:
 
         # Run CMA-ES to find the best grasp.
         # The objective function consists of solving a series of planning problems with MPPI.
-        # Since we want to _change_ our grasp, we should probably seed CMA-ES with something other than the
-        # current grasp, so a 1 - x should be a good starting point.
-        x0 = np.concatenate([1 - grasp0.is_grasping, 1 - grasp0.locations])
+        # x0 is a vector of the form [p(is_grasping), grasp_locations]
+        # and is initialized with a bias towards inverting the current grasp and grasping in the middle
+        x0 = np.concatenate([(1 - grasp0.is_grasping) * 0.8, np.ones_like(grasp0.locations) * 0.5])
         es = cma.CMAEvolutionStrategy(x0=x0, sigma0=hp['cma_sigma'], inopts=hp['cma_opts'])
+        # CMA keeps track of this internally, but we do it ourselves since we don't want to have to re-sample
+        # the is_grasping variables, which could cause a different binary is_grasping state than the one we evaluated
+        grasp_best = None
+        fbest = None
         while not es.stop():
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")
@@ -250,11 +259,16 @@ class RegraspMPC:
                 # Visualize!
                 viz_regrasp_solutions_and_costs(all_costs_dicts, all_grasps)
 
+                # track the best
+                if fbest is None or total_cost < fbest:
+                    fbest = total_cost
+                    grasp_best = grasp
+                    logger.info(Fore.GREEN + f"New best grasp: {grasp_best=}, {fbest=:.2f}" + Fore.RESET)
+
             es.tell(candidates_xs, candidate_costs)
 
-        grasp_best = self.cma_result_to_grasp(es.result)
         print(es.result_pretty())
-        logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {es.result.fbest=:.2f}" + Fore.RESET)
+        logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {fbest=:.2f}" + Fore.RESET)
         return grasp_best
 
     def cma_result_to_grasp(self, result):
@@ -427,7 +441,7 @@ class RegraspMPC:
         rope_body_to_grasp = phy.m.body(grasp.indices[gripper_idx])
 
         self.mppi.reset()
-        self.dq_buffer.reset()
+        self.reset_trap_detection()
         self.viz.viz(phy, is_planning)
 
         warmstart_count = 0
@@ -471,7 +485,7 @@ class RegraspMPC:
 
     def move_to_goal(self, phy, max_iters, is_planning: bool, sub_time_s: float, num_samples: int):
         self.mppi.reset()
-        self.dq_buffer.reset()
+        self.reset_trap_detection()
         self.viz.viz(phy, is_planning)
         warmstart_count = 0
         execution_costs = []
