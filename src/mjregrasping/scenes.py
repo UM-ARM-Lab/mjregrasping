@@ -4,6 +4,7 @@ import numpy as np
 
 from mjregrasping.grasping import activate_eq
 from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.movie import MjMovieMaker
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
 from mjregrasping.viz import Viz
@@ -40,7 +41,9 @@ def activate_and_settle(phy, viz, sub_time_s, is_planning=False):
     settle(phy, sub_time_s, viz, is_planning)
 
 
-def settle(phy, sub_time_s, viz: Viz, is_planning, settle_steps=50):
+def settle(phy, sub_time_s, viz: Viz, is_planning, settle_steps=50, mov: Optional[MjMovieMaker] = None):
     for _ in range(settle_steps):
         viz.viz(phy, is_planning)
         control_step(phy, np.zeros(phy.m.nu), sub_time_s=sub_time_s)
+        if not is_planning and mov:
+            mov.render(phy.d)

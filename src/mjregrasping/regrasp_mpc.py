@@ -159,7 +159,7 @@ class RegraspMPC:
 
         self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(4), horizon=hp['horizon'],
                                lambda_=hp['lambda'])
-        self.state_history = Buffer(12)
+        self.state_history = Buffer(15)
         self.reset_trap_detection()
 
         self.regrasp_idx = 0
@@ -197,7 +197,7 @@ class RegraspMPC:
             self.regrasp_idx += 1
 
     def check_needs_regrasp(self, data):
-        latest_q = data.qpos[self.objects.rope.qpos_indices]
+        latest_q = self.get_q_for_trap_detection(data)
         self.state_history.insert(latest_q)
         qs = np.array(self.state_history.data)
         if len(qs) < 2:
@@ -213,6 +213,9 @@ class RegraspMPC:
         rr.log_scalar('needs_regrasp/max_dq', self.max_dq, color=[0, 0, 255])
         rr.log_scalar('needs_regrasp/dq_threshold', self.max_dq * hp['frac_max_dq'], color=[255, 0, 0])
         return needs_regrasp
+
+    def get_q_for_trap_detection(self, data):
+        return np.concatenate((hp['q_joint_weight'] * data.qpos[self.objects.rope.qpos_indices], data.qpos[self.objects.val.qpos_indices]))
 
     def compute_new_grasp(self, phy: Physics):
         grasp0 = GraspState.from_mujoco(self.rope_body_indices, phy.m)
@@ -352,7 +355,7 @@ class RegraspMPC:
                 name = gripper_idx_to_eq_name(gripper_idx)
                 deactivate_eq(phy.m, name)
                 phy_before = phy.copy_data()
-                settle(phy, hp['plan_sub_time_s'], self.viz, True, settle_steps)
+                settle(phy, hp['plan_sub_time_s'], self.viz, True, settle_steps, mov=None)
                 phy_after = phy.copy_data()
                 settle_cost = compute_settle_cost(phy_after, phy_before)
                 f_settles.append(settle_cost)
@@ -409,7 +412,7 @@ class RegraspMPC:
                 # activate new grasp
                 change_eq(phy.m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
                           self.rope_body_indices)
-                settle(phy, sub_time_s, self.viz, is_planning, settle_steps)
+                settle(phy, sub_time_s, self.viz, is_planning, settle_steps, mov=self.mov)
                 # add error for the grasp changing the state a lot, or for the eq constraint not being met
                 # mm means 'mismatch'
                 f_new_eq_err_i = compute_eq_errors(phy)
@@ -418,7 +421,7 @@ class RegraspMPC:
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx] or needs_release[gripper_idx]:
                 deactivate_eq(phy.m, gripper_idx_to_eq_name(gripper_idx))
-                settle(phy, sub_time_s, self.viz, is_planning, settle_steps)
+                settle(phy, sub_time_s, self.viz, is_planning, settle_steps, mov=self.mov)
         # For each gripper, if it needs a different grasp, run MPPI to try to find a grasp and add the cost
         for gripper_idx in range(self.n_g):
             if is_diff[gripper_idx]:
@@ -429,7 +432,7 @@ class RegraspMPC:
                 f_diffs.extend(f_diff_result.cost)
                 change_eq(phy.m, gripper_idx_to_eq_name(gripper_idx), grasp.locations[gripper_idx],
                           self.rope_body_indices)
-                settle(phy, sub_time_s, self.viz, is_planning, settle_steps)
+                settle(phy, sub_time_s, self.viz, is_planning, settle_steps, mov=self.mov)
                 f_diff_eq_err_i = compute_eq_errors(phy)
                 f_diff_eq_errs.append(f_diff_eq_err_i)
 

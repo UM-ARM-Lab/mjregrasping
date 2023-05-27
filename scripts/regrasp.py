@@ -56,19 +56,22 @@ def main():
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         mpc = RegraspMPC(mppi_nu=m.nu, pool=pool, viz=viz, goal=goal, objects=objects, seed=seed, mov=None)
 
-        # grasp = GraspState(mpc.rope_body_indices, np.array([0.66, 0.]))
-        # r = mpc.do_single_gripper_grasp(phy, grasp, gripper_idx=0, max_iters=100, is_planning=False,
-        #                                 sub_time_s=hp['grasp_sub_time_s'], num_samples=50)
-        # print(r)
+        grasp = GraspState(mpc.rope_body_indices, np.array([0.0, 0.644]))
+        r = mpc.do_single_gripper_grasp(phy, grasp, gripper_idx=0, max_iters=100, is_planning=False,
+                                        sub_time_s=hp['grasp_sub_time_s'], num_samples=50)
+        print(r)
 
-        mpc.compute_new_grasp(phy)
+        # mpc.compute_new_grasp(phy)
 
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
 
         grasp_locations = [
-            np.array([0.0, 0.99]),
-            np.array([0.0, 0.90]),
-            np.array([0.0, 0.35]),
+            np.array([0.342, 0.90]),
+            np.array([0.342, 0.70]),
+            np.array([0.342, 0.60]),
+            np.array([0.342, 0.50]),
+            np.array([0.342, 0.40]),
+            np.array([0.342, 0.30]),
         ]
         grasps = []
         costs_dicts = []

@@ -59,6 +59,7 @@ def main():
         else:
             mov = MjMovieMaker(m, "rack1")
             mov_path = root / f'untangle_{seed}.mp4'
+            logger.info(f"Saving movie to {mov_path}")
             mov.start(mov_path, fps=12)
 
         # store and load from disk to save time?
