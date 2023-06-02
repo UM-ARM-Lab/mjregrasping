@@ -226,6 +226,14 @@ class ObjectPointGoal(MPPIGoal):
         self.goal_radius = goal_radius
         self.objects = objects
 
+    def point_dist_cost(self, results):
+        rope_points = results[0]
+        point_dist = self.min_dist_to_specified_point(rope_points)
+        pred_point_dist = point_dist[:, 1:]
+
+        return pred_point_dist
+
+
     def cost(self, results):
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
 
@@ -238,8 +246,6 @@ class ObjectPointGoal(MPPIGoal):
         pred_joint_positions = joint_positions[:, 1:]
 
         pred_is_grasping = is_grasping[:, 1:]  # skip t=0
-
-        is_grasping0 = is_grasping[:, 0]  # grasp state cannot change within a rollout
 
         # Get the potential field gradient at the specified points
         gripper_dfield = self.dfield.get_costs(pred_gripper_points)  # [b, h, 2]
@@ -342,8 +348,8 @@ def get_contact_cost(phy: Physics, objects: Objects):
     for contact in phy.d.contact:
         geom_name1 = phy.m.geom(contact.geom1).name
         geom_name2 = phy.m.geom(contact.geom2).name
-        if (geom_name1 in objects.obstacle.geom_names and geom_name2 in objects.val.geom_names) or \
-                (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val.geom_names) or \
+        if (geom_name1 in objects.obstacle.geom_names and geom_name2 in objects.val_collision_geom_names) or \
+                (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val_collision_geom_names) or \
                 val_self_collision(geom_name1, geom_name2, objects):
             contact_cost += 1
     max_expected_contacts = 6.0

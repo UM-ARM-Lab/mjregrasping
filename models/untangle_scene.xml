@@ -18,9 +18,10 @@
     </worldbody>
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
-        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.16" active="false" solref="0.04 1"/>
-        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.16" active="false" solref="0.04 1"/>
-        <connect body1="drive50" body2="world" name="left_world" anchor="0 0 0.16" active="false" solref="0.04 1"/>
-        <connect body1="drive10" body2="world" name="right_world" anchor="0 0 0.16" active="false" solref="0.04 1"/>
+        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.17" active="false" solref="0.04 1"/>
+        <connect body1="drive10" body2="B_last" name="right" anchor="0 0 0.17" active="false" solref="0.04 1"/>
+        <connect body1="drive50" body2="world" name="left_world" anchor="0 0 0.17" active="false" solref="0.15 1"/>
+        <connect body1="drive10" body2="world" name="right_world" anchor="0 0 0.17" active="false" solref="0.15 1"/>
+        <connect body1="B_last" body2="world" name="rope_world" anchor="0 0 0" active="false" solref="0.1 1"/>
     </equality>
 </mujoco>

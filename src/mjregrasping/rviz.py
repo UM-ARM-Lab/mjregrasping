@@ -46,13 +46,14 @@ class MjRViz:
         geom_markers_msg = MarkerArray()
         for geom_id in range(phy.m.ngeom):
             geom_bodyid = phy.m.geom_bodyid[geom_id]
+            geom_name = phy.m.geom(geom_id).name
             parent_name, child_name = get_parent_child_names(geom_bodyid, phy.m)
 
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
             geom_marker_msg.header.frame_id = "world"
             # FIXME: parent name is unhelpful, it's always 'world'
-            geom_marker_msg.ns = f"{parent_name}/{child_name}"
+            geom_marker_msg.ns = f"{parent_name}/{child_name}/{geom_name}"
             geom_marker_msg.id = geom_id
 
             geom_type = phy.m.geom_type[geom_id]

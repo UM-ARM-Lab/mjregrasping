@@ -107,3 +107,14 @@ def parallel_rollout(pool: ThreadPoolExecutor, phy, controls_samples, sub_time_s
     else:
         results = np.array(results)
     return results
+
+
+def expand_result(result):
+    results = []
+    for r in result:
+        if isinstance(r, np.ndarray):
+            results.append(r[None])
+        else:
+            results.append([r])
+
+    return tuple(results)

@@ -64,6 +64,13 @@ class Objects:
         self.rope = Object(model, "rope")
         self.obstacle = Object(model, obstacle_name)
 
+        # allow collision between the environment and the finger pads
+        self.val_collision_geom_names = copy(self.val.geom_names)
+        self.val_collision_geom_names.remove('left_finger_pad')
+        self.val_collision_geom_names.remove('left_finger_pad2')
+        self.val_collision_geom_names.remove('right_finger_pad')
+        self.val_collision_geom_names.remove('right_finger_pad2')
+
         self.val_self_collision_geom_names = copy(self.val.geom_names)
         self.val_gripper_act_names = [
             'leftgripper_vel',
@@ -72,6 +79,10 @@ class Objects:
             'rightgripper2_vel',
         ]
         self.gripper_ctrl_indices = np.concatenate([model.actuator(n).actadr for n in self.val_gripper_act_names])
+        self.val_self_collision_geom_names.remove('left_finger_pad')
+        self.val_self_collision_geom_names.remove('left_finger_pad2')
+        self.val_self_collision_geom_names.remove('right_finger_pad')
+        self.val_self_collision_geom_names.remove('right_finger_pad2')
         self.val_self_collision_geom_names.remove('leftgripper')
         self.val_self_collision_geom_names.remove('leftgripper2')
         self.val_self_collision_geom_names.remove('rightgripper')
