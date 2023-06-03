@@ -20,9 +20,9 @@ class Viz:
 
         self.markers_pub = rospy.Publisher("markers", MarkerArray, queue_size=10)
 
-    def sphere(self, ns: str, position, radius, frame_id, color):
+    def sphere(self, ns: str, position, radius, frame_id, color, idx):
         plot_sphere_rviz(pub=self.markers_pub, position=position, radius=radius, frame_id=frame_id, color=color,
-                         label=f'{ns}')
+                         label=f'{ns}', idx=idx)
         # TODO: also show in rerun
 
     def lines(self, positions, ns: str, idx: int, scale: float, color):

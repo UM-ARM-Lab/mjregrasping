@@ -5,14 +5,13 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from pathlib import Path
 
 import mujoco
-import numpy as np
 import rerun as rr
 
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.body_with_children import Objects
 from mjregrasping.dijsktra_field import make_dfield
-from mjregrasping.goals import ObjectPointGoal
+from mjregrasping.goals import ObjectPointGoal, CombinedGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
@@ -55,7 +54,7 @@ class Runner:
 
             self.setup_scene(phy, self.viz)
 
-            mov = MjMovieMaker(m, "rack1")
+            mov = MjMovieMaker(m)
             mov_path = self.root / f'untangle_{seed}.mp4'
             logger.info(f"Saving movie to {mov_path}")
             mov.start(mov_path, fps=12)
@@ -76,6 +75,7 @@ class Runner:
                                    body_idx=self.goal_body_idx,
                                    goal_radius=0.05,
                                    objects=objects)
+            goal = CombinedGoal(dfield, self.goal_point, 0.05, self.goal_body_idx, objects, self.viz)
 
             with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
                 from time import perf_counter

@@ -4,7 +4,7 @@ import numpy as np
 
 
 class MjMovieMaker:
-    def __init__(self, m: mujoco.MjModel, trackbody_name: str, w=1280, h=720):
+    def __init__(self, m: mujoco.MjModel, w=1280, h=720):
         """ Initialize a movie maker for a mujoco model """
         self.m = m
         self.gl_ctx = mujoco.GLContext(w, h)

@@ -5,9 +5,13 @@ from dynamic_reconfigure.server import Server
 
 # These values are considered const by convention
 hp = {
-    "max_perf":                           False,
+    "n_g":                                2,
+    "weight_activation_thresh":           0.95,
+    "weight_deactivation_thresh":         0.05,
+    "cost_activation_thresh":             0.25,
+    "grasp_weight":                       5.0,
     "iters":                              5,
-    "max_move_to_goal_iters":             200,
+    "max_move_to_goal_iters":             600,
     "max_grasp_iters":                    100,
     "max_plan_to_goal_iters":             40,
     "warmstart":                          5,

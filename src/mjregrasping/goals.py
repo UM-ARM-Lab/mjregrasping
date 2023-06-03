@@ -4,11 +4,13 @@ from copy import copy
 import mujoco
 import numpy as np
 import rerun as rr
+from matplotlib import cm
 from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.rviz import plot_spheres_rviz
 from mjregrasping.viz import Viz
 
 logger = logging.getLogger(f'rosout.{__name__}')
@@ -41,7 +43,7 @@ class MPPIGoal:
         raise NotImplementedError()
 
     def viz_sphere(self, position, radius):
-        self.viz.sphere(ns='goal', position=position, radius=radius, frame_id='world', color=[1, 0, 1, 0.5])
+        self.viz.sphere(ns='goal', position=position, radius=radius, frame_id='world', color=[1, 0, 1, 0.5], idx=0)
         self.viz.tf(translation=position, quat_xyzw=[0, 0, 0, 1], parent='world', child='goal')
 
     def viz_result(self, result, idx: int, scale, color):
@@ -58,6 +60,9 @@ class MPPIGoal:
         """
         Returns: the result is any object or tuple of objects, and will be passed to cost()
         """
+        raise NotImplementedError()
+
+    def viz_goal(self, phy):
         raise NotImplementedError()
 
 
@@ -142,15 +147,12 @@ class GraspRopeGoal(MPPIGoal):
         self.objects = objects
         self.initial_body_pos = None
 
+    def get_results(self, phy):
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
+        body_pos = self.get_body_pos(phy.d)
+        return left_tool_pos, right_tool_pos, joint_positions, body_pos, contact_cost
+
     def cost(self, results):
-        """
-        Args:
-            results: the output of get_results()
-
-        Returns:
-            matrix of costs [b, horizon]
-
-        """
         left_gripper_pos, right_gripper_pos, joint_positions, body_pos, contact_cost = results
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
@@ -182,16 +184,6 @@ class GraspRopeGoal(MPPIGoal):
     def viz_goal(self, phy):
         body_pos = self.get_body_pos(phy.d)
         self.viz_sphere(body_pos, self.goal_radius)
-
-    def get_results(self, phy):
-        """
-        Returns: the result is any object or tuple of objects, and will be passed to cost()
-        """
-        joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
-        joint_positions = phy.d.qpos[joint_indices_for_actuators]
-        contact_cost = get_contact_cost(phy, self.objects)
-        body_pos = self.get_body_pos(phy.d)
-        return phy.d.site('left_tool').xpos, phy.d.site('right_tool').xpos, joint_positions, body_pos, contact_cost
 
     def viz_result(self, result, idx: int, scale, color):
         left_tool_pos = result[0]
@@ -226,13 +218,27 @@ class ObjectPointGoal(MPPIGoal):
         self.goal_radius = goal_radius
         self.objects = objects
 
+    def get_results(self, phy):
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
+        rope_points = self.get_rope_points(phy)
+        eq_indices = [
+            mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'left'),
+            mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'right'),
+        ]
+        is_grasping = phy.m.eq_active[eq_indices]
+
+        return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
+
+    def get_rope_points(self, phy):
+        rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in self.objects.rope.body_indices])
+        return rope_points
+
     def point_dist_cost(self, results):
         rope_points = results[0]
         point_dist = self.min_dist_to_specified_point(rope_points)
         pred_point_dist = point_dist[:, 1:]
 
         return pred_point_dist
-
 
     def cost(self, results):
         rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
@@ -298,7 +304,7 @@ class ObjectPointGoal(MPPIGoal):
         return cost  # [b, horizon]
 
     def satisfied(self, phy):
-        rope_points = np.array([phy.d.geom_xpos[rope_geom_idx] for rope_geom_idx in self.objects.rope.geom_indices])
+        rope_points = self.get_rope_points(phy)
         error = self.min_dist_to_specified_point(rope_points).squeeze()
         return error < self.goal_radius
 
@@ -323,21 +329,106 @@ class ObjectPointGoal(MPPIGoal):
     def viz_goal(self, phy):
         self.viz_sphere(self.goal_point, self.goal_radius)
 
+
+class CombinedGoal(ObjectPointGoal):
+
+    def __init__(self, dfield, goal_point: np.array, goal_radius: float, body_idx: int, objects, viz: Viz):
+        super().__init__(dfield, goal_point, goal_radius, body_idx, objects, viz)
+        self.rope_body_indices = np.array(self.objects.rope.body_indices)
+        self.n_b = len(self.rope_body_indices)
+        self.n_g = hp['n_g']
+        # cached intermediate result used by the algorithm elsewhere
+        self.grasp_costs = None
+
     def get_results(self, phy):
-        left_tool_pos = phy.d.site('left_tool').xpos
-        right_tool_pos = phy.d.site('right_tool').xpos
-        rope_points = np.array([phy.d.geom_xpos[rope_geom_idx] for rope_geom_idx in self.objects.rope.geom_indices])
-        joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
-        joint_positions = phy.d.qpos[joint_indices_for_actuators]
-        eq_indices = [
-            mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'left'),
-            mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'right'),
-        ]
-        is_grasping = phy.m.eq_active[eq_indices]
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
+        rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in self.objects.rope.body_indices])
+        eq_active = np.concatenate([phy.m.eq("left").active, phy.m.eq("right").active])
+        eq_obj2id = np.concatenate([phy.m.eq("left").obj2id, phy.m.eq("right").obj2id])
 
-        contact_cost = get_contact_cost(phy, self.objects)
+        return left_tool_pos, right_tool_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id
 
-        return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
+    def cost(self, results):
+        left_pos, right_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id = results
+        pred_contact_cost = contact_cost[:, 1:]  # skip t=0
+
+        point_dist = self.min_dist_to_specified_point(rope_points)
+        pred_point_dist = point_dist[:, 1:] * hp['point_dist_weight']
+        gripper_points = np.stack([left_pos, right_pos], axis=-2)
+        pred_gripper_points = gripper_points[:, 1:]
+
+        pred_is_grasping = eq_active[:, 1:]  # skip t=0
+
+        # Get the potential field gradient at the specified points
+        gripper_dfield = self.dfield.get_costs(pred_gripper_points)  # [b, h, 2]
+        gripper_dfield *= hp['gripper_dfield']
+        grasping_gripper_dfield = np.sum(gripper_dfield * pred_is_grasping, -1)  # [b, horizon]
+
+        action_cost = get_action_cost(joint_positions)
+
+        goal_costs = pred_point_dist + grasping_gripper_dfield + pred_contact_cost + action_cost
+
+        self.grasp_costs = np.zeros([self.n_g, self.n_b, hp['num_samples'], hp['horizon']])
+        is_grasping_mat = np.zeros([self.n_g, self.n_b])
+        for gripper_i in range(self.n_g):
+            gripper_pos = left_pos if gripper_i == 0 else right_pos
+            # These two things are constant across samples & time
+            eq_i_active = eq_active[0, 0, gripper_i]
+            eq_i_obj2id = eq_obj2id[0, 0, gripper_i]
+            for body_j, body_idx in enumerate(self.rope_body_indices):
+                body_pos = rope_points[:, :, body_j]
+                dist_cost = norm(body_pos - gripper_pos, axis=-1)[:, 1:]
+                grasp_ij_cost = dist_cost + action_cost
+                self.grasp_costs[gripper_i, body_j] = grasp_ij_cost
+                is_grasping_mat[gripper_i, body_j] = eq_i_active and eq_i_obj2id == body_idx
+
+        self.grasp_costs *= hp['grasp_weight']  # overall rescale to make comparable with goal cost
+        grasp_w = self.get_grasp_weights()
+        grasp_w_not_grasping = grasp_w * (1 - is_grasping_mat)
+        weighted_grasp_costs = np.einsum('gr,grbh->bh', grasp_w_not_grasping, self.grasp_costs)
+        total_costs = goal_costs + weighted_grasp_costs
+
+        rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('grasp_rope_goal/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
+        rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
+        rr.log_scalar('object_point_goal/grasping_gripper_dfield', grasping_gripper_dfield.mean(), color=[255, 0, 255])
+        rr.log_scalar('object_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('object_point_goal/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('combined_goal/goal', goal_costs.mean(), color=[0, 255, 0])
+        rr.log_scalar('combined_goal/grasping', self.grasp_costs.mean(), color=[0, 0, 255])
+        rr.log_scalar('combined_goal/weighted_grasping', weighted_grasp_costs.mean(), color=[0, 255, 255])
+
+        # Visualize grasp_w
+        positions = []
+        colors = []
+        for gripper_i in range(self.n_g):
+            offset = np.array([0.01, 0.01, 0.01]) * gripper_i
+            for body_j, body_idx in enumerate(self.rope_body_indices):
+                grasp_w_ij = grasp_w[gripper_i, body_j]
+                color = cm.RdYlGn(grasp_w_ij)
+                color = (color[0], color[1], color[2], 0.4)  # alpha
+                pos = rope_points[0, 0, body_j] + offset
+                positions.append(pos)
+                colors.append(color)
+
+        plot_spheres_rviz(self.viz.markers_pub, positions, colors, 0.02, "world", label="gasp_w")
+
+        return total_costs  # [b, horizon]
+
+    def get_grasp_weights(self):
+        grasp_weights = np.array(
+            [[self.viz.p.config[f'left_w_{i}'] for i in range(self.n_b)],
+             [self.viz.p.config[f'right_w_{i}'] for i in range(self.n_b)]]
+        )
+        return grasp_weights
+
+    def viz_result(self, result, idx: int, scale, color):
+        left_pos = result[0]
+        right_pos = result[1]
+        rope_pos = np.array(result[4])[:, self.body_idx]
+        self.viz_ee_lines(left_pos, right_pos, idx, scale, color)
+        self.viz_rope_lines(rope_pos, idx, scale, color='y')
 
 
 def get_contact_cost(phy: Physics, objects: Objects):
@@ -367,3 +458,12 @@ def get_action_cost(joint_positions):
     action_cost = np.sum(np.abs(joint_positions[:, 1:] - joint_positions[:, :-1]), axis=-1)
     action_cost *= hp['action']
     return action_cost
+
+
+def get_results_common(objects: Objects, phy: Physics):
+    joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
+    joint_positions = phy.d.qpos[joint_indices_for_actuators]
+    contact_cost = get_contact_cost(phy, objects)
+    left_tool_pos = phy.d.site('left_tool').xpos
+    right_tool_pos = phy.d.site('right_tool').xpos
+    return left_tool_pos, right_tool_pos, joint_positions, contact_cost

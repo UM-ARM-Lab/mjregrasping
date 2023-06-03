@@ -10,13 +10,14 @@ import numpy as np
 import rerun as rr
 from colorama import Fore
 from matplotlib import cm
+from numpy.linalg import norm
 
 import rospy
 from mjregrasping.body_with_children import Objects
 from mjregrasping.buffer import Buffer
 from mjregrasping.change_grasp_eq import change_eq
-from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost
-from mjregrasping.grasp_state import GraspState, grasp_location_to_indices, grasp_offset
+from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost, CombinedGoal
+from mjregrasping.grasp_state import GraspState, grasp_location_to_indices, grasp_offset, grasp_indices_to_locations
 from mjregrasping.grasping import deactivate_eq, compute_eq_errors
 from mjregrasping.mjsaver import save_data_and_eq
 from mjregrasping.movie import MjMovieMaker
@@ -186,14 +187,15 @@ def grasp_loc_recursive(is_grasping, i: int, grasp_locations: List):
 
 class RegraspMPC:
 
-    def __init__(self, mppi_nu: int, pool: ThreadPoolExecutor, viz: Viz, goal: ObjectPointGoal, objects: Objects,
+    def __init__(self, mppi_nu: int, pool: ThreadPoolExecutor, viz: Viz, goal: CombinedGoal, objects: Objects,
                  seed: int = 1, mov: Optional[MjMovieMaker] = None):
         self.max_dq = None
         self.viz = viz
         self.op_goal = goal
         self.objects = objects
         self.rope_body_indices = np.array(self.objects.rope.body_indices)
-        self.n_g = 2
+        self.n_b = len(self.rope_body_indices)
+        self.n_g = hp['n_g']
         self.mov = mov
         self.is_gasping_rng = np.random.RandomState(0)
 
@@ -209,6 +211,78 @@ class RegraspMPC:
         self.max_dq = 0
 
     def run(self, phy):
+        # for self.iter in range(hp['iters']):
+        #     if rospy.is_shutdown():
+        #         self.close()
+        #         raise RuntimeError("ROS shutdown")
+        sub_time_s = hp['move_sub_time_s']
+        num_samples = hp['num_samples']
+
+        self.mppi.reset()
+        warmstart_count = 0
+        itr = 0
+        while True:
+            if rospy.is_shutdown():
+                raise RuntimeError("ROS shutdown")
+
+            self.op_goal.viz_goal(phy)
+            if self.op_goal.satisfied(phy):
+                return Result(Status.SUCCESS, f"Goal reached! ({itr} iters)", None)
+
+            self.viz.viz(phy)
+
+            # these weights are from 0 to 1 and are used to weight the cost terms for each potential grasp
+            grasp_w = self.op_goal.get_grasp_weights()
+            per_grasp_costs = np.zeros_like(grasp_w)
+
+            while warmstart_count < hp['warmstart']:
+                command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
+                self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+                warmstart_count += 1
+            command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
+            self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+
+            # If the weight is high and the cost is low enough, commit to actually making the grasp
+            for gripper_i in range(self.n_g):
+                gripper_name = gripper_idx_to_eq_name(gripper_i)
+                current_eq = phy.m.eq(gripper_name)
+                for body_j, body_idx in enumerate(self.rope_body_indices):
+                    grasp_w_ij = grasp_w[gripper_i, body_j]
+                    # FIXME: is mean the right thing to do here?
+                    per_grasp_cost = np.mean(self.op_goal.grasp_costs[gripper_i, body_j])
+                    near = per_grasp_cost < hp['cost_activation_thresh']
+                    already_grasping = (bool(current_eq.active) and bool(current_eq.obj2id == body_idx))
+                    if grasp_w_ij > hp['weight_activation_thresh'] and near and not already_grasping:
+                        # todo: how can we have continuous grasp locations instead of discretizing?
+                        loc = grasp_indices_to_locations(self.rope_body_indices, body_idx)
+                        # activate the grasp.
+                        # note: in the real world we will need to run some closed-loop grasping controller
+                        #   but the gripper should already very close to the grasp location
+                        activate_grasp(phy, gripper_name, loc, self.rope_body_indices)
+
+            # conversely, if the weight is low and the grasp is currently being made, release the grasp
+            for gripper_i in range(self.n_g):
+                gripper_name = gripper_idx_to_eq_name(gripper_i)
+                current_eq = phy.m.eq(gripper_name)
+                for body_j, body_idx in enumerate(self.rope_body_indices):
+                    grasp_w_ij = grasp_w[gripper_i, body_j]
+                    is_grasping = bool(current_eq.active) and current_eq.obj2id == body_idx
+                    if grasp_w_ij < hp['weight_deactivation_thresh'] and is_grasping:
+                        current_eq.active[0] = 0
+
+            control_step(phy, command, sub_time_s)
+            self.viz.viz(phy, False)
+            if self.mov:
+                self.mov.render(phy.d)
+
+            self.mppi.roll()
+
+            if itr > hp['max_move_to_goal_iters']:
+                return Result(Status.FAILED, f"Gave up after {itr} iters", None)
+
+            itr += 1
+
+    def run_old(self, phy):
         for self.iter in range(hp['iters']):
             if rospy.is_shutdown():
                 self.close()
@@ -421,13 +495,11 @@ class RegraspMPC:
                 if grasp.is_grasping[i]:
                     gripper_name = gripper_idx_to_eq_name(i)
 
-
-
-
         def _move_to_goal():
             self.op_goal.viz_goal(phy)
             phy_before = phy.copy_data()
-            settle_result = settle(phy, hp['plan_sub_time_s'], self.viz, True, hp['plan_settle_steps'], get_result_func=self.op_goal.get_results, policy=_policy)
+            settle_result = settle(phy, hp['plan_sub_time_s'], self.viz, True, hp['plan_settle_steps'],
+                                   get_result_func=self.op_goal.get_results, policy=_policy)
             settle_results = expand_result(settle_result)
             f_goal_cost = self.op_goal.point_dist_cost(settle_results)[0, -1]
             f_goal_cost = f_goal_cost * self.mppi.gamma * hp['f_goal_weight']
@@ -584,6 +656,9 @@ class RegraspMPC:
 
             grasp_iter += 1
             execution_costs.append(self.mppi.get_first_step_cost() * hp['running_cost_weight'])
+
+    def combined_goal_and_grasping(self, phy, max_iters, is_planning: bool, sub_time_s: float, num_samples: int):
+        pass
 
     def move_to_goal(self, phy, max_iters, is_planning: bool, sub_time_s: float, num_samples: int):
         self.mppi.reset()

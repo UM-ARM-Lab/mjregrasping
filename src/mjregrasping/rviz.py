@@ -239,6 +239,28 @@ class MjRViz:
         self.contacts_pub.publish(contact_markers)
 
 
+def plot_spheres_rviz(
+        pub, positions, colors, radius, frame_id="world", idx=0, label=""
+):
+    msg = Marker()
+    msg.action = Marker.ADD
+    msg.type = Marker.SPHERE_LIST
+    msg.header.frame_id = frame_id
+    msg.scale.x = radius * 2
+    msg.scale.y = radius * 2
+    msg.scale.z = radius * 2
+    msg.id = idx
+    msg.ns = label
+    msg.pose.orientation.w = 1
+    for p, c in zip(positions, colors):
+        msg.points.append(Point(*p))
+        msg.colors.append(ColorRGBA(*to_rgba(c)))
+
+    array_msg = MarkerArray()
+    array_msg.markers.append(msg)
+    pub.publish(array_msg)
+
+
 def plot_sphere_rviz(
         pub, position, radius, frame_id="world", color="m", idx=0, label=""
 ):

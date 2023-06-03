@@ -18,7 +18,7 @@ def main():
 
     m, d, viz = initialize("test_render", args.xml_path)
 
-    mov = MjMovieMaker(m, "rack1", w=1280, h=720)
+    mov = MjMovieMaker(m, w=1280, h=720)
     mov.cam.distance = 3.0
     mov.cam.azimuth = 45
     nstep = 20
