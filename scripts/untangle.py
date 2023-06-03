@@ -1,84 +1,54 @@
 #!/usr/bin/env python3
 import logging
-import multiprocessing
-from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
-import mujoco
 import numpy as np
-import rerun as rr
 
-import rospy
-from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.body_with_children import Objects
-from mjregrasping.dijsktra_field import save_load_dfield
-from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.movie import MjMovieMaker
-from mjregrasping.params import Params
-from mjregrasping.physics import Physics
-from mjregrasping.regrasp_mpc import RegraspMPC
-from mjregrasping.rerun_visualizer import MjReRun
-from mjregrasping.rviz import MjRViz
-from mjregrasping.scenes import setup_tangled_scene
-from mjregrasping.viz import Viz
+from mjregrasping.grasping import activate_eq
+from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.regrasp_mpc_runner import Runner
+from mjregrasping.rollout import DEFAULT_SUB_TIME_S
+from mjregrasping.settle import settle
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
 
+class Untangle(Runner):
+
+    def __init__(self):
+        super().__init__("models/untangle_scene.xml")
+
+    def get_goal_point(self):
+        return np.array([0.78, 0.04, 1.28])
+
+    def setup_scene(self, phy, viz):
+        robot_q1 = np.array([
+                                 -0.7, 0.1,  # torso
+                                 -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+                                 0, 0,  # left gripper
+                                 0.0, -0.2, 0, -0.30, 0, -0.2, 0,  # right arm
+                                 0, 0,  # right gripper
+                                    ])
+        pid_to_joint_config(phy, viz, robot_q1, sub_time_s=DEFAULT_SUB_TIME_S)
+        robot_q2 = np.array([
+                                 -0.5, 0.4,  # torso
+                                 -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+                                 0, 0,  # left gripper
+                                 1.2, -0.2, 0, -0.90, 0, -0.6, 0,  # right arm
+                                 0, 0,  # right gripper
+                                    ])
+        pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
+        activate_eq(phy.m, 'right')
+        settle(phy, sub_time_s=DEFAULT_SUB_TIME_S, viz=viz, is_planning=False)
+
+    def get_goal_body_idx(self):
+        return -1
+
+
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
-    rr.init('mjregrasping')
-    rr.connect()
-    rospy.init_node("untangle")
-    xml_path = "models/untangle_scene.xml"
-    tfw = TF2Wrapper()
-    mjviz = MjRViz(xml_path, tfw)
-    p = Params()
-    viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
-    root = Path("results")
-    root.mkdir(exist_ok=True)
-
-    goal_point = np.array([0.78, 0.04, 1.28])
-    n_seeds = 1
-    for seed in range(n_seeds):
-        m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
-        objects = Objects(m)
-        d = mujoco.MjData(m)
-        phy = Physics(m, d)
-
-        # setup_untangled_scene(phy, mjviz)
-        setup_tangled_scene(phy, viz)
-
-        if False:
-            p.rviz = False
-            p.rr = False
-            p.mppi_rollouts = False
-            p.viz_planning = False
-            mov = None
-        else:
-            mov = MjMovieMaker(m, "rack1")
-            mov_path = root / f'untangle_{seed}.mp4'
-            logger.info(f"Saving movie to {mov_path}")
-            mov.start(mov_path, fps=12)
-
-        # store and load from disk to save time?
-        dfield = save_load_dfield(phy, goal_point)
-
-        goal = ObjectPointGoal(dfield=dfield,
-                               viz=viz,
-                               goal_point=goal_point,
-                               body_idx=-1,
-                               goal_radius=0.05,
-                               objects=objects)
-
-        with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-            from time import perf_counter
-            t0 = perf_counter()
-            mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=viz, goal=goal, objects=objects, seed=seed, mov=mov)
-            result = mpc.run(phy)
-            logger.info(f'dt: {perf_counter() - t0:.4f}')
-            logger.info(f"{seed=} {result=}")
+    runner = Untangle()
+    runner.run([5])
 
 
 if __name__ == "__main__":

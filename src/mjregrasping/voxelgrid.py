@@ -41,8 +41,8 @@ def set_cc_sphere_pos(phy, xyz):
 
 class VoxelGrid:
 
-    def __init__(self, phy: Physics, res, extends_2d):
-        self.objects = Objects(phy.m)
+    def __init__(self, phy: Physics, res, extends_2d, objects):
+        self.objects = objects
         self.res = res
         self.extents_2d = extends_2d
         self.extents_flat = self.extents_2d.reshape(-1)

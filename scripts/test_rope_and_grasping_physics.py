@@ -16,7 +16,7 @@ from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenes import setup_tangled_scene, settle
+from mjregrasping.settle import setup_tangled_scene, settle
 from mjregrasping.viz import Viz
 
 logger = logging.getLogger(f'rosout.{__name__}')

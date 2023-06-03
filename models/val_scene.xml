@@ -1,5 +1,0 @@
-<mujoco model="untangle">
-    <include file="materials.xml"/>
-    <include file="floor.xml"/>
-    <include file="val_husky.xml"/>
-</mujoco>

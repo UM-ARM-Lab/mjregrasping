@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 import logging
 import multiprocessing
+import pickle
 from concurrent.futures import ThreadPoolExecutor
-from time import perf_counter
+from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -11,11 +12,10 @@ import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.body_with_children import Objects
-from mjregrasping.dijsktra_field import save_load_dfield
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_state import GraspState
 from mjregrasping.mjsaver import load_data_and_eq
-from mjregrasping.params import Params, hp
+from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_mpc import RegraspMPC, viz_regrasp_solutions_and_costs
 from mjregrasping.rerun_visualizer import MjReRun
@@ -37,14 +37,17 @@ def main():
     viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
     seed = 0
-    m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
-
-    objects = Objects(m)
+    m = mujoco.MjModel.from_xml_path("models/untangle_scene2.xml")
 
     d = load_data_and_eq(m, forward=False)
     phy = Physics(m, d)
-    goal_point = np.array([0.78, 0.04, 1.28])
-    dfield = save_load_dfield(phy, goal_point)
+    goal_point = np.array([0.8, 0.2, 0.2])
+    goal_body_idx = -1
+    obstacle_name = "floor"
+    dfield_path = Path("models/untangle_scene2.dfield.pkl")
+    objects = Objects(m, obstacle_name=obstacle_name)
+    with dfield_path.open('rb') as f:
+        dfield = pickle.load(f)
 
     goal = ObjectPointGoal(dfield=dfield,
                            viz=viz,
@@ -63,7 +66,7 @@ def main():
 
         # mpc.compute_new_grasp(phy)
 
-        # mpc.exhaustive_new_grasp_search(phy)
+        mpc.exhaustive_new_grasp_search(phy)
 
         grasp0 = GraspState.from_mujoco(mpc.rope_body_indices, phy.m)
         grasp_locations = [

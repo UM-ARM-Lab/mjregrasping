@@ -25,7 +25,7 @@ from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import log_box
 from mjregrasping.rollout import control_step, rollout, expand_result
-from mjregrasping.scenes import settle
+from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
 
 GRASP_POINT_OFFSET = 0.17
@@ -60,8 +60,8 @@ def gripper_idx_to_eq_name(gripper_idx):
 def viz_regrasp_solutions_and_costs(costs_dicts: List[Dict], candidate_grasps: List[GraspState]):
     # histograms
     n_g = 2
-    width = 0.1
-    cost_to_meters = 0.1
+    width = 0.2
+    cost_to_meters = 0.5
     depth = 0.05
     cost_colors = {
         'f_is_same':             [1.0, 0, 1.0],
@@ -150,7 +150,7 @@ def pull_rope_and_gripper_to_goal(phy, grasping_gripper_names, goal: ObjectPoint
     for gripper_name in grasping_gripper_names:
         grasp_world_eq = phy.m.eq(f'{gripper_name}_world')
         grasp_world_eq.active = 1
-        grasp_world_eq.solref[0] = 0.4  # make it pretty weak
+        grasp_world_eq.solref[0] = hp['pull_gripper_to_goal_solref']
         grasp_world_eq.data[0:3] = np.array([0, 0, GRASP_POINT_OFFSET])
         grasp_world_eq.data[3:6] = goal.goal_point
 
@@ -396,7 +396,8 @@ class RegraspMPC:
             # Let the newly activate eq's settle, and command the grippers to close
             ctrl = np.zeros(phy.m.nu)
             ctrl[self.objects.gripper_ctrl_indices] = -0.5
-            settle(phy, hp['plan_sub_time_s'], self.viz, True, hp['plan_settle_steps'], ctrl=ctrl)
+            settle_results = settle(phy, hp['plan_sub_time_s'], self.viz, True, hp['plan_settle_steps'], ctrl=ctrl)
+            # TODO: penalize contact cost during the settle?
 
             phy_after = phy.copy_data()
             f_settles.append(compute_settle_cost(phy_after, phy_before))
@@ -408,11 +409,25 @@ class RegraspMPC:
             # the cost/feasibility of the grasp
             unfix_grippers(phy)
 
+        def _policy(_phy):
+            ctrl = np.zeros(_phy.m.nu)
+            # use the jacobian to compute the joint velocities which would move the gripper in the direction from
+            # rope to goal
+            rope_pos = _phy.d.xpos[self.rope_body_indices[self.op_goal.body_idx]]
+            goal_pos = self.op_goal.goal_point
+            gripper_dir = goal_pos - rope_pos
+
+            for i in range(self.n_g):
+                if grasp.is_grasping[i]:
+                    gripper_name = gripper_idx_to_eq_name(i)
+
+
+
+
         def _move_to_goal():
             self.op_goal.viz_goal(phy)
-            pull_rope_and_gripper_to_goal(phy, grasping_gripper_names, self.op_goal)
             phy_before = phy.copy_data()
-            settle_result = settle(phy, hp['plan_sub_time_s'], self.viz, True, hp['plan_settle_steps'], get_result_func=self.op_goal.get_results)
+            settle_result = settle(phy, hp['plan_sub_time_s'], self.viz, True, hp['plan_settle_steps'], get_result_func=self.op_goal.get_results, policy=_policy)
             settle_results = expand_result(settle_result)
             f_goal_cost = self.op_goal.point_dist_cost(settle_results)[0, -1]
             f_goal_cost = f_goal_cost * self.mppi.gamma * hp['f_goal_weight']
