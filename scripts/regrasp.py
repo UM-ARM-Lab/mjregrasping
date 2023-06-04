@@ -37,7 +37,7 @@ def main():
     viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
     seed = 0
-    m = mujoco.MjModel.from_xml_path("models/untangle_scene2.xml")
+    m = mujoco.MjModel.from_xml_path("models/pull_scene.xml")
 
     d = load_data_and_eq(m, forward=False)
     phy = Physics(m, d)

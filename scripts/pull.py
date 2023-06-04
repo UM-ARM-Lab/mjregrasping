@@ -18,7 +18,7 @@ logger = logging.getLogger(f'rosout.{__name__}')
 class Untangle2(Runner):
 
     def __init__(self):
-        super().__init__("models/untangle_scene2.xml")
+        super().__init__("models/pull_scene.xml")
 
     def setup_scene(self, phy, viz):
         # set the rope pose

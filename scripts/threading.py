@@ -17,7 +17,7 @@ logger = logging.getLogger(f'rosout.{__name__}')
 class Threading1(Runner):
 
     def __init__(self):
-        super().__init__("models/threading_scene1.xml")
+        super().__init__("models/threading_scene.xml")
 
     def setup_scene(self, phy, viz):
         # set the rope pose
