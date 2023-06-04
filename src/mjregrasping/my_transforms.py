@@ -39,7 +39,6 @@ def np_wxyz_to_xyzw(quat):
     return np.stack([x, y, z, w], axis=-1)
 
 
-
 def matrix_dist(m1, m2):
     rot1 = m1[:3, :3]
     rot2 = m2[:3, :3]
@@ -86,3 +85,18 @@ def quaternion_difference(child_quat, parent_quat):
     parent2child_quat = np.zeros(4)
     mju_mat2Quat(parent2child_quat, parent2child.flatten())
     return parent2child_quat
+
+
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    # https://stackoverflow.com/questions/2827393
+    return vector / np.linalg.norm(vector, axis=-1, keepdims=True)
+
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+    # https://stackoverflow.com/questions/2827393
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.sum(v1_u * v2_u, axis=-1), -1.0, 1.0))

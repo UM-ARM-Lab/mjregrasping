@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 import logging
-from pathlib import Path
 
 import numpy as np
 
+from mjregrasping.goals import CombinedGoal
 from mjregrasping.grasping import activate_eq
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.regrasp_mpc_runner import Runner
@@ -14,11 +14,6 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 
 class Untangle(Runner):
-    goal_point = np.array([0.78, 0.04, 1.28])
-    goal_body_idx = -1
-    obstacle_name = "computer_rack"
-    dfield_path = Path("models/untangle_scene.dfield.pkl")
-    dfield_extents = np.array([[0.6, 1.4], [-0.7, 0.4], [0.2, 1.35]])
 
     def __init__(self):
         super().__init__("models/untangle_scene.xml")
@@ -43,12 +38,18 @@ class Untangle(Runner):
         activate_eq(phy.m, 'right')
         settle(phy, sub_time_s=DEFAULT_SUB_TIME_S, viz=viz, is_planning=False)
 
+    def make_goal(self, objects):
+        goal_point = np.array([0.78, 0.04, 1.25])
+        goal_body_idx = -1
+        goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
+        return goal
+
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     runner = Untangle()
-    runner.run([5])
+    runner.run([5], obstacle_name="computer_rack")
 
 
 if __name__ == "__main__":

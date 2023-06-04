@@ -23,7 +23,7 @@
             </body>
             <body name="computer" pos="-0.10 0 1">
                 <geom type="box" name="case" pos="0 0 0.2" size="0.15 0.1 0.2" rgba="0.2 0.2 0.4 1"/>
-                <geom type="box" name="port" pos="-0.15 0.04 0.28" size="0.01 0.01 0.01" rgba="0.2 0.6 0.4 1"/>
+                <geom type="box" name="port" pos="-0.15 0.04 0.25" size="0.01 0.01 0.01" rgba="0.2 0.6 0.4 1"/>
             </body>
         </body>
     </worldbody>

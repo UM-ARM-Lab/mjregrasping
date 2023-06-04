@@ -8,12 +8,19 @@ from matplotlib import cm
 from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
+from mjregrasping.grasp_state import grasp_indices_to_locations
+from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rviz import plot_spheres_rviz
 from mjregrasping.viz import Viz
 
 logger = logging.getLogger(f'rosout.{__name__}')
+
+
+def softmax(x, temp):
+    x = x / temp
+    return np.exp(x) / np.exp(x).sum(-1, keepdims=True)
 
 
 class MPPIGoal:
@@ -332,8 +339,9 @@ class ObjectPointGoal(MPPIGoal):
 
 class CombinedGoal(ObjectPointGoal):
 
-    def __init__(self, dfield, goal_point: np.array, goal_radius: float, body_idx: int, objects, viz: Viz):
-        super().__init__(dfield, goal_point, goal_radius, body_idx, objects, viz)
+    def __init__(self, goal_point: np.array, goal_radius: float, body_idx: int, objects, viz: Viz):
+        # TODO: get rid of dfield if we stop using it
+        super().__init__(None, goal_point, goal_radius, body_idx, objects, viz)
         self.rope_body_indices = np.array(self.objects.rope.body_indices)
         self.n_b = len(self.rope_body_indices)
         self.n_g = hp['n_g']
@@ -354,19 +362,39 @@ class CombinedGoal(ObjectPointGoal):
 
         point_dist = self.min_dist_to_specified_point(rope_points)
         pred_point_dist = point_dist[:, 1:] * hp['point_dist_weight']
-        gripper_points = np.stack([left_pos, right_pos], axis=-2)
-        pred_gripper_points = gripper_points[:, 1:]
 
-        pred_is_grasping = eq_active[:, 1:]  # skip t=0
+        # get the weight average direction from gripper to rope points,
+        # where the weight is the normalized geodesic distance from the gripper.
+        loc = grasp_indices_to_locations(self.rope_body_indices, eq_obj2id)
+        # FIXME: assumes rope length is 1m???
+        num_samples, horizon = loc.shape[:2]
+        linespaced = np.tile(np.linspace(0, 1, self.n_b)[None, None, None], [num_samples, horizon, self.n_g, 1])
+        inv_geodesic = np.square(1 - (linespaced - loc[..., None]))  # [num_samples, horizon, n_g, n_b]
+        weight = softmax(inv_geodesic, 0.5)
+        rope_deltas = rope_points[:, :, 1:] - rope_points[:, :, :-1]  # [num_samples, horizon, n_b-1, 3]
+        # extend the last delta to be the same as the second last delta
+        rope_deltas = np.insert(rope_deltas, -1, rope_deltas[:, :, -1], axis=2)  # [num_samples, horizon, n_b, 3]
+        # tile to match the number of grippers
+        rope_deltas = np.tile(rope_deltas[:, :, None], [1, 1, self.n_g, 1, 1])  # [num_samples, horizon, n_g, n_b, 3]
+        # negate the delta if the point grasped by the gripper is after before the point on the rope
+        eq_loc = grasp_indices_to_locations(self.rope_body_indices, eq_obj2id)
+        flip = (linespaced > eq_loc[..., None])[..., None]
+        rope_deltas = np.where(flip, -rope_deltas, rope_deltas)
+        # we need rope deltas to have shape [num_samples, horizon, n_b, 3, 2]
+        rope_deltas_weighted = np.einsum('bhgr,bhgrx->bhgx', weight, rope_deltas)  # [num_samples, horizon, n_g, 3]
 
-        # Get the potential field gradient at the specified points
-        gripper_dfield = self.dfield.get_costs(pred_gripper_points)  # [b, h, 2]
-        gripper_dfield *= hp['gripper_dfield']
-        grasping_gripper_dfield = np.sum(gripper_dfield * pred_is_grasping, -1)  # [b, horizon]
+        # compute alignment between the change in the gripper position and the weighted direction of the rope points
+        # and mask basked on whether the grasp is active
+        gripper_pos = np.stack([left_pos, right_pos], axis=-2)  # [b, horizon, n_g, 3]
+        gripper_dir = gripper_pos[:, 1:] - gripper_pos[:, :-1]  # [num_samples, horizon - 1, n_g, 3]
+        gripper_dir = np.insert(gripper_dir, 0, gripper_dir[:, 0], axis=1)  # [num_samples, horizon, n_g, 3]
+        pull_cost = angle_between(rope_deltas_weighted, gripper_dir)  # [num_samples, horizon, n_g]
+        grasping_pull_cost = np.einsum('bhg,bhg->bh', eq_active, pull_cost)
+        pred_grasping_pull_cost = grasping_pull_cost[:, 1:] * hp['pull_cost_weight']
 
         action_cost = get_action_cost(joint_positions)
 
-        goal_costs = pred_point_dist + grasping_gripper_dfield + pred_contact_cost + action_cost
+        goal_costs = pred_point_dist + pred_grasping_pull_cost + pred_contact_cost + action_cost
 
         self.grasp_costs = np.zeros([self.n_g, self.n_b, hp['num_samples'], hp['horizon']])
         is_grasping_mat = np.zeros([self.n_g, self.n_b])
@@ -392,12 +420,13 @@ class CombinedGoal(ObjectPointGoal):
         rr.log_scalar('grasp_rope_goal/action', action_cost.mean(), color=[255, 255, 255])
         rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
         rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
-        rr.log_scalar('object_point_goal/grasping_gripper_dfield', grasping_gripper_dfield.mean(), color=[255, 0, 255])
+        rr.log_scalar('object_point_goal/pull_cost', pred_grasping_pull_cost.mean(), color=[255, 0, 255])
         rr.log_scalar('object_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
         rr.log_scalar('object_point_goal/action', action_cost.mean(), color=[255, 255, 255])
-        rr.log_scalar('combined_goal/goal', goal_costs.mean(), color=[0, 255, 0])
+        rr.log_scalar('combined_goal/goal', goal_costs.mean(), color=[128, 255, 128])
         rr.log_scalar('combined_goal/grasping', self.grasp_costs.mean(), color=[0, 0, 255])
         rr.log_scalar('combined_goal/weighted_grasping', weighted_grasp_costs.mean(), color=[0, 255, 255])
+        rr.log_scalar('combined_goal/total', total_costs.mean(), color=[0, 255, 0])
 
         # Visualize grasp_w
         positions = []
@@ -412,7 +441,7 @@ class CombinedGoal(ObjectPointGoal):
                 positions.append(pos)
                 colors.append(color)
 
-        plot_spheres_rviz(self.viz.markers_pub, positions, colors, 0.02, "world", label="gasp_w")
+        plot_spheres_rviz(self.viz.markers_pub, positions, colors, 0.015, "world", label="gasp_w")
 
         return total_costs  # [b, horizon]
 
@@ -431,6 +460,14 @@ class CombinedGoal(ObjectPointGoal):
         self.viz_rope_lines(rope_pos, idx, scale, color='y')
 
 
+class CombinedThreadingGoal(CombinedGoal):
+    def __init__(self, goal_point: np.array, goal_radius: float, body_idx: int, objects, viz: Viz):
+        super().__init__(goal_point, goal_radius, body_idx, objects, viz)
+
+    def cost(self, results):
+        pass
+
+
 def get_contact_cost(phy: Physics, objects: Objects):
     # TODO: use SDF to compute near-contact cost to avoid getting too close
     # doing the contact cost calculation here means we don't need to return the entire data.contact array,
@@ -441,7 +478,8 @@ def get_contact_cost(phy: Physics, objects: Objects):
         geom_name2 = phy.m.geom(contact.geom2).name
         if (geom_name1 in objects.obstacle.geom_names and geom_name2 in objects.val_collision_geom_names) or \
                 (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val_collision_geom_names) or \
-                val_self_collision(geom_name1, geom_name2, objects):
+                val_self_collision(geom_name1, geom_name2, objects) or \
+                (geom_name1 == 'floor' or geom_name2 == 'floor'):
             contact_cost += 1
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts

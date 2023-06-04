@@ -253,12 +253,13 @@ class RegraspMPC:
                     near = per_grasp_cost < hp['cost_activation_thresh']
                     already_grasping = (bool(current_eq.active) and bool(current_eq.obj2id == body_idx))
                     if grasp_w_ij > hp['weight_activation_thresh'] and near and not already_grasping:
-                        # todo: how can we have continuous grasp locations instead of discretizing?
+                        # Todo: how can we have continuous grasp locations instead of discretizing?
                         loc = grasp_indices_to_locations(self.rope_body_indices, body_idx)
-                        # activate the grasp.
-                        # note: in the real world we will need to run some closed-loop grasping controller
+                        # Note: in the real world we will need to run some closed-loop grasping controller
                         #   but the gripper should already very close to the grasp location
+                        print(f"Activating grasp {gripper_i} on body {body_j}")
                         activate_grasp(phy, gripper_name, loc, self.rope_body_indices)
+                        warmstart_count = 0  # redo warmstarting since the cost landscape has changed
 
             # conversely, if the weight is low and the grasp is currently being made, release the grasp
             for gripper_i in range(self.n_g):
@@ -268,7 +269,9 @@ class RegraspMPC:
                     grasp_w_ij = grasp_w[gripper_i, body_j]
                     is_grasping = bool(current_eq.active) and current_eq.obj2id == body_idx
                     if grasp_w_ij < hp['weight_deactivation_thresh'] and is_grasping:
+                        print(f"Deactivating grasp {gripper_i} on body {body_j}")
                         current_eq.active[0] = 0
+                        warmstart_count = 0  # redo warmstarting since the cost landscape has changed
 
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy, False)
