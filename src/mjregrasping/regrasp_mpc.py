@@ -1,6 +1,7 @@
 import itertools
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from copy import copy
 from enum import Enum, auto
 from typing import Optional, Dict, List
 
@@ -16,7 +17,7 @@ import rospy
 from mjregrasping.body_with_children import Objects
 from mjregrasping.buffer import Buffer
 from mjregrasping.change_grasp_eq import change_eq
-from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost, CombinedGoal
+from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost, CombinedGoal, get_rope_points
 from mjregrasping.grasp_state import GraspState, grasp_location_to_indices, grasp_offset, grasp_indices_to_locations
 from mjregrasping.grasping import deactivate_eq, compute_eq_errors
 from mjregrasping.mjsaver import save_data_and_eq
@@ -185,6 +186,52 @@ def grasp_loc_recursive(is_grasping, i: int, grasp_locations: List):
         yield from grasp_loc_recursive(is_grasping, i + 1, grasp_locations + [0])
 
 
+class ProgressField:
+
+    def __init__(self, idx: int, rope_body_indices):
+        self.idx = idx
+        self.rope_body_indices = rope_body_indices
+        self.dataset = []
+        self.state_histories = [Buffer(hp['state_history_size']) for _ in self.rope_body_indices]
+
+    def predict(self, p, u=None):
+        """
+
+        Args:
+            p: A point np.array([x, y, z])
+            u: An action. Not sure how this is represented yet, if at all?
+
+        Returns:
+            A scalar > 0 representing expected progress
+
+        """
+        raise NotImplementedError()
+
+    def update(self, phy: Physics):
+        rope_points = copy(get_rope_points(phy, self.rope_body_indices))  # copy otherwise it gets overwritten
+        for rope_point, state_history in zip(rope_points, self.state_histories):
+            state_history.insert(rope_point)
+
+        # TODO: implement a bunch of GPs or something simpler
+        data_dict = {
+            'p': phy.d.body(self.rope_body_indices[self.idx]).xpos,
+            'u': phy.d.ctrl,
+        }
+        self.dataset.append(data_dict)
+
+        # Visualize progress
+        for i, state_history in enumerate(self.state_histories):
+            if not state_history.full():
+                continue
+            point_history = np.array(state_history.data)
+            deltas = norm(point_history[1:] - point_history[:-1], axis=-1)
+            rr.log_scalar(f'progress/{i}/mean', np.mean(deltas))
+            rr.log_scalar(f'progress/{i}/max', np.max(deltas))
+
+    def viz(self):
+        pass
+
+
 class RegraspMPC:
 
     def __init__(self, mppi_nu: int, pool: ThreadPoolExecutor, viz: Viz, goal: CombinedGoal, objects: Objects,
@@ -201,8 +248,9 @@ class RegraspMPC:
 
         self.mppi = MujocoMPPI(pool=pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(4), horizon=hp['horizon'],
                                lambda_=hp['lambda'])
-        self.state_history = Buffer(15)
+        self.state_history = Buffer(hp['state_history_size'])
         self.reset_trap_detection()
+        self.progress_fields = [ProgressField(i, self.rope_body_indices) for i in range(self.n_b)]
 
         self.regrasp_idx = 0
 
@@ -211,16 +259,25 @@ class RegraspMPC:
         self.max_dq = 0
 
     def run(self, phy):
-        # for self.iter in range(hp['iters']):
-        #     if rospy.is_shutdown():
-        #         self.close()
-        #         raise RuntimeError("ROS shutdown")
+        current_grasp = GraspState.from_mujoco(self.rope_body_indices, phy.m)
+        for j, body_idx in enumerate(self.rope_body_indices):
+            if current_grasp.is_grasping[0] and body_idx == current_grasp.indices[0]:
+                self.viz.p.config[f'left_w_{j}'] = 1.0
+            else:
+                self.viz.p.config[f'left_w_{j}'] = 0.0
+            if current_grasp.is_grasping[1] and body_idx == current_grasp.indices[1]:
+                self.viz.p.config[f'right_w_{j}'] = 1.0
+            else:
+                self.viz.p.config[f'right_w_{j}'] = 0.0
+        self.viz.p.update()
+
         sub_time_s = hp['move_sub_time_s']
         num_samples = hp['num_samples']
 
-        self.mppi.reset()
-        warmstart_count = 0
         itr = 0
+        self.mppi.reset()
+        warmstarting = 0.0  # use a float here then cast to int when iterating
+        last_costs = None
         while True:
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")
@@ -231,16 +288,26 @@ class RegraspMPC:
 
             self.viz.viz(phy)
 
+            for pf in self.progress_fields:
+                pf.update(phy)
+
             # these weights are from 0 to 1 and are used to weight the cost terms for each potential grasp
             grasp_w = self.op_goal.get_grasp_weights()
-            per_grasp_costs = np.zeros_like(grasp_w)
 
-            while warmstart_count < hp['warmstart']:
+            print(f'{warmstarting=}')
+            for i in range(int(warmstarting)):
                 command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
                 self.mppi_viz(self.op_goal, phy, command, sub_time_s)
-                warmstart_count += 1
             command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
             self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+
+            # NOTE: disable because this wasn't a well thought out idea and didn't help that much
+            # adjust warmstarting based on how much the costs have changed
+            # if last_costs is not None:
+            #     t_stat, p_value = ttest_ind(last_costs[:, 1:].mean(-1), self.mppi.costs[:, :-1].mean(-1))
+            #     p_value = float(p_value)
+            #     warmstarting += (0.1 - p_value) * 1  # increase warmstarting if the costs are different
+            #     warmstarting = max(min(warmstarting, hp['warmstart']), 0)
 
             # If the weight is high and the cost is low enough, commit to actually making the grasp
             for gripper_i in range(self.n_g):
@@ -259,7 +326,8 @@ class RegraspMPC:
                         #   but the gripper should already very close to the grasp location
                         print(f"Activating grasp {gripper_i} on body {body_j}")
                         activate_grasp(phy, gripper_name, loc, self.rope_body_indices)
-                        warmstart_count = 0  # redo warmstarting since the cost landscape has changed
+                        # Reset since cost landscape has changed a lot
+                        self.mppi.reset()
 
             # conversely, if the weight is low and the grasp is currently being made, release the grasp
             for gripper_i in range(self.n_g):
@@ -271,9 +339,11 @@ class RegraspMPC:
                     if grasp_w_ij < hp['weight_deactivation_thresh'] and is_grasping:
                         print(f"Deactivating grasp {gripper_i} on body {body_j}")
                         current_eq.active[0] = 0
-                        warmstart_count = 0  # redo warmstarting since the cost landscape has changed
+                        # Reset since cost landscape has changed a lot
+                        self.mppi.reset()
 
             control_step(phy, command, sub_time_s)
+
             self.viz.viz(phy, False)
             if self.mov:
                 self.mov.render(phy.d)
@@ -282,6 +352,8 @@ class RegraspMPC:
 
             if itr > hp['max_move_to_goal_iters']:
                 return Result(Status.FAILED, f"Gave up after {itr} iters", None)
+
+            last_costs = self.mppi.costs
 
             itr += 1
 

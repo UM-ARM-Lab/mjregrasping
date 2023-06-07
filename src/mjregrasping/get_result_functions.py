@@ -1,6 +1,6 @@
 from copy import copy
 
-import mujoco
+import numpy as np
 
 
 def get_left_tool_pos_and_contact_cost(phy):
@@ -14,5 +14,11 @@ def get_left_tool_pos_and_contact_cost(phy):
 
 
 def get_q_current(phy):
-    # FIXME: don't hardcode the indices
-    return copy(phy.d.qpos[:20])
+    # NOTE: if I used "sensors" instead of "qpos", it might clearer because I could just omit the sensor
+    #  for the mimic'd gripper joint.
+    deduplicated_indices = np.array([0, 1,
+                                     2, 3, 4, 5, 6, 7, 8,
+                                     9,
+                                     11, 12, 13, 14, 15, 16, 17,
+                                     18])
+    return copy(phy.d.qpos[deduplicated_indices])

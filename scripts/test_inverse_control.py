@@ -21,7 +21,7 @@ def main():
     rr.init('test_inverse_control')
     rr.connect()
     rospy.init_node("test_inverse_control")
-    xml_path = "models/val_husky.xml"
+    xml_path = "models/pull_scene.xml"
     tfw = TF2Wrapper()
     mjviz = MjRViz(xml_path, tfw)
     p = Params()
@@ -42,6 +42,12 @@ def main():
         Jr = np.zeros((3, phy.m.nv))
         mujoco.mj_jac(m, d, Jp, Jr, ee_offset, body_idx)
         J = np.concatenate((Jp, -Jr), axis=0)
+        deduplicated_indices = np.array([0, 1,
+                                         2, 3, 4, 5, 6, 7, 8,
+                                         9,
+                                         11, 12, 13, 14, 15, 16, 17,
+                                         18])
+        J = J[:, deduplicated_indices]
         J_T = J.T
 
         target_point = np.array([1.0, 0.0, 0.5])

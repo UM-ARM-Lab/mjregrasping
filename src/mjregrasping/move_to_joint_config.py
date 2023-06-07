@@ -1,10 +1,11 @@
+import logging
+
 import numpy as np
 
 from mjregrasping.get_result_functions import get_q_current
 from mjregrasping.physics import Physics
-from mjregrasping.viz import Viz
 from mjregrasping.rollout import control_step
-import logging
+from mjregrasping.viz import Viz
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
@@ -35,8 +36,8 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
         q_prev = q_current
 
     if not reached:
-        reason = f"Joint {phy.m.joint(offending_q_idx).name} is {np.rad2deg(max_joint_error)} away from target."
+        reason = f"qpos {offending_q_idx} is {np.rad2deg(max_joint_error)} deg away from target."
     else:
-        reason = f"Joint {phy.m.joint(offending_qvel_idx).name} is still moving too fast."
+        reason = f"qpos {offending_qvel_idx} is still moving too fast."
     # raise RuntimeError()
     logger.error(f"PID failed to converge. {reason}")

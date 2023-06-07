@@ -227,7 +227,7 @@ class ObjectPointGoal(MPPIGoal):
 
     def get_results(self, phy):
         left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
-        rope_points = self.get_rope_points(phy)
+        rope_points = get_rope_points(phy, self.objects.rope.body_indices)
         eq_indices = [
             mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'left'),
             mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'right'),
@@ -235,10 +235,6 @@ class ObjectPointGoal(MPPIGoal):
         is_grasping = phy.m.eq_active[eq_indices]
 
         return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
-
-    def get_rope_points(self, phy):
-        rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in self.objects.rope.body_indices])
-        return rope_points
 
     def point_dist_cost(self, results):
         rope_points = results[0]
@@ -285,9 +281,9 @@ class ObjectPointGoal(MPPIGoal):
         # Add a cost that non-grasping grippers should try to return to a "home" position.
         # Home is assumed to be 0, so penalize the distance from 0.
         # FIXME: doesn't generalize, hard-coded for Val
-        arm_gripper_matrix = np.zeros([20, 2])
-        left_joint_indices = np.arange(2, 2 + 9)
-        right_joint_indices = np.arange(11, 11 + 9)
+        arm_gripper_matrix = np.zeros([18, 2])
+        left_joint_indices = np.arange(2, 10)
+        right_joint_indices = np.arange(10, 19)
         arm_gripper_matrix[left_joint_indices, 0] = 1
         arm_gripper_matrix[right_joint_indices, 1] = 1
         home_cost_joints = np.abs(pred_joint_positions)  # [b, horizon, n_joints]
@@ -311,7 +307,7 @@ class ObjectPointGoal(MPPIGoal):
         return cost  # [b, horizon]
 
     def satisfied(self, phy):
-        rope_points = self.get_rope_points(phy)
+        rope_points = get_rope_points(phy, self.objects.rope.body_indices)
         error = self.min_dist_to_specified_point(rope_points).squeeze()
         return error < self.goal_radius
 
@@ -472,14 +468,14 @@ def get_contact_cost(phy: Physics, objects: Objects):
     # TODO: use SDF to compute near-contact cost to avoid getting too close
     # doing the contact cost calculation here means we don't need to return the entire data.contact array,
     # which makes things simpler and possibly faster, since this operation can't be easily vectorized.
+    all_obstacle_geoms = objects.obstacle.geom_names + ['floor']
     contact_cost = 0
     for contact in phy.d.contact:
         geom_name1 = phy.m.geom(contact.geom1).name
         geom_name2 = phy.m.geom(contact.geom2).name
-        if (geom_name1 in objects.obstacle.geom_names and geom_name2 in objects.val_collision_geom_names) or \
-                (geom_name2 in objects.obstacle.geom_names and geom_name1 in objects.val_collision_geom_names) or \
-                val_self_collision(geom_name1, geom_name2, objects) or \
-                (geom_name1 == 'floor' or geom_name2 == 'floor'):
+        if (geom_name1 in all_obstacle_geoms and geom_name2 in objects.val_collision_geom_names) or \
+                (geom_name2 in all_obstacle_geoms and geom_name1 in objects.val_collision_geom_names) or \
+                val_self_collision(geom_name1, geom_name2, objects):
             contact_cost += 1
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts
@@ -505,3 +501,8 @@ def get_results_common(objects: Objects, phy: Physics):
     left_tool_pos = phy.d.site('left_tool').xpos
     right_tool_pos = phy.d.site('right_tool').xpos
     return left_tool_pos, right_tool_pos, joint_positions, contact_cost
+
+
+def get_rope_points(phy, rope_body_indices):
+    rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in rope_body_indices])
+    return rope_points

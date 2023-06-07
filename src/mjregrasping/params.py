@@ -11,6 +11,7 @@ hp = {
     "cost_activation_thresh":             0.25,
     "grasp_weight":                       5.0,
     "pull_cost_weight":                   0.005,
+    "state_history_size":                 15,
     "iters":                              5,
     "max_move_to_goal_iters":             600,
     "max_grasp_iters":                    100,
@@ -67,6 +68,9 @@ class Params:
     def callback(self, new_config: Config, _):
         self.config = new_config
         return new_config
+
+    def update(self):
+        self.config = self.srv.update_configuration(self.config)
 
     def __getattr__(self, item):
         return getattr(self.config, item)

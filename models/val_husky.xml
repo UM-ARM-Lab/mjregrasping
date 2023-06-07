@@ -75,7 +75,8 @@
                                       quat="0.865182 0.501455 -0.00145709 0.000441505"
                                       mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/>
                             <site name="joint42_sensor_site"/>
-                            <joint name="joint42" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="0 3.14159" damping="8"
+                            <joint name="joint42" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="0 3.14159"
+                                   damping="8"
                                    frictionloss="1"/>
                             <geom type="mesh" mesh="SHOULDER_BRACKET" name="left_shoulder_bracket"
                                   rgba="0.2 0.2 0.2 1"/>
@@ -89,7 +90,8 @@
                                           quat="0.707443 -0.0157784 -0.0162832 0.706407"
                                           mass="1.7" diaginertia="0.00548 0.00493 0.00172"/>
                                 <site name="joint43_sensor_site"/>
-                                <joint name="joint43" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-6.2 6.2" damping="8"
+                                <joint name="joint43" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                       range="-6.2 6.2" damping="8"
                                        frictionloss="1"/>
                                 <body quat="0.707107 0 0.707107 0" name="lefttube">
                                     <inertial pos="0.0342 -4.48e-12 1.93e-07" quat="1 0 0 0" mass="0.2"
@@ -106,7 +108,8 @@
                                               quat="0.790471 0.612292 0.00995154 -0.0124285"
                                               mass="0.265" diaginertia="0.00109 0.00106 6e-05"/>
                                     <site name="joint44_sensor_site"/>
-                                    <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 0.5"
+                                    <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true"
+                                           range="-3.14159 0.5"
                                            damping="8" frictionloss="1"/>
                                     <geom type="mesh" mesh="FOREARM_BRACKET" name="left_forearm_bracket"
                                           rgba="0.2 0.2 0.2 1"/>
@@ -120,7 +123,8 @@
                                                   quat="0.99866 0.0517272 0.00100884 -0.00155161"
                                                   mass="0.108" diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
                                         <site name="joint45_sensor_site"/>
-                                        <joint name="joint45" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2"
+                                        <joint name="joint45" type="hinge" pos="0 0 0" axis="0 1 0" limited="true"
+                                               range="-6.2 6.2"
                                                damping="0.4" frictionloss="0.01"/>
                                         <geom type="mesh" mesh="A35_DRIVE" name="drive46_mesh" rgba="0.2 0.2 0.2 1"/>
                                         <body name="leftwrist" pos="0 0 -0.0566728">
@@ -143,14 +147,16 @@
                                                 <inertial pos="0.0136 -5.13e-09 0.0377 " quat="1 0 0 0" mass="0.168"
                                                           diaginertia="0.00012 0.000112 6.09e-05"/>
                                                 <site name="joint47_sensor_site"/>
-                                                <joint name="joint47" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-6.2 6.2"
+                                                <joint name="joint47" type="hinge" pos="0 0 0" axis="0 0 -1"
+                                                       limited="true" range="-6.2 6.2"
                                                        damping="0.08" frictionloss="0.1"/>
                                                 <geom type="mesh" mesh="PINCER_HOUSING2" name="drive47_housing_mesh"
                                                       rgba="0.2 0.2 0.2 1"/>
                                                 <site name="left_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
                                                 <body name="leftgripper_link" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
-                                                    <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true" range="-0.1166 1"
+                                                    <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -158,12 +164,14 @@
                                                     <geom type="mesh" mesh="PINCER_FINGER" name="leftgripper"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                     <body name="left_finger_pad_link" pos="0.05 0.1 0">
-                                                        <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad" rgba="0.6 0.4 0.2 1"/>
+                                                        <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad"
+                                                              rgba="0.6 0.4 0.2 1"/>
                                                     </body>
                                                 </body>
                                                 <body name="leftgripper2_link" pos="0 -0.0135 0.068553"
                                                       euler="1.99 1.5707 0">
-                                                    <joint name="leftgripper2" type="hinge" axis="0 0 1" limited="true" range="-0.1166 1"
+                                                    <joint name="leftgripper2" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -171,7 +179,8 @@
                                                     <geom type="mesh" mesh="PINCER_FINGER" name="leftgripper2"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                     <body name="left_finger_pad2" pos="0.05 0.1 0">
-                                                        <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad2" rgba="0.6 0.4 0.2 1"/>
+                                                        <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad2"
+                                                              rgba="0.6 0.4 0.2 1"/>
                                                     </body>
                                                 </body>
                                             </body>
@@ -186,7 +195,8 @@
                                   quat="0.999687 -0.0245928 0.000670972 -0.00444195"
                                   mass="0.372" diaginertia="0.000423 0.000381 0.000247"/>
                         <site name="joint1_sensor_site"/>
-                        <joint name="joint1" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-6.2 6.2" damping="20"
+                        <joint name="joint1" type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="-6.2 6.2"
+                               damping="20"
                                frictionloss="1"/>
                         <geom type="mesh" mesh="MK4_LT" name="joint2_mesh" rgba="0.2 0.2 0.2 1"/>
                         <body name="rightshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 0.707107">
@@ -194,7 +204,8 @@
                                       quat="0.865182 0.501455 -0.00145709 0.000441505"
                                       mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/>
                             <site name="joint2_sensor_site"/>
-                            <joint name="joint2" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 0" damping="8"
+                            <joint name="joint2" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 0"
+                                   damping="8"
                                    frictionloss="1"/>
                             <geom type="mesh" mesh="SHOULDER_BRACKET" name="right_shoulder_bracket"
                                   rgba="0.2 0.2 0.2 1"/>
@@ -208,7 +219,8 @@
                                           quat="0.707443 -0.0157784 -0.0162832 0.706407"
                                           mass="1.7" diaginertia="0.00548 0.00493 0.00172"/>
                                 <site name="joint3_sensor_site"/>
-                                <joint name="joint3" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-6.2 6.2" damping="8"
+                                <joint name="joint3" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                       range="-6.2 6.2" damping="8"
                                        frictionloss="1"/>
                                 <body quat="0.707107 0 0.707107 0" name="righttube">
                                     <inertial pos="0.0342 -4.48e-12 1.93e-07" quat="1 0 0 0" mass="0.2"
@@ -225,7 +237,8 @@
                                               quat="0.790471 0.612292 0.00995154 -0.0124285"
                                               mass="0.265" diaginertia="0.00109 0.00106 6e-05"/>
                                     <site name="joint4_sensor_site"/>
-                                    <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-3.14159 0.5"
+                                    <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
+                                           range="-3.14159 0.5"
                                            damping="8" frictionloss="1"/>
                                     <geom type="mesh" mesh="FOREARM_BRACKET" name="right_forearm_bracket"
                                           rgba="0.2 0.2 0.2 1"/>
@@ -239,7 +252,8 @@
                                                   quat="0.99866 0.0517272 0.00100884 -0.00155161"
                                                   mass="0.108" diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
                                         <site name="joint5_sensor_site"/>
-                                        <joint name="joint5" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2"
+                                        <joint name="joint5" type="hinge" pos="0 0 0" axis="0 1 0" limited="true"
+                                               range="-6.2 6.2"
                                                damping="0.4" frictionloss="0.01"/>
                                         <geom type="mesh" mesh="A35_DRIVE" name="drive6_mesh" rgba="0.2 0.2 0.2 1"/>
                                         <body name="rightwrist" pos="0 0 -0.0566728">
@@ -255,20 +269,23 @@
                                                   name="drive7">
                                                 <inertial pos="-1.41e-07 0.00618 -0.00546" quat="1 0 0 0" mass="0.108"
                                                           diaginertia="5.02e-05 4.29e-05 3.49e-05"/>
-                                                <geom type="mesh" mesh="A35_DRIVE" name="drive7_mesh" rgba="0.2 0.2 0.2 1"/>
+                                                <geom type="mesh" mesh="A35_DRIVE" name="drive7_mesh"
+                                                      rgba="0.2 0.2 0.2 1"/>
                                             </body>
                                             <body name="drive10" pos="0 -0.086 0.0566728" quat="0.707107 0.707107 0 0">
                                                 <inertial pos="0.0136 -5.13e-09 0.0377" quat="1 0 0 0" mass="0.168"
                                                           diaginertia="0.00012 0.000112 6.09e-05"/>
                                                 <site name="joint7_sensor_site"/>
-                                                <joint name="joint7" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-6.2 6.2"
+                                                <joint name="joint7" type="hinge" pos="0 0 0" axis="0 0 -1"
+                                                       limited="true" range="-6.2 6.2"
                                                        damping=".08" frictionloss="0.1"/>
                                                 <geom type="mesh" mesh="PINCER_HOUSING2" name="drive7_housing_mesh"
                                                       rgba="0.2 0.2 0.2 1"/>
                                                 <site name="right_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
                                                 <body name="rightgripper_link" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
-                                                    <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true" range="-0.1166 1"
+                                                    <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -276,12 +293,14 @@
                                                     <geom type="mesh" mesh="PINCER_FINGER" name="rightgripper"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                     <body name="right_finger_pad" pos="0.05 0.1 0">
-                                                        <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad" rgba="0.6 0.4 0.2 1"/>
+                                                        <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad"
+                                                              rgba="0.6 0.4 0.2 1"/>
                                                     </body>
                                                 </body>
                                                 <body name="rightgripper2_link" pos="0 -0.0135 0.068553"
                                                       euler="1.99 1.5707 0">
-                                                    <joint name="rightgripper2" type="hinge" axis="0 0 1" limited="true" range="-0.1166 1"
+                                                    <joint name="rightgripper2" type="hinge" axis="0 0 1" limited="true"
+                                                           range="-0.1166 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -289,7 +308,8 @@
                                                     <geom type="mesh" mesh="PINCER_FINGER" name="rightgripper2"
                                                           rgba="0.1 0.1 0.1 1"/>
                                                     <body name="right_finger_pad2" pos="0.05 0.1 0">
-                                                        <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad2" rgba="0.6 0.4 0.2 1"/>
+                                                        <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad2"
+                                                              rgba="0.6 0.4 0.2 1"/>
                                                     </body>
                                                 </body>
                                             </body>
@@ -333,52 +353,31 @@
     </worldbody>
     <actuator>
         <!--  0 -->
-        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="2000"
-                     forcelimited="true" forcerange="-50 50"/>
-        <intvelocity name="joint57_vel" joint="joint57" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-1.5708 1.5708" kp="20000"
-                     forcelimited="true" forcerange="-45 45"/>
+        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="2000" forcelimited="true" forcerange="-50 50"/>
+        <intvelocity name="joint57_vel" joint="joint57" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-1.5708 1.5708" kp="20000" forcelimited="true" forcerange="-55 55"/>
 
         <!--  2 -->
-        <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000"
-                     forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000"
-                     forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
-                     forcelimited="true" forcerange="-3 3"/>
+        <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000" forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-3 3"/>
         <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
                      forcelimited="true" forcerange="-5 5"/>
         <!--  6 -->
-        <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
-                     forcerange="-1 1"/>
-        <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
-                     forcelimited="true" forcerange="-2 2"/>
-        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
-                     forcelimited="true" forcerange="-0.5 0.5"/>
-        <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="10"
-                     forcelimited="true" forcerange="-1 1"/>
-        <intvelocity name="leftgripper2_vel" joint="leftgripper2" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="10"
-                     forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-2 2"/>
+        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-0.5 0.5"/>
+        <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="50" forcelimited="true" forcerange="-1 1"/>
 
-        <!--  11 -->
-        <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000"
-                     forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000"
-                     forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
-                     forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
-                     forcelimited="true" forcerange="-5 5"/>
-        <!--  15 -->
-        <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
-                     forcerange="-1 1"/>
-        <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
-                     forcelimited="true" forcerange="-2 2"/>
-        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
-                     forcelimited="true" forcerange="-0.5 0.5"/>
-        <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="10"
-                     forcelimited="true" forcerange="-1 1"/>
-        <intvelocity name="rightgripper2_vel" joint="rightgripper2" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="10"
-                     forcelimited="true" forcerange="-1 1"/>
+        <!--  10 -->
+        <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000" forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-3 3"/>
+        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-5 5"/>
+        <!--  14 -->
+        <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-2 2"/>
+        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-0.5 0.5"/>
+        <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="50" forcelimited="true" forcerange="-1 1"/>
     </actuator>
     <sensor>
         <!-- order of torque sensors and actuators must match -->
@@ -392,7 +391,6 @@
         <torque name="joint46_torque" site="joint46_sensor_site"/>
         <torque name="joint47_torque" site="joint47_sensor_site"/>
         <torque name="leftgripper_torque" site="leftgripper_sensor_site"/>
-        <torque name="leftgripper2_torque" site="leftgripper2_sensor_site"/>
         <torque name="joint1_torque" site="joint1_sensor_site"/>
         <torque name="joint2_torque" site="joint2_sensor_site"/>
         <torque name="joint3_torque" site="joint3_sensor_site"/>
@@ -401,6 +399,9 @@
         <torque name="joint6_torque" site="joint6_sensor_site"/>
         <torque name="joint7_torque" site="joint7_sensor_site"/>
         <torque name="rightgripper_torque" site="rightgripper_sensor_site"/>
-        <torque name="rightgripper2_torque" site="rightgripper2_sensor_site"/>
     </sensor>
+    <equality>
+        <joint name="left_mimic" joint1="leftgripper" joint2="leftgripper2" solref="0.01 1"/>
+        <joint name="right_mimic" joint1="rightgripper" joint2="rightgripper2" solref="0.01 1"/>
+    </equality>
 </mujoco>

@@ -74,9 +74,7 @@ class Objects:
         self.val_self_collision_geom_names = copy(self.val.geom_names)
         self.val_gripper_act_names = [
             'leftgripper_vel',
-            'leftgripper2_vel',
             'rightgripper_vel',
-            'rightgripper2_vel',
         ]
         self.gripper_ctrl_indices = np.concatenate([model.actuator(n).actadr for n in self.val_gripper_act_names])
         self.val_self_collision_geom_names.remove('left_finger_pad')

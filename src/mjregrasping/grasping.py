@@ -20,12 +20,6 @@ def get_grasp_constraints(m):
     return [m.eq('left'), m.eq('right')]
 
 
-def activate_eq(m, eq_name):
-    eq = m.eq(eq_name)
-    eq.active = 1
-    eq.data[3:6] = 0
-
-
 def deactivate_eq(m, eq_name):
     eq_idx = mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_EQUALITY, eq_name)
     m.eq_active[eq_idx] = 0
@@ -35,7 +29,7 @@ def compute_eq_errors(phy: Physics):
     eq_errs = []
     for i in range(phy.m.neq):
         eq = phy.m.eq(i)
-        if eq.active:
+        if eq.active and eq.type == mujoco.mjtEq.mjEQ_CONNECT:
             eq_err = compute_eq_error(phy, eq)
             eq_errs.append(eq_err)
     return sum(eq_errs)

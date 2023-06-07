@@ -83,13 +83,16 @@ def slow_when_eqs_bad(phy):
 
 
 # Very small performance optimization to avoid re-computing these. We assume it's constant.
-_qpos_indices_for_act = None
+_qpos_indices_for_act = np.array([
+    0, 1,
+    2, 3, 4, 5, 6, 7, 8,
+    9,
+    11, 12, 13, 14, 15, 16, 17,
+    18,
+])
 
 
 def limit_actuator_windup(phy):
-    global _qpos_indices_for_act
-    if _qpos_indices_for_act is None:
-        _qpos_indices_for_act = np.array([phy.m.actuator(i).actadr[0] for i in range(phy.m.na)])
     qpos_for_act = phy.d.qpos[_qpos_indices_for_act]
     phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -0.01, 0.01)
 

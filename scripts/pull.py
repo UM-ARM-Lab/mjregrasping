@@ -26,11 +26,11 @@ class Untangle2(Runner):
         phy.d.qpos[23:27] = quaternion_from_euler(0, 0, 0)
 
         robot_q2 = np.array([
-            0.0, 1.0,  # torso
+            0.0, 0.9,  # torso
             1.0, 0.0, 0.0, -1.0, 0, 0, 0,  # left arm
-            0.3, 0.3,  # left gripper
+            0.3,  # left gripper
             1.0, 0.0, 0, 0.0, 0, 0.0, 0,  # right arm
-            0, 0,  # right gripper
+            0,  # right gripper
         ])
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
