@@ -3,7 +3,6 @@
         <joint stiffness="0.5"/>
         <geom friction="0.01"/>
     </default>
-    <option viscosity="1" timestep="0.005"/>
     <include file="materials.xml"/>
     <include file="val_husky.xml"/>
     <include file="floor.xml"/>

@@ -23,7 +23,7 @@ from mjregrasping.grasping import deactivate_eq, compute_eq_errors
 from mjregrasping.mjsaver import save_data_and_eq
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_mppi import MujocoMPPI
-from mjregrasping.params import hp
+from mjregrasping.params import hp, Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import log_box
 from mjregrasping.rollout import control_step, rollout, expand_result
@@ -232,6 +232,31 @@ class ProgressField:
         pass
 
 
+def grasp_weights_from_current_state(rope_body_indices, m):
+    current_grasp = GraspState.from_mujoco(rope_body_indices, m)
+    grasp_weights = []
+    for body_idx in rope_body_indices:
+        if current_grasp.is_grasping[0] and body_idx == current_grasp.indices[0]:
+            grasp_weights.append(1.0)
+        else:
+            grasp_weights.append(0.0)
+    for body_idx in rope_body_indices:
+        if current_grasp.is_grasping[1] and body_idx == current_grasp.indices[1]:
+            grasp_weights.append(1.0)
+        else:
+            grasp_weights.append(0.0)
+    return np.array(grasp_weights)
+
+
+def set_grasp_weights(p: Params, grasp_weights: np.ndarray):
+    for i in range(int(len(grasp_weights) / 2)):
+        left_w = grasp_weights[i]
+        right_w = grasp_weights[int(len(grasp_weights) / 2) + i]
+        p.config[f'left_w_{i}'] = float(left_w)
+        p.config[f'right_w_{i}'] = float(right_w)
+    p.update()
+
+
 class RegraspMPC:
 
     def __init__(self, mppi_nu: int, pool: ThreadPoolExecutor, viz: Viz, goal: CombinedGoal, objects: Objects,
@@ -259,17 +284,8 @@ class RegraspMPC:
         self.max_dq = 0
 
     def run(self, phy):
-        current_grasp = GraspState.from_mujoco(self.rope_body_indices, phy.m)
-        for j, body_idx in enumerate(self.rope_body_indices):
-            if current_grasp.is_grasping[0] and body_idx == current_grasp.indices[0]:
-                self.viz.p.config[f'left_w_{j}'] = 1.0
-            else:
-                self.viz.p.config[f'left_w_{j}'] = 0.0
-            if current_grasp.is_grasping[1] and body_idx == current_grasp.indices[1]:
-                self.viz.p.config[f'right_w_{j}'] = 1.0
-            else:
-                self.viz.p.config[f'right_w_{j}'] = 0.0
-        self.viz.p.update()
+        initial_grasp_weights = grasp_weights_from_current_state(self.rope_body_indices, phy.m)
+        set_grasp_weights(self.viz.p, initial_grasp_weights)
 
         sub_time_s = hp['move_sub_time_s']
         num_samples = hp['num_samples']

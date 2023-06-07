@@ -15,7 +15,7 @@ from mjregrasping.settle import settle
 logger = logging.getLogger(f'rosout.{__name__}')
 
 
-class Untangle2(Runner):
+class Pull(Runner):
 
     def __init__(self):
         super().__init__("models/pull_scene.xml")
@@ -56,8 +56,8 @@ class Untangle2(Runner):
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    runner = Untangle2()
-    runner.run([5], "floor")  # contact cost with floor not working?
+    runner = Pull()
+    runner.run([5], "floor_obstacles")
 
 
 if __name__ == "__main__":

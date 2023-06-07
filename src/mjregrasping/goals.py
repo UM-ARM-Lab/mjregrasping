@@ -8,7 +8,7 @@ from matplotlib import cm
 from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
-from mjregrasping.grasp_state import grasp_indices_to_locations
+from mjregrasping.grasp_state import grasp_indices_to_locations, GraspState
 from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -506,3 +506,6 @@ def get_results_common(objects: Objects, phy: Physics):
 def get_rope_points(phy, rope_body_indices):
     rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in rope_body_indices])
     return rope_points
+
+
+
