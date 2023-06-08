@@ -118,6 +118,34 @@ def activate_grasp(phy, name, loc, rope_body_indices):
     grasp_eq.active = 1
     offset_body = np.array([x_offset, 0, 0])
     grasp_eq.data[3:6] = offset_body
+    # grasp_eq.data[6:10] =
+
+def activate_weld(phy, name, loc, rope_body_indices):
+    """ Preserves the orientation of the gripper and rope, but forces the position to be right between the fingers. """
+    grasp_index = grasp_location_to_indices(loc, rope_body_indices)
+    x_offset = grasp_offset(grasp_index, loc, rope_body_indices)
+    x_offset = round(x_offset, 2)
+    grasp_eq = phy.m.eq(name)
+    grasp_eq.obj2id = grasp_index
+    grasp_eq.active = 1
+    offset_body = np.array([x_offset, 0, 0])
+
+    obj1_pos = phy.d.body(grasp_eq.obj1id).xpos
+    gripper_quat = phy.d.body(grasp_eq.obj1id).xquat
+    b_pos = phy.d.body(grasp_eq.obj2id).xpos
+    b_quat = phy.d.body(grasp_eq.obj2id).xquat
+
+    neg_gripper_pos = np.zeros(3)
+    neg_gripper_quat = np.zeros(4)
+    mujoco.mju_negPose(neg_gripper_pos, neg_gripper_quat, obj1_pos, gripper_quat)
+
+    g_b_pos = np.zeros(3)
+    g_b_quat = np.zeros(4)
+    mujoco.mju_mulPose(g_b_pos, g_b_quat, neg_gripper_pos, neg_gripper_quat, b_pos, b_quat)
+
+    grasp_eq.data[0:3] = offset_body
+    grasp_eq.data[3:6] = np.array([0, 0, 0.17])
+    grasp_eq.data[6:10] = g_b_quat
 
 
 def pull_gripper(phy, name, loc, rope_body_indices):

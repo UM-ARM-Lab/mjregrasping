@@ -361,23 +361,22 @@
         <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000" forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
-                     forcelimited="true" forcerange="-5 5"/>
+        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-8 8"/>
         <!--  6 -->
-        <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-1 1"/>
-        <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-2 2"/>
-        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-0.5 0.5"/>
+        <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-2 2"/>
+        <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4"/>
+        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-3.5 3.5"/>
         <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="25" forcelimited="true" forcerange="-1 1"/>
 
         <!--  10 -->
         <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000" forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-5 5"/>
+        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-8 8"/>
         <!--  14 -->
-        <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-1 1"/>
-        <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-2 2"/>
-        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-0.5 0.5"/>
+        <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-2 2"/>
+        <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4"/>
+        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-3.5 3.5"/>
         <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="25" forcelimited="true" forcerange="-1 1"/>
     </actuator>
     <sensor>

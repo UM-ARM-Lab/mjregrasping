@@ -28,7 +28,7 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
         offending_q_idx = np.argmax(error)
         abs_qvel = np.abs(q_prev - q_current)
         offending_qvel_idx = np.argmax(abs_qvel)
-        reached = np.rad2deg(max_joint_error) < 0.5
+        reached = np.rad2deg(max_joint_error) < 1
         stopped = np.rad2deg(np.max(abs_qvel)) < 0.5
         if reached and stopped:
             return
