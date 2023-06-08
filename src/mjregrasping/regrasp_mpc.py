@@ -310,7 +310,6 @@ class RegraspMPC:
             # these weights are from 0 to 1 and are used to weight the cost terms for each potential grasp
             grasp_w = self.op_goal.get_grasp_weights()
 
-            print(f'{warmstarting=}')
             for i in range(int(warmstarting)):
                 command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
                 self.mppi_viz(self.op_goal, phy, command, sub_time_s)
