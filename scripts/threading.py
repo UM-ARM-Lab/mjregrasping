@@ -22,32 +22,12 @@ class Threading1(Runner):
         super().__init__("models/threading_scene.xml")
 
     def setup_scene(self, phy, viz):
-        robot_q2 = np.array([
-            0.1, 1.05,  # torso
-            1.0, 0.0, 0.0, -1.0, 1.5707, -0.6, 1.5707,  # left arm
-            0.3,  # left gripper
-            -.5, 0.0, 0, 0.5, 0, 0.0, 0,  # right arm
-            0,  # right gripper
-        ])
-        pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-
-        rope = Object(phy.m, "rope")
-        rope_body_indices = np.array(rope.body_indices)
-
-        loc = 0.08
-        name = 'left'
-        activate_weld(phy, name, loc, rope_body_indices)
         settle(phy, sub_time_s=DEFAULT_SUB_TIME_S, viz=viz, is_planning=False)
 
-        robot_q2 = np.array([
-            0.1, 0.0,  # torso
-            1.0, 0.0, 0.0, 0, 1.5707, 0, 1.5707,  # left arm
-            0.3,  # left gripper
-            -.5, 0.0, 0, 0.5, 0, 0.0, 0,  # right arm
-            0,  # right gripper
-        ])
-        pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-        print("setup")
+        # loc = 0.08
+        # name = 'left'
+        # activate_weld(phy, name, loc, rope_body_indices)
+        # settle(phy, sub_time_s=DEFAULT_SUB_TIME_S, viz=viz, is_planning=False)
 
 
     def make_goal(self, objects):
