@@ -33,6 +33,8 @@ hp = {
     "gripper_dfield":                     0.01,
     "action":                             0.01,
     "rope_motion_weight":                 0.1,
+    "thread_dir_weight":                  1.0,  # for threading
+    "thread_orient_weight":               0.0,  # for threading
     "nongrasping_home":                   0.05,
     "contact_exponent":                   0.5,
     "max_contact_cost":                   1,

@@ -13,6 +13,7 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics
+from mjregrasping.ring_utils import make_ring_mat
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -376,6 +377,34 @@ def plot_lines_rviz(
     array_msg = MarkerArray()
     array_msg.markers.append(marker_msg)
     pub.publish(array_msg)
+
+
+def plot_ring_rviz(pub, ring_position, ring_z_axis, radius, idx=0):
+    ring_msg = Marker()
+    ring_msg.header.frame_id = "world"
+    ring_msg.ns = "ring"
+    ring_msg.id = idx
+    ring_msg.type = Marker.LINE_STRIP
+    ring_msg.action = Marker.ADD
+    ring_msg.pose.orientation.w = 1.0
+    ring_msg.scale.x = radius * 0.05
+    ring_msg.color.a = 1.0
+    ring_msg.color.g = 1.0
+
+    delta_angle = 0.1
+    angles = np.arange(0, 2 * np.pi, delta_angle)
+    zeros = np.zeros_like(angles)
+    ones = np.ones_like(angles)
+    x = np.stack([radius * np.cos(angles), radius * np.sin(angles), zeros, ones], -1)
+    ring_mat = make_ring_mat(ring_position, ring_z_axis)
+    x = (x @ ring_mat.T)[:, :3]
+
+    for x_i in x:
+        ring_msg.points.append(Point(x_i[0], x_i[1], x_i[2]))
+    markers_msg = MarkerArray()
+    markers_msg.markers.append(ring_msg)
+
+    pub.publish(markers_msg)
 
 
 class MujocoXmlMeshParser:

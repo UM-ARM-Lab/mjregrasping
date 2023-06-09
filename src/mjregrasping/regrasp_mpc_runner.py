@@ -52,7 +52,7 @@ class Runner:
             logger.info(f"Saving movie to {mov_path}")
             mov.start(mov_path, fps=12)
 
-            goal = self.make_goal(objects)
+            goal = self.make_goal(phy, objects)
 
             with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
                 from time import perf_counter

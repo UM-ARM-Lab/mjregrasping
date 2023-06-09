@@ -46,7 +46,7 @@ class Pull(Runner):
             self.viz.p.config[f'right_w_{i}'] = 0.0
         self.viz.p.config[f'left_w_0'] = 1.0
 
-    def make_goal(self, objects):
+    def make_goal(self, phy, objects):
         goal_point = np.array([0.8, 0.21, 0.2])
         goal_body_idx = -1
         goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)

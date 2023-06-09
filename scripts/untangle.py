@@ -41,7 +41,7 @@ class Untangle(Runner):
         activate_grasp(phy, 'right', 0.95, rope_body_indices)
         settle(phy, sub_time_s=DEFAULT_SUB_TIME_S, viz=viz, is_planning=False)
 
-    def make_goal(self, objects):
+    def make_goal(self, phy, objects):
         goal_point = np.array([0.78, 0.04, 1.25])
         goal_body_idx = -1
         goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)

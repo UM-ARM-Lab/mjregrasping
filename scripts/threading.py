@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 import logging
 
-import mujoco
 import numpy as np
-from transformations import quaternion_from_matrix, quaternion_from_euler
 
-from mjregrasping.body_with_children import Object
 from mjregrasping.goals import CombinedThreadingGoal
-from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.regrasp_mpc import activate_weld
 from mjregrasping.regrasp_mpc_runner import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
@@ -29,11 +24,11 @@ class Threading1(Runner):
         # activate_weld(phy, name, loc, rope_body_indices)
         # settle(phy, sub_time_s=DEFAULT_SUB_TIME_S, viz=viz, is_planning=False)
 
-
-    def make_goal(self, objects):
-        goal_point = np.array([0.8, 0.0, 0.0])
+    def make_goal(self, phy, objects):
+        goal_point = phy.d.site("cable_tube_center").xpos
+        goal_dir = np.array([0.0, -1.0, 0.0])
         goal_body_idx = 0
-        goal = CombinedThreadingGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
+        goal = CombinedThreadingGoal(goal_point, goal_dir, 0.05, goal_body_idx, objects, self.viz)
         return goal
 
 

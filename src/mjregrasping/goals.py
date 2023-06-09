@@ -8,10 +8,11 @@ from matplotlib import cm
 from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
-from mjregrasping.grasp_state import grasp_indices_to_locations, GraspState
+from mjregrasping.grasp_state import grasp_indices_to_locations
 from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.ring_utils import make_ring_mat
 from mjregrasping.rviz import plot_spheres_rviz
 from mjregrasping.viz import Viz
 
@@ -341,7 +342,7 @@ class CombinedGoal(ObjectPointGoal):
         self.rope_body_indices = np.array(self.objects.rope.body_indices)
         self.n_b = len(self.rope_body_indices)
         self.n_g = hp['n_g']
-        # cached intermediate result used by the algorithm elsewhere
+        # cached intermediate result used by the MPC algorithm in regrasp_mpc.py
         self.grasp_costs = None
 
     def get_results(self, phy):
@@ -390,8 +391,27 @@ class CombinedGoal(ObjectPointGoal):
 
         action_cost = get_action_cost(joint_positions)
 
-        goal_costs = pred_point_dist + pred_grasping_pull_cost + pred_contact_cost + action_cost
+        goal_costs = pred_point_dist + pred_grasping_pull_cost
 
+        grasp_w, weighted_grasp_costs = self.compute_weighted_grasp_costs(eq_active, eq_obj2id, left_pos, right_pos,
+                                                                          rope_points)
+        total_costs = goal_costs + weighted_grasp_costs + action_cost + pred_contact_cost
+
+        rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
+        rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
+        rr.log_scalar('object_point_goal/pull_cost', pred_grasping_pull_cost.mean(), color=[255, 0, 255])
+        rr.log_scalar('combined_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('combined_goal/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('combined_goal/goal', goal_costs.mean(), color=[128, 255, 128])
+        rr.log_scalar('combined_goal/grasping', self.grasp_costs.mean(), color=[0, 0, 255])
+        rr.log_scalar('combined_goal/weighted_grasping', weighted_grasp_costs.mean(), color=[0, 255, 255])
+        rr.log_scalar('combined_goal/total', total_costs.mean(), color=[0, 255, 0])
+
+        self.viz_grasp_weights(grasp_w, rope_points)
+
+        return total_costs  # [b, horizon]
+
+    def compute_weighted_grasp_costs(self, eq_active, eq_obj2id, left_pos, right_pos, rope_points):
         self.grasp_costs = np.zeros([self.n_g, self.n_b, hp['num_samples'], hp['horizon']])
         is_grasping_mat = np.zeros([self.n_g, self.n_b])
         for gripper_i in range(self.n_g):
@@ -402,28 +422,16 @@ class CombinedGoal(ObjectPointGoal):
             for body_j, body_idx in enumerate(self.rope_body_indices):
                 body_pos = rope_points[:, :, body_j]
                 dist_cost = norm(body_pos - gripper_pos, axis=-1)[:, 1:]
-                grasp_ij_cost = dist_cost + action_cost
+                grasp_ij_cost = dist_cost
                 self.grasp_costs[gripper_i, body_j] = grasp_ij_cost
                 is_grasping_mat[gripper_i, body_j] = eq_i_active and eq_i_obj2id == body_idx
-
         self.grasp_costs *= hp['grasp_weight']  # overall rescale to make comparable with goal cost
         grasp_w = self.get_grasp_weights()
         grasp_w_not_grasping = grasp_w * (1 - is_grasping_mat)
         weighted_grasp_costs = np.einsum('gr,grbh->bh', grasp_w_not_grasping, self.grasp_costs)
-        total_costs = goal_costs + weighted_grasp_costs
+        return grasp_w, weighted_grasp_costs
 
-        rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
-        rr.log_scalar('grasp_rope_goal/action', action_cost.mean(), color=[255, 255, 255])
-        rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
-        rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
-        rr.log_scalar('object_point_goal/pull_cost', pred_grasping_pull_cost.mean(), color=[255, 0, 255])
-        rr.log_scalar('object_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
-        rr.log_scalar('object_point_goal/action', action_cost.mean(), color=[255, 255, 255])
-        rr.log_scalar('combined_goal/goal', goal_costs.mean(), color=[128, 255, 128])
-        rr.log_scalar('combined_goal/grasping', self.grasp_costs.mean(), color=[0, 0, 255])
-        rr.log_scalar('combined_goal/weighted_grasping', weighted_grasp_costs.mean(), color=[0, 255, 255])
-        rr.log_scalar('combined_goal/total', total_costs.mean(), color=[0, 255, 0])
-
+    def viz_grasp_weights(self, grasp_w, rope_points):
         # Visualize grasp_w
         positions = []
         colors = []
@@ -436,10 +444,7 @@ class CombinedGoal(ObjectPointGoal):
                 pos = rope_points[0, 0, body_j] + offset
                 positions.append(pos)
                 colors.append(color)
-
-        plot_spheres_rviz(self.viz.markers_pub, positions, colors, 0.015, "world", label="gasp_w")
-
-        return total_costs  # [b, horizon]
+        plot_spheres_rviz(self.viz.markers_pub, positions, colors, 0.015, "world", label="grasp_w")
 
     def get_grasp_weights(self):
         grasp_weights = np.array(
@@ -457,11 +462,154 @@ class CombinedGoal(ObjectPointGoal):
 
 
 class CombinedThreadingGoal(CombinedGoal):
-    def __init__(self, goal_point: np.array, goal_radius: float, body_idx: int, objects, viz: Viz):
+    def __init__(self, goal_point: np.array, goal_dir, goal_radius: float, body_idx: int, objects, viz: Viz):
         super().__init__(goal_point, goal_radius, body_idx, objects, viz)
+        self.goal_dir = goal_dir
 
     def cost(self, results):
-        pass
+        left_pos, right_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id = results
+        b, t = left_pos.shape[:2]
+        rope_keypoint = rope_points[:, :, self.body_idx]
+        rope_keypoint_flat = rope_keypoint.reshape(-1, 3)
+        b_dir_flat = compute_threading_dir(self.goal_point, self.goal_dir, self.goal_radius, rope_keypoint_flat)
+        b_dir = b_dir_flat.reshape(b, t, 3)
+        b_dir = b_dir / norm(b_dir, axis=-1, keepdims=True)
+
+        from mjregrasping.rviz import plot_arrows_rviz
+        b_dir_viz = b_dir * 0.05
+        plot_arrows_rviz(self.viz.markers_pub, rope_keypoint[0, 0:1], b_dir_viz[0, 0:1], "b_dir", 0, 'b')
+
+        # compare the direction of motion of the rope with b_dir
+        # if the rope is pointing in the same direction as b_dir, the cost is 0
+        rope_deltas = rope_keypoint[:, 1:] - rope_keypoint[:, :-1]  # [b, t-1, 3]
+        rope_deltas = rope_deltas / norm(rope_deltas, axis=-1, keepdims=True)
+        thread_dir_costs = angle_between(b_dir[:, :-1], rope_deltas)
+        thread_dir_costs = thread_dir_costs * hp['thread_dir_weight']
+
+        # compare the orientation of the rope with b_dir
+        if self.body_idx == 0:
+            orientation = rope_points[:, :, 1] - rope_points[:, :, 0]
+        else:
+            orientation = rope_points[:, :, self.body_idx] - rope_points[:, :, self.body_idx - 1]
+        orientation_costs = angle_between(orientation, b_dir)
+        pred_thread_orient_costs = orientation_costs[:, 1:] * hp['thread_orient_weight']
+
+        pred_contact_cost = contact_cost[:, 1:]  # skip t=0
+
+        point_dist = self.min_dist_to_specified_point(rope_points)
+        pred_point_dist = point_dist[:, 1:] * hp['point_dist_weight']
+
+        # get the weight average direction from gripper to rope points,
+        # where the weight is the normalized geodesic distance from the gripper.
+        loc = grasp_indices_to_locations(self.rope_body_indices, eq_obj2id)
+        # FIXME: assumes rope length is 1m???
+        num_samples, horizon = loc.shape[:2]
+        linespaced = np.tile(np.linspace(0, 1, self.n_b)[None, None, None], [num_samples, horizon, self.n_g, 1])
+        inv_geodesic = np.square(1 - (linespaced - loc[..., None]))  # [num_samples, horizon, n_g, n_b]
+        weight = softmax(inv_geodesic, 0.5)
+        rope_deltas = rope_points[:, :, 1:] - rope_points[:, :, :-1]  # [num_samples, horizon, n_b-1, 3]
+        # extend the last delta to be the same as the second last delta
+        rope_deltas = np.insert(rope_deltas, -1, rope_deltas[:, :, -1], axis=2)  # [num_samples, horizon, n_b, 3]
+        # tile to match the number of grippers
+        rope_deltas = np.tile(rope_deltas[:, :, None], [1, 1, self.n_g, 1, 1])  # [num_samples, horizon, n_g, n_b, 3]
+        # negate the delta if the point grasped by the gripper is after before the point on the rope
+        eq_loc = grasp_indices_to_locations(self.rope_body_indices, eq_obj2id)
+        flip = (linespaced > eq_loc[..., None])[..., None]
+        rope_deltas = np.where(flip, -rope_deltas, rope_deltas)
+        # we need rope deltas to have shape [num_samples, horizon, n_b, 3, 2]
+        rope_deltas_weighted = np.einsum('bhgr,bhgrx->bhgx', weight, rope_deltas)  # [num_samples, horizon, n_g, 3]
+
+        action_cost = get_action_cost(joint_positions)
+
+        goal_costs = thread_dir_costs + pred_thread_orient_costs
+
+        grasp_w, weighted_grasp_costs = self.compute_weighted_grasp_costs(eq_active, eq_obj2id, left_pos, right_pos,
+                                                                          rope_points)
+        total_costs = goal_costs + weighted_grasp_costs + action_cost + pred_contact_cost
+
+        rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
+        rr.log_scalar('threading_goal/thread_dir_cost', thread_dir_costs.mean(), color=[0, 255, 0])
+        rr.log_scalar('threading_goal/thread_orient_cost', pred_thread_orient_costs.mean(), color=[0, 0, 255])
+        rr.log_scalar('combined_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
+        rr.log_scalar('combined_goal/action', action_cost.mean(), color=[255, 255, 255])
+        rr.log_scalar('combined_goal/goal', goal_costs.mean(), color=[128, 255, 128])
+        rr.log_scalar('combined_goal/grasping', self.grasp_costs.mean(), color=[0, 0, 255])
+        rr.log_scalar('combined_goal/weighted_grasping', weighted_grasp_costs.mean(), color=[0, 255, 255])
+        rr.log_scalar('combined_goal/total', total_costs.mean(), color=[0, 255, 0])
+
+        self.viz_grasp_weights(grasp_w, rope_points)
+
+        return total_costs  # [b, horizon]
+
+    def satisfied(self, phy):
+        rope_points = get_rope_points(phy, self.objects.rope.body_indices)
+        rope_keypoint = rope_points[self.body_idx]
+        return np.linalg.norm(rope_keypoint - self.goal_point) < self.goal_radius
+
+    def viz_goal(self, phy):
+        self.viz.ring(self.goal_point, self.goal_dir, self.goal_radius)
+
+
+def compute_threading_dir(ring_position, ring_z_axis, R, p, I=1, mu=1):
+    """
+    Compute the direction of a virtual magnetic field that will pull the rope through the ring.
+
+    Args:
+        ring_position: [3] The position of the origin of the ring in world coordinates
+        ring_z_axis: [3] The axis point out up and out of the ring in world coordinates
+        R: [1] radius of the ring in meters.
+        p: [b, 3] the positions at which you want to compute the field
+        I: [1] current, higher means stronger field. If you only care about direction, using 1 is fine.
+        mu: [1] another scalar that controls the strength of the field. If you only care about direction, using 1 is fine.
+
+    Returns:
+        [b, 3] the direction of the field at p
+
+    """
+    dx, x = compute_ring_vecs(ring_position, ring_z_axis, R)
+    # We need a batch cross product
+    b = p.shape[0]
+    n = dx.shape[0]
+    dx_repeated = np.repeat(dx[None], b, axis=0)
+    x_repeated = np.repeat(x[None], b, axis=0)
+    p_repeated = np.repeat(p[:, None], n, axis=1)
+    dp_repeated = p_repeated - x_repeated
+    cross_product = np.cross(dx_repeated, dp_repeated)
+    db = I * R * cross_product / np.linalg.norm(dp_repeated, axis=-1, keepdims=True) ** 3
+    b = np.sum(db, axis=-2)
+    b *= mu / (4 * np.pi)
+
+    return b
+
+
+def compute_ring_vecs(ring_position, ring_z_axis, R):
+    """
+    Compute the direction sub-quantities needed for compute_threading_dir
+
+    Args:
+        ring_position: [3] The position of the origin of the ring in world coordinates
+        ring_z_axis: [3] The axis point out up and out of the ring in world coordinates
+        R: [1] radius of the ring in meters.
+
+    Returns:
+        [n, 3] the direction of the conductor (ring) at each ring point
+        [n, 3] the position of the ring points
+
+    """
+    delta_angle = 0.1
+    angles = np.arange(0, 2 * np.pi, delta_angle)
+    zeros = np.zeros_like(angles)
+    ones = np.ones_like(angles)
+    x = np.stack([R * np.cos(angles), R * np.sin(angles), zeros, ones], -1)
+    ring_mat = make_ring_mat(ring_position, ring_z_axis)
+    x = (x @ ring_mat.T)[:, :3]
+    zeros = np.zeros_like(angles)
+    dx = np.stack([-np.sin(angles), np.cos(angles), zeros], -1)
+    # only rotate here
+    ring_rot = ring_mat.copy()[:3, :3]
+    dx = (dx @ ring_rot.T)
+    dx = dx / np.linalg.norm(dx, axis=-1, keepdims=True)  # normalize
+    return dx, x
 
 
 def get_contact_cost(phy: Physics, objects: Objects):
@@ -506,6 +654,3 @@ def get_results_common(objects: Objects, phy: Physics):
 def get_rope_points(phy, rope_body_indices):
     rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in rope_body_indices])
     return rope_points
-
-
-

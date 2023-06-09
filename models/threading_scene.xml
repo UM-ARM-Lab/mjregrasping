@@ -13,11 +13,12 @@
     <include file="stiff_wire.xml"/>
     <include file="cc_sphere.xml"/>
     <worldbody>
-        <body name="cable_tube" pos="0.8 0.0 0.0">
-            <geom name="cable_tube_bottom" type="box" size="0.027 0.05 0.002" pos="0 0 0"/>
-            <geom name="cable_tube_top" type="box" size="0.027 0.05 0.002" pos="0 0 0.05"/>
-            <geom name="cable_tube_front" type="box" size="0.002 0.05 0.027" pos="-0.025 0 0.025"/>
-            <geom name="cable_tube_back" type="box" size="0.002 0.05 0.027" pos="0.025 0 0.025"/>
+        <body name="cable_tube" pos="0.9 0.0 0.0">
+            <geom name="cable_tube_bottom" type="box" size="0.042 0.08 0.002" pos="0 0 0"/>
+            <geom name="cable_tube_top" type="box" size="0.042 0.08 0.002" pos="0 0 0.08"/>
+            <geom name="cable_tube_front" type="box" size="0.002 0.08 0.042" pos="-0.04 0 0.04"/>
+            <geom name="cable_tube_back" type="box" size="0.002 0.08 0.042" pos="0.04 0 0.04"/>
+            <site name="cable_tube_center" pos="0 0 0.04"/>
         </body>
         <body name="attach" pos="0 0.25 0.55">
             <geom type="box" name="attach" size="0.005 0.005 0.005" rgba="0.5 0 0 1"/>
