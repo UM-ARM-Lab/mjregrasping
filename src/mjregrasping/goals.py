@@ -93,7 +93,7 @@ class GripperPointGoal(MPPIGoal):
             matrix of costs [b, horizon]
 
         """
-        left_gripper_pos, right_gripper_pos, joint_positions, contact_cost = results
+        left_gripper_pos, right_gripper_pos, joint_positions, contact_cost, is_unstable = results
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(self.goal_point - gripper_point, axis=-1)[:, 1:]
@@ -156,12 +156,13 @@ class GraspRopeGoal(MPPIGoal):
         self.initial_body_pos = None
 
     def get_results(self, phy):
-        left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable = get_results_common(self.objects,
+                                                                                                       phy)
         body_pos = self.get_body_pos(phy.d)
-        return left_tool_pos, right_tool_pos, joint_positions, body_pos, contact_cost
+        return left_tool_pos, right_tool_pos, joint_positions, body_pos, contact_cost, is_unstable
 
     def cost(self, results):
-        left_gripper_pos, right_gripper_pos, joint_positions, body_pos, contact_cost = results
+        left_gripper_pos, right_gripper_pos, joint_positions, body_pos, contact_cost, is_unstable = results
         pred_contact_cost = contact_cost[:, 1:]
         gripper_point = self.choose_gripper_pos(left_gripper_pos, right_gripper_pos)
         dist_cost = norm(body_pos - gripper_point, axis=-1)[:, 1:]
@@ -171,10 +172,9 @@ class GraspRopeGoal(MPPIGoal):
             self.initial_body_pos = body_pos
         rope_motion_cost = norm(body_pos - self.initial_body_pos, axis=-1)[:, 1:] * hp['rope_motion_weight']
 
-        cost = copy(pred_contact_cost)
-        cost += dist_cost
-        cost += action_cost
-        cost += rope_motion_cost
+        unstable_cost = is_unstable[:, 1:] * 1e6
+
+        cost = pred_contact_cost + dist_cost + action_cost + rope_motion_cost + unstable_cost
 
         rr.log_scalar('grasp_rope_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
         rr.log_scalar('grasp_rope_goal/rope_motion', rope_motion_cost.mean(), color=[255, 0, 0])
@@ -227,7 +227,8 @@ class ObjectPointGoal(MPPIGoal):
         self.objects = objects
 
     def get_results(self, phy):
-        left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable = get_results_common(self.objects,
+                                                                                                       phy)
         rope_points = get_rope_points(phy, self.objects.rope.body_indices)
         eq_indices = [
             mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'left'),
@@ -235,17 +236,10 @@ class ObjectPointGoal(MPPIGoal):
         ]
         is_grasping = phy.m.eq_active[eq_indices]
 
-        return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost
-
-    def point_dist_cost(self, results):
-        rope_points = results[0]
-        point_dist = self.min_dist_to_specified_point(rope_points)
-        pred_point_dist = point_dist[:, 1:]
-
-        return pred_point_dist
+        return rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost, is_unstable
 
     def cost(self, results):
-        rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost = results
+        rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost, is_unstable = results
 
         pred_rope_points = rope_points[:, 1:]
         pred_contact_cost = contact_cost[:, 1:]
@@ -262,11 +256,10 @@ class ObjectPointGoal(MPPIGoal):
         gripper_dfield *= hp['gripper_dfield']
         grasping_gripper_dfield = np.sum(gripper_dfield * pred_is_grasping, -1)  # [b, horizon]
 
-        cost = copy(pred_point_dist) * hp['point_dist_weight']
+        unstable_cost = is_unstable[:, 1:] * 1e6
 
-        cost += grasping_gripper_dfield
-
-        cost += pred_contact_cost
+        point_dist_cost = pred_point_dist * hp['point_dist_weight']
+        cost = point_dist_cost + grasping_gripper_dfield + pred_contact_cost + unstable_cost
 
         # Add cost for grippers that are not grasping
         # that encourages them to remain close to the rope
@@ -298,7 +291,7 @@ class ObjectPointGoal(MPPIGoal):
         cost += action_cost
 
         # keep track of this in a member variable, so we can detect when it's value has changed
-        rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
+        rr.log_scalar('object_point_goal/points', point_dist_cost.mean(), color=[0, 0, 255])
         rr.log_scalar('object_point_goal/grasping_gripper_dfield', grasping_gripper_dfield.mean(), color=[255, 0, 255])
         rr.log_scalar('object_point_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
         rr.log_scalar('object_point_goal/min_nongrasping', min_nongrasping_cost.mean(), color=[0, 255, 255])
@@ -346,15 +339,16 @@ class CombinedGoal(ObjectPointGoal):
         self.grasp_costs = None
 
     def get_results(self, phy):
-        left_tool_pos, right_tool_pos, joint_positions, contact_cost = get_results_common(self.objects, phy)
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable = get_results_common(self.objects,
+                                                                                                       phy)
         rope_points = np.array([phy.d.xpos[rope_body_idx] for rope_body_idx in self.objects.rope.body_indices])
         eq_active = np.concatenate([phy.m.eq("left").active, phy.m.eq("right").active])
         eq_obj2id = np.concatenate([phy.m.eq("left").obj2id, phy.m.eq("right").obj2id])
 
-        return left_tool_pos, right_tool_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id
+        return left_tool_pos, right_tool_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id, is_unstable
 
     def cost(self, results):
-        left_pos, right_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id = results
+        left_pos, right_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id, is_unstable = results
         pred_contact_cost = contact_cost[:, 1:]  # skip t=0
 
         point_dist = self.min_dist_to_specified_point(rope_points)
@@ -391,11 +385,13 @@ class CombinedGoal(ObjectPointGoal):
 
         action_cost = get_action_cost(joint_positions)
 
+        unstable_cost = is_unstable[:, 1:] * 1e3
+
         goal_costs = pred_point_dist + pred_grasping_pull_cost
 
         grasp_w, weighted_grasp_costs = self.compute_weighted_grasp_costs(eq_active, eq_obj2id, left_pos, right_pos,
                                                                           rope_points)
-        total_costs = goal_costs + weighted_grasp_costs + action_cost + pred_contact_cost
+        total_costs = goal_costs + weighted_grasp_costs + action_cost + pred_contact_cost + unstable_cost
 
         rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
         rr.log_scalar('object_point_goal/points', pred_point_dist.mean(), color=[0, 0, 255])
@@ -467,7 +463,7 @@ class CombinedThreadingGoal(CombinedGoal):
         self.goal_dir = goal_dir
 
     def cost(self, results):
-        left_pos, right_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id = results
+        left_pos, right_pos, joint_positions, contact_cost, rope_points, eq_active, eq_obj2id, is_unstable = results
         b, t = left_pos.shape[:2]
         rope_keypoint = rope_points[:, :, self.body_idx]
         rope_keypoint_flat = rope_keypoint.reshape(-1, 3)
@@ -521,11 +517,13 @@ class CombinedThreadingGoal(CombinedGoal):
 
         action_cost = get_action_cost(joint_positions)
 
+        unstable_cost = is_unstable[:, 1:] * 1e6
+
         goal_costs = thread_dir_costs + pred_thread_orient_costs
 
         grasp_w, weighted_grasp_costs = self.compute_weighted_grasp_costs(eq_active, eq_obj2id, left_pos, right_pos,
                                                                           rope_points)
-        total_costs = goal_costs + weighted_grasp_costs + action_cost + pred_contact_cost
+        total_costs = goal_costs + weighted_grasp_costs + action_cost + pred_contact_cost + unstable_cost
 
         rr.log_scalar('grasp_rope_goal/dist', pred_point_dist.mean(), color=[0, 255, 0])
         rr.log_scalar('threading_goal/thread_dir_cost', thread_dir_costs.mean(), color=[0, 255, 0])
@@ -641,14 +639,14 @@ def get_action_cost(joint_positions):
     action_cost *= hp['action']
     return action_cost
 
-
 def get_results_common(objects: Objects, phy: Physics):
     joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
     joint_positions = phy.d.qpos[joint_indices_for_actuators]
     contact_cost = get_contact_cost(phy, objects)
     left_tool_pos = phy.d.site('left_tool').xpos
     right_tool_pos = phy.d.site('right_tool').xpos
-    return left_tool_pos, right_tool_pos, joint_positions, contact_cost
+    is_unstable = phy.d.warning.number.sum() > 0
+    return left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable
 
 
 def get_rope_points(phy, rope_body_indices):

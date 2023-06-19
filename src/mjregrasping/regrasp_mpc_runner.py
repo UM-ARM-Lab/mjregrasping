@@ -1,6 +1,5 @@
 import logging
 import multiprocessing
-import pickle
 from concurrent.futures.thread import ThreadPoolExecutor
 from pathlib import Path
 
@@ -10,7 +9,6 @@ import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.body_with_children import Objects
-from mjregrasping.goals import ObjectPointGoal, CombinedGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics

@@ -387,7 +387,7 @@ def plot_ring_rviz(pub, ring_position, ring_z_axis, radius, idx=0):
     ring_msg.type = Marker.LINE_STRIP
     ring_msg.action = Marker.ADD
     ring_msg.pose.orientation.w = 1.0
-    ring_msg.scale.x = radius * 0.05
+    ring_msg.scale.x = radius * 0.2
     ring_msg.color.a = 1.0
     ring_msg.color.g = 1.0
 
