@@ -19,7 +19,6 @@ def main():
 
     for i in range(100):
         # Compute the control using inverse dynamics
-        phy.d.
         mujoco.mj_inverse(phy.m, phy.d)
         phy.d.qfrc_inverse
         viz.viz(phy)

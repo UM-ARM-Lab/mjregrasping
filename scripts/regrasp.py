@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 import logging
 import multiprocessing
-import pickle
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -37,20 +35,16 @@ def main():
     viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
 
     seed = 0
-    m = mujoco.MjModel.from_xml_path("models/pull_scene.xml")
+    m = mujoco.MjModel.from_xml_path("models/untangle_scene.xml")
 
     d = load_data_and_eq(m, forward=False)
     phy = Physics(m, d)
     goal_point = np.array([0.8, 0.2, 0.2])
     goal_body_idx = -1
     obstacle_name = "floor"
-    dfield_path = Path("models/untangle_scene2.dfield.pkl")
     objects = Objects(m, obstacle_name=obstacle_name)
-    with dfield_path.open('rb') as f:
-        dfield = pickle.load(f)
 
-    goal = ObjectPointGoal(dfield=dfield,
-                           viz=viz,
+    goal = ObjectPointGoal(viz=viz,
                            goal_point=goal_point,
                            body_idx=-1,
                            goal_radius=0.05,
@@ -58,6 +52,8 @@ def main():
 
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
         mpc = RegraspMPC(mppi_nu=m.nu, pool=pool, viz=viz, goal=goal, objects=objects, seed=seed, mov=None)
+
+        mpc.compute_new_grasp_mppi(phy)
 
         # grasp = GraspState(mpc.rope_body_indices, np.array([0.0, 0.644]))
         # r = mpc.do_single_gripper_grasp(phy, grasp, gripper_idx=0, max_iters=100, is_planning=False,

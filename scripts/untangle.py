@@ -4,9 +4,9 @@ import logging
 import numpy as np
 
 from mjregrasping.body_with_children import Object
-from mjregrasping.goals import CombinedGoal
+from mjregrasping.goals import CombinedGoal, ObjectPointGoal
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.regrasp_mpc import activate_grasp
+from mjregrasping.grasping import activate_grasp
 from mjregrasping.regrasp_mpc_runner import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
@@ -44,7 +44,8 @@ class Untangle(Runner):
     def make_goal(self, phy, objects):
         goal_point = np.array([0.78, 0.04, 1.25])
         goal_body_idx = -1
-        goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
+        # goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
+        goal = ObjectPointGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
         return goal
 
 

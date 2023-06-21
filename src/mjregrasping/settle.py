@@ -1,38 +1,31 @@
-from typing import Optional, Callable
+from typing import Optional, Callable, Tuple
 
 import numpy as np
 
 from mjregrasping.movie import MjMovieMaker
-from mjregrasping.rollout import control_step, get_result_tuple
+from mjregrasping.rollout import control_step, get_result_tuple, no_results, list_of_tuples_to_tuple_of_lists
 from mjregrasping.viz import Viz
 
 
-def settle(phy, sub_time_s, viz: Viz, is_planning, settle_steps=50, mov: Optional[MjMovieMaker] = None,
-           ctrl: Optional[np.ndarray] = None, get_result_func: Optional[Callable] = None,
+def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mov: Optional[MjMovieMaker] = None,
+           ctrl: Optional[np.ndarray] = None, get_result_func: Optional[Callable] = no_results,
            policy: Optional[Callable] = None):
     if ctrl is None:
         ctrl = np.zeros(phy.m.nu)
 
-    results_lists = None
+    results = []
     for _ in range(settle_steps):
-        viz.viz(phy, is_planning)
+        if viz:
+            viz.viz(phy, is_planning)
         if policy is not None:
             ctrl = policy(phy)
         control_step(phy, ctrl, sub_time_s=sub_time_s)
 
-        if get_result_func is not None:
-            result_tuple = get_result_tuple(get_result_func, phy)
-
-            if results_lists is None:
-                results_lists = tuple([] for _ in result_tuple)
-
-            for result_list, result in zip(results_lists, result_tuple):
-                result_list.append(result)
-
         if not is_planning and mov:
             mov.render(phy.d)
 
-    if results_lists is None:
-        return None
+        result_tuple: Tuple = get_result_tuple(get_result_func, phy)
 
-    return tuple(np.array(result_i) for result_i in results_lists)
+        results.append(result_tuple)
+
+    return list_of_tuples_to_tuple_of_lists(results)

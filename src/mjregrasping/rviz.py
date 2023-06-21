@@ -5,7 +5,7 @@ from typing import Optional
 import mujoco
 import numpy as np
 from matplotlib.colors import to_rgba
-from mujoco import mju_str2Type, mju_mat2Quat, mjtGeom, mj_id2name
+from mujoco import mju_str2Type, mju_mat2Quat, mjtGeom, mj_id2name, mjtEq
 
 import ros_numpy
 import rospy
@@ -38,6 +38,7 @@ class MjRViz:
         self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
 
         self.eq_constraints_pub = rospy.Publisher("eq_constraints", MarkerArray, queue_size=10)
+        self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
         self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=10)
         self.planning_markers_pub = rospy.Publisher('planning', MarkerArray, queue_size=10)
@@ -234,10 +235,30 @@ class MjRViz:
             contact_marker.pose.position.z = float(contact.pos[2])
             contact_markers.markers.append(contact_marker)
 
-        clear_contact_markers = MarkerArray()
-        clear_contact_markers.markers.append(Marker(action=Marker.DELETEALL))
-        self.contacts_pub.publish(clear_contact_markers)
+        clear_all_marker = MarkerArray()
+        clear_all_marker.markers.append(Marker(action=Marker.DELETEALL))
+        self.contacts_pub.publish(clear_all_marker)
         self.contacts_pub.publish(contact_markers)
+
+        eqs_markers = MarkerArray()
+        for eq_constraint_idx in range(phy.m.neq):
+            eq = phy.m.eq(eq_constraint_idx)
+            if eq.active and eq.type == mjtEq.mjEQ_CONNECT:
+                eq_marker = Marker()
+                eq_marker.action = Marker.ADD
+                eq_marker.type = Marker.LINE_STRIP
+                eq_marker.header.frame_id = "world"
+                eq_marker.scale.x = 0.005
+                eq_marker.pose.orientation.w = 1
+                eq_marker.color = ColorRGBA(*to_rgba("y"))
+                eq_marker.color.a = 0.4
+                eq_marker.ns = f"eq_{eq.name}"
+                eq_marker.points.append(Point(*phy.d.xpos[eq.obj1id][0]))
+                eq_marker.points.append(Point(*phy.d.xpos[eq.obj2id][0]))
+                eqs_markers.markers.append(eq_marker)
+
+        self.eq_constraints_pub.publish(clear_all_marker)
+        self.eq_constraints_pub.publish(eqs_markers)
 
 
 def plot_spheres_rviz(

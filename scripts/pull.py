@@ -7,7 +7,7 @@ from transformations import quaternion_from_euler
 from mjregrasping.body_with_children import Object
 from mjregrasping.goals import CombinedGoal
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.regrasp_mpc import activate_grasp
+from mjregrasping.grasping import activate_grasp
 from mjregrasping.regrasp_mpc_runner import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle

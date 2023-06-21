@@ -23,10 +23,9 @@ hp = {
     "plan_settle_steps":                  20,
     "settle_steps":                       20,
     "num_samples":                        24,
-    "num_samples_when_scoring":           10,
     "horizon":                            9,
     "n_samples":                          50,
-    "lambda":                             0.02,
+    "lambda":                             0.1,  # temperature
     "min_nongrasping_rope_gripper_dists": 0.5,
     "nongrasping_close":                  0.1,
     "near_threshold":                     0.02,
@@ -57,7 +56,8 @@ hp = {
         'maxfevals': 25,
         'tolx':      1e-2,
         'bounds':    [0, 1],
-    }
+    },
+    "grasp_goal_radius":                  0.025,
 }
 
 
