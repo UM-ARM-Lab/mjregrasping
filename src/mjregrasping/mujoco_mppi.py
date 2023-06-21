@@ -14,7 +14,7 @@ def softmax(x, temp):
 
 class MujocoMPPI:
 
-    def __init__(self, pool, nu, seed, horizon, noise_sigma, lambda_=1., gamma=0.9):
+    def __init__(self, pool, nu, seed, horizon, noise_sigma, temp=1., gamma=0.9):
         self.pool = pool
         self.horizon = horizon
         self.nu = nu
@@ -22,7 +22,7 @@ class MujocoMPPI:
         self.seed = seed
 
         # dimensions of state and control
-        self.lambda_ = lambda_
+        self.temp = temp
 
         self.noise_sigma_diag = np.ones(nu) * noise_sigma
         self.noise_rng = np.random.RandomState(seed)
@@ -87,7 +87,7 @@ class MujocoMPPI:
             cost_range = 1.0
         self.cost_normalized = (self.cost - self.cost.min()) / cost_range
 
-        weights = softmax(-self.cost, self.lambda_)
+        weights = softmax(-self.cost, self.temp)
         logger.debug(f'weights: std={float(np.std(weights)):.3f} max={float(np.max(weights)):.2f}')
 
         # compute the (weighted) average noise and add that to the reference control

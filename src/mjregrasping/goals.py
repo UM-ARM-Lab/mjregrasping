@@ -618,3 +618,11 @@ class RegraspGoal(BaseRegraspGoal):
         left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable, is_grasping, grasp_indices, offsets, needs_grasp, rope_points, eq_indices = results
         move_results = rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost, is_unstable
         return self.op_goal.cost(move_results)
+
+    def viz_result(self, result, idx: int, scale, color):
+        left_tool_pos = result[0]
+        right_tool_pos = result[1]
+        self.viz_ee_lines(left_tool_pos, right_tool_pos, idx, scale, color)
+        # TODO: not sure which point to visualize, doing all of them would be overwhelming
+        # rope_pos = np.array(result[9])[:, self.body_idx]
+        # self.viz_rope_lines(rope_pos, idx, scale, color='y')

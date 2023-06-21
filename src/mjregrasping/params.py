@@ -24,14 +24,19 @@ hp = {
     "settle_steps":                       20,
     "num_samples":                        24,
     "horizon":                            9,
+    "regrasp_horizon":                    15,
     "n_samples":                          50,
-    "lambda":                             0.1,  # temperature
+    "regrasp_n_samples":                  250,
+    "temp":                               0.1,
+    "regrasp_temp":                       0.5,
     "min_nongrasping_rope_gripper_dists": 0.5,
     "nongrasping_close":                  0.1,
     "near_threshold":                     0.02,
     "gripper_dfield":                     0.01,
     "action":                             0.01,
     "rope_motion_weight":                 0.1,
+    "ever_not_grasping":                  10,
+    "grasp_change_error":                 50,
     "thread_dir_weight":                  1.0,  # for threading
     "thread_orient_weight":               0.0,  # for threading
     "nongrasping_home":                   0.05,

@@ -163,6 +163,11 @@ class MjRViz:
                 geom_marker_msg.scale.x = 1
                 geom_marker_msg.scale.y = 1
                 geom_marker_msg.scale.z = 1
+            elif geom_type == mjtGeom.mjGEOM_PLANE:
+                geom_marker_msg.type = Marker.CUBE
+                geom_marker_msg.scale.x = 10
+                geom_marker_msg.scale.y = 10
+                geom_marker_msg.scale.z = 0.001
             else:
                 rospy.loginfo_once(f"Unsupported geom type {geom_type}")
                 continue

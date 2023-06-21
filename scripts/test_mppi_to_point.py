@@ -41,7 +41,7 @@ def main():
 
     dts = []
     with ThreadPoolExecutor(multiprocessing.cpu_count()) as pool:
-        mppi = MujocoMPPI(pool, model.nu, seed=0, horizon=horizon, noise_sigma=np.deg2rad(8), lambda_=0.005)
+        mppi = MujocoMPPI(pool, model.nu, seed=0, horizon=horizon, noise_sigma=np.deg2rad(8), temp=0.005)
 
         for warmstart_i in range(5):
             command = mppi.command(phy, get_left_tool_pos_and_contact_cost, _cost_func,

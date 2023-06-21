@@ -257,7 +257,7 @@ class RegraspMPC:
         self.is_gasping_rng = np.random.RandomState(0)
 
         self.mppi = MujocoMPPI(pool=self.pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(2), horizon=hp['horizon'],
-                               lambda_=hp['lambda'])
+                               temp=hp['temp'])
         self.state_history = Buffer(hp['state_history_size'])
         self.reset_trap_detection()
         self.progress_fields = [ProgressField(i, self.rope_body_indices) for i in range(self.n_b)]
@@ -297,9 +297,9 @@ class RegraspMPC:
 
             for i in range(int(warmstarting)):
                 command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
-                self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+                self.mppi_viz(self.mppi, self.op_goal, phy, command, sub_time_s)
             command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
-            self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+            self.mppi_viz(self.mppi, self.op_goal, phy, command, sub_time_s)
 
             # NOTE: disable because this wasn't a well thought out idea and didn't help that much
             # adjust warmstarting based on how much the costs have changed
@@ -422,17 +422,17 @@ class RegraspMPC:
                 viz_regrasp_solutions_and_costs(all_costs_dicts, all_grasps)
 
     def compute_new_grasp_mppi(self, parent_phy: Physics):
-        grasp0 = GraspState.from_mujoco(self.rope_body_indices, parent_phy.m)
-
         # copy model and data since each solution should be different/independent
         phy = parent_phy.copy_all()
-        num_samples = 200
+        num_samples = hp['regrasp_n_samples']
+        # num_samples = 5
 
         regrasp_goal = RegraspGoal(self.op_goal, hp['grasp_goal_radius'], self.objects, self.viz)
 
         # TODO: seed properly
-        mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=0, horizon=hp['horizon'], noise_sigma=np.deg2rad(2),
-                           n_g=self.n_g, rope_body_indices=self.rope_body_indices, lambda_=hp['lambda'])
+        mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=0, horizon=hp['regrasp_horizon'],
+                           noise_sigma=np.deg2rad(2),
+                           n_g=self.n_g, rope_body_indices=self.rope_body_indices, temp=hp['regrasp_temp'])
         iter = 0
         max_iters = 100
         sub_time_s = hp['plan_sub_time_s']
@@ -448,11 +448,11 @@ class RegraspMPC:
             #     break
 
             mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
-            self.mppi_viz(regrasp_goal, phy, command, sub_time_s)
+            # Yes this redoes all the simulation, but it's a nicer visualization than just self.mppi_viz()
+            mppi.regrasp_parallel_rollout(phy, regrasp_goal, mppi.U[None], 1, sub_time_s, viz=self.viz)
 
             self.viz.viz(phy, is_planning=True)
-
-            mppi.roll()
+            # TODO: should we actually compute a command and execute it? might that improve the solution?
 
             iter += 1
 
@@ -751,10 +751,10 @@ class RegraspMPC:
             while warmstart_count < hp['warmstart']:
                 command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, sub_time_s,
                                             num_samples)
-                self.mppi_viz(grasp_goal, phy, command, sub_time_s)
+                self.mppi_viz(self.mppi, grasp_goal, phy, command, sub_time_s)
                 warmstart_count += 1
             command = self.mppi.command(phy, grasp_goal.get_results, grasp_goal.cost, sub_time_s, num_samples)
-            self.mppi_viz(grasp_goal, phy, command, sub_time_s)
+            self.mppi_viz(self.mppi, grasp_goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy, is_planning)
@@ -791,10 +791,10 @@ class RegraspMPC:
 
             while warmstart_count < hp['warmstart']:
                 command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
-                self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+                self.mppi_viz(self.mppi, self.op_goal, phy, command, sub_time_s)
                 warmstart_count += 1
             command = self.mppi.command(phy, self.op_goal.get_results, self.op_goal.cost, sub_time_s, num_samples)
-            self.mppi_viz(self.op_goal, phy, command, sub_time_s)
+            self.mppi_viz(self.mppi, self.op_goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy, is_planning)
@@ -815,26 +815,25 @@ class RegraspMPC:
             execution_costs.append(self.mppi.get_first_step_cost() * hp['running_cost_weight'])
             move_iter += 1
 
-    def mppi_viz(self, goal, phy, command, sub_time_s):
+    def mppi_viz(self, mppi, goal, phy, command, sub_time_s):
         if not self.viz.p.mppi_rollouts:
             return
 
-        sorted_traj_indices = np.argsort(self.mppi.cost)
+        sorted_traj_indices = np.argsort(mppi.cost)
 
         i = None
-        num_samples = self.mppi.cost.shape[0]
+        num_samples = mppi.cost.shape[0]
         for i in range(min(num_samples, 10)):
             sorted_traj_idx = sorted_traj_indices[i]
-            cost_normalized = self.mppi.cost_normalized[sorted_traj_idx]
+            cost_normalized = mppi.cost_normalized[sorted_traj_idx]
             c = cm.RdYlGn(1 - cost_normalized)
-            result_i = tuple(r[sorted_traj_idx] for r in self.mppi.rollout_results)
+            result_i = tuple(r[sorted_traj_idx] for r in mppi.rollout_results)
             goal.viz_result(result_i, i, color=c, scale=0.002)
             rospy.sleep(0.01)  # needed otherwise messages get dropped :( I hate ROS...
 
-        if command:
+        if command is not None:
             cmd_rollout_results = rollout(phy.copy_data(), command[None], sub_time_s, get_result_func=goal.get_results)
-
-        goal.viz_result(cmd_rollout_results, i, color='b', scale=0.004)
+            goal.viz_result(cmd_rollout_results, i, color='b', scale=0.004)
 
     def close(self):
         if self.mov is not None:
