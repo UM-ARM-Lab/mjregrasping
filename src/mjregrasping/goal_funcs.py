@@ -100,7 +100,7 @@ def val_self_collision(geom_name1, geom_name2, objects: Objects):
 
 
 def get_action_cost(joint_positions):
-    action_cost = np.sum(np.abs(joint_positions[:, 1:] - joint_positions[:, :-1]), axis=-1)
+    action_cost = np.sum(np.abs(joint_positions[..., 1:] - joint_positions[..., :-1]), axis=-1)
     action_cost *= hp['action']
     return action_cost
 

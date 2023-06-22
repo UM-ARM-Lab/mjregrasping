@@ -39,14 +39,14 @@ def main():
 
     d = load_data_and_eq(m, forward=False)
     phy = Physics(m, d)
-    goal_point = np.array([0.8, 0.2, 0.2])
-    goal_body_idx = -1
-    obstacle_name = "floor"
-    objects = Objects(m, obstacle_name=obstacle_name)
 
+    goal_point = np.array([0.78, 0.04, 1.25])
+    goal_body_idx = -1
+    obstacle_name = "computer_rack"
+    objects = Objects(m, obstacle_name=obstacle_name)
     goal = ObjectPointGoal(viz=viz,
                            goal_point=goal_point,
-                           body_idx=-1,
+                           body_idx=goal_body_idx,
                            goal_radius=0.05,
                            objects=objects)
 

@@ -358,7 +358,7 @@ class RegraspMPC:
             itr += 1
 
     def run(self, phy):
-        for self.iter in range(hp['iters']):
+        for self.itr in range(hp['iters']):
             if rospy.is_shutdown():
                 self.close()
                 raise RuntimeError("ROS shutdown")
@@ -425,36 +425,43 @@ class RegraspMPC:
         # copy model and data since each solution should be different/independent
         phy = parent_phy.copy_all()
         num_samples = hp['regrasp_n_samples']
-        # num_samples = 5
 
         regrasp_goal = RegraspGoal(self.op_goal, hp['grasp_goal_radius'], self.objects, self.viz)
 
         # TODO: seed properly
         mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=0, horizon=hp['regrasp_horizon'],
-                           noise_sigma=np.deg2rad(2),
+                           noise_sigma=np.deg2rad(5),
                            n_g=self.n_g, rope_body_indices=self.rope_body_indices, temp=hp['regrasp_temp'])
-        iter = 0
+        itr = 0
         max_iters = 100
         sub_time_s = hp['plan_sub_time_s']
+        warmstart_count = 0
         while True:
+            self.viz.viz(phy, is_planning=True)
+
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")
 
-            if iter > max_iters:
+            if itr > max_iters:
                 break
 
             regrasp_goal.viz_goal(phy)
             # if regrasp_goal.satisfied(phy):
             #     break
 
-            mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
-            # Yes this redoes all the simulation, but it's a nicer visualization than just self.mppi_viz()
-            mppi.regrasp_parallel_rollout(phy, regrasp_goal, mppi.U[None], 1, sub_time_s, viz=self.viz)
+            while warmstart_count < hp['warmstart']:
+                release, command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
+                self.mppi_viz(mppi, regrasp_goal, phy, None, sub_time_s)
+                warmstart_count += 1
 
-            self.viz.viz(phy, is_planning=True)
-            # TODO: should we actually compute a command and execute it? might that improve the solution?
+            release, command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
+            self.mppi_viz(mppi, regrasp_goal, phy, None, sub_time_s)
 
-            iter += 1
+            control_step(phy, command, sub_time_s)
+
+            mppi.roll()
+
+            itr += 1
 
         # logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {fbest=:.2f}" + Fore.RESET)
         # return grasp_best
@@ -827,7 +834,7 @@ class RegraspMPC:
             sorted_traj_idx = sorted_traj_indices[i]
             cost_normalized = mppi.cost_normalized[sorted_traj_idx]
             c = cm.RdYlGn(1 - cost_normalized)
-            result_i = tuple(r[sorted_traj_idx] for r in mppi.rollout_results)
+            result_i = mppi.rollout_results[sorted_traj_idx]
             goal.viz_result(result_i, i, color=c, scale=0.002)
             rospy.sleep(0.01)  # needed otherwise messages get dropped :( I hate ROS...
 

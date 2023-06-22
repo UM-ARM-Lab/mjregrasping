@@ -1,5 +1,6 @@
 import logging
 from copy import copy
+from typing import List, Tuple
 
 import mujoco
 import numpy as np
@@ -10,9 +11,9 @@ from numpy.linalg import norm
 from mjregrasping.body_with_children import Objects
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_action_cost, get_contact_cost, get_results_common, get_rope_points, \
-    compute_threading_dir, get_nearest_body_idx_and_offset
+    compute_threading_dir
 from mjregrasping.grasp_state_utils import grasp_indices_to_locations
-from mjregrasping.grasping import get_grasp_constraints
+from mjregrasping.grasping import get_is_grasping
 from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -175,7 +176,7 @@ class GraspRopeGoal(MPPIGoal):
             self.initial_body_pos = body_pos
         rope_motion_cost = norm(body_pos - self.initial_body_pos, axis=-1)[:, 1:] * hp['rope_motion_weight']
 
-        unstable_cost = is_unstable[:, 1:] * 1e6
+        unstable_cost = is_unstable[:, 1:] * hp['unstable_weight']
 
         cost = pred_contact_cost + dist_cost + action_cost + rope_motion_cost + unstable_cost
 
@@ -253,7 +254,7 @@ class ObjectPointGoal(MPPIGoal):
 
         pred_is_grasping = is_grasping[:, 1:]  # skip t=0
 
-        unstable_cost = is_unstable[:, 1:] * 1e6
+        unstable_cost = is_unstable[:, 1:] * hp['unstable_weight']
 
         point_dist_cost = pred_point_dist * hp['point_dist_weight']
         cost = point_dist_cost + pred_contact_cost + unstable_cost
@@ -493,7 +494,7 @@ class CombinedThreadingGoal(CombinedGoal):
 
         action_cost = get_action_cost(joint_positions)
 
-        unstable_cost = is_unstable[:, 1:] * 1e6
+        unstable_cost = is_unstable[:, 1:] * hp['unstable_weight']
 
         goal_costs = thread_dir_costs + pred_thread_orient_costs
 
@@ -556,72 +557,52 @@ class RegraspGoal(BaseRegraspGoal):
     def viz_goal(self, phy):
         self.op_goal.viz_goal(phy)
 
-    def get_results(self, phy: Physics, change_grasp):
+    def get_results(self, phy: Physics):
         # Create goals that makes the closest point on the rope the intended goal
         # For create a result tuple for each gripper, based on gripper_action
         # The only case where we want to make a gripper result/cost is when we are not currently grasping
         # but when gripper_action is 1, meaning change the grasp state.
         left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable = get_results_common(self.objects,
                                                                                                        phy)
-        is_grasping = []
-        grasp_indices = []
-        offsets = []
-        for eq, tool_pos in zip(get_grasp_constraints(phy.m), [left_tool_pos, right_tool_pos]):
-            body_idx, offset = get_nearest_body_idx_and_offset(phy, self.objects.rope.body_indices, tool_pos)
-            is_grasping.append(bool(eq.active))
-            grasp_indices.append(body_idx)
-            offsets.append(offset)
-        is_grasping = np.array(is_grasping)
-        grasp_indices = np.array(grasp_indices)
-        offsets = np.array(offsets)
-
-        not_active = np.logical_not(is_grasping)
-        needs_grasp = np.logical_and(change_grasp, not_active)
-
+        is_grasping = get_is_grasping(phy.m)
+        ctrl = phy.d.ctrl
         rope_points = get_rope_points(phy, self.objects.rope.body_indices)
-        eq_indices = [
-            mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'left'),
-            mujoco.mj_name2id(phy.m, mujoco.mjtObj.mjOBJ_EQUALITY, 'right'),
-        ]
 
-        return left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable, is_grasping, grasp_indices, offsets, needs_grasp, rope_points, eq_indices
+        return left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_grasping, is_unstable, rope_points, ctrl
 
     def grasp_cost(self, results):
-        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable, is_grasping, grasp_indices, offsets, needs_grasp, rope_points, eq_indices = results
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_grasping, is_unstable, rope_points, ctrl = results
 
         # Compute the minimum distance between each gripper and each point on the rope and min over rope points
         # then mask by needs_grasp
-        pred_left_tool_pos = left_tool_pos[:, 1:]
-        pred_right_tool_pos = right_tool_pos[:, 1:]
-        pred_rope_points = rope_points[:, 1:]
-        pred_needs_grasp = needs_grasp[:, 1:]
-        tool_pos = np.stack([pred_left_tool_pos, pred_right_tool_pos], axis=-2)  # [b, T, n_g, 3]
-        dists = pairwise_squared_distances(tool_pos, pred_rope_points) # [b, T, n_g, n_p]
-        min_dists = dists.min(axis=-1)  # [b, T, n_g]
-        min_dists_masked = np.sum(min_dists * pred_needs_grasp, -1)  # [b, T]
+        tool_pos = np.stack([left_tool_pos, right_tool_pos], axis=0)  # [n_g, 3]
+        dists = pairwise_squared_distances(tool_pos, rope_points)  # [n_g, n_p]
+        min_dists = dists.min(axis=-1)  # [n_g]
+        min_dists_nongrasping = np.sum(min_dists * np.logical_not(is_grasping), -1) * hp['grasp_weight']
 
-        pred_contact_cost = contact_cost[:, 1:]
+        unstable_cost = is_unstable * hp['unstable_weight']
 
-        action_cost = get_action_cost(joint_positions)
-
-        unstable_cost = is_unstable[:, 1:] * 1e6
-
-        cost = pred_contact_cost + min_dists_masked + action_cost + unstable_cost
-
-        rr.log_scalar('regrasp_grasp_rope_goal/pred_contact', pred_contact_cost.mean(), color=[255, 255, 0])
-        rr.log_scalar('regrasp_grasp_rope_goal/action', action_cost.mean(), color=[255, 255, 255])
-        rr.log_scalar('regrasp_grasp_rope_goal/dist', min_dists_masked.mean(), color=[0, 255, 0])
+        cost = contact_cost + min_dists_nongrasping + unstable_cost
 
         return cost
 
     def move_cost(self, results):
-        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable, is_grasping, grasp_indices, offsets, needs_grasp, rope_points, eq_indices = results
-        move_results = rope_points, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost, is_unstable
-        return self.op_goal.cost(move_results)
+        left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_grasping, is_unstable, rope_points, ctrl = results
 
-    def viz_result(self, result, idx: int, scale, color):
-        left_tool_pos = result[0]
-        right_tool_pos = result[1]
+        dist_to_goal = norm(self.op_goal.goal_point - rope_points[self.op_goal.body_idx])
+
+        unstable_cost = is_unstable * hp['unstable_weight']
+
+        goal_cost = dist_to_goal * hp['point_dist_weight']
+
+        cost = contact_cost + goal_cost + unstable_cost
+
+        # return cost
+        return 0
+
+    def viz_result(self, result: List[Tuple], idx: int, scale, color):
+        left_tool_pos = [result_t[0] for result_t in result]
+        right_tool_pos = [result_t[1] for result_t in result]
         self.viz_ee_lines(left_tool_pos, right_tool_pos, idx, scale, color)
         # TODO: not sure which point to visualize, doing all of them would be overwhelming
         # rope_pos = np.array(result[9])[:, self.body_idx]

@@ -156,3 +156,21 @@ def log_box(entity_path, size, transform, color):
                 positions=mesh.vertices,
                 indices=mesh.faces,
                 albedo_factor=color)
+
+
+def log_line_with_std(entity_path, x, *args, **kwargs):
+    """
+
+    Args:
+        entity_path: Entity apth
+        x: [N,] array, where N are different samples
+    Returns:
+
+    """
+    mean = np.mean(x)
+    std = np.std(x)
+    low = mean - std
+    high = mean + std
+    rr.log_scalar(f'{entity_path}/μ', mean, *args, **kwargs)
+    rr.log_scalar(f'{entity_path}/μ-σ', low, *args, **kwargs)
+    rr.log_scalar(f'{entity_path}/μ+σ', high, *args, **kwargs)

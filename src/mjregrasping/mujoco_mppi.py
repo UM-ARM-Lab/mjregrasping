@@ -24,10 +24,10 @@ class MujocoMPPI:
         # dimensions of state and control
         self.temp = temp
 
-        self.noise_sigma_diag = np.ones(nu) * noise_sigma
+        self.u_sigma_diag = np.ones(nu) * noise_sigma
         self.noise_rng = np.random.RandomState(seed)
 
-        self.U = np.zeros([self.horizon * self.nu])
+        self.u_mu = np.zeros([self.horizon * self.nu])
 
         # sampled results from last command
         self.cost = None
@@ -37,8 +37,8 @@ class MujocoMPPI:
 
     def roll(self):
         """ shift command 1 time step. Used before sampling a new command. """
-        self.U[:-self.nu] = self.U[self.nu:]
-        self.U[-self.nu:] = 0
+        self.u_mu[:-self.nu] = self.u_mu[self.nu:]
+        self.u_mu[-self.nu:] = 0
 
     def roll_and_command(self, phy, get_result_func, cost_func, sub_time_s, num_samples):
         """
@@ -58,11 +58,11 @@ class MujocoMPPI:
         get_result_func needs to take in the model and data and return a result for each sample, which
         can be any object or tuple of objects.
         """
-        noise_sigma_diag_repeated = np.repeat(self.noise_sigma_diag, self.horizon)  # repeat across time
+        noise_sigma_diag_repeated = np.repeat(self.u_sigma_diag, self.horizon)  # repeat across time
         noise_sigma_matrix = np.diagflat(noise_sigma_diag_repeated)
         # plt.imshow(noise_sigma_matrix[:self.nu, :self.nu], vmax=0.02); plt.show()
         noise = self.noise_rng.randn(num_samples, self.horizon * self.nu) @ np.sqrt(noise_sigma_matrix)
-        perturbed_action = self.U + noise
+        perturbed_action = self.u_mu + noise
 
         lower = np.tile(phy.m.actuator_ctrlrange[:, 0], self.horizon)
         upper = np.tile(phy.m.actuator_ctrlrange[:, 1], self.horizon)
@@ -70,7 +70,7 @@ class MujocoMPPI:
         # NOTE: We clip the absolute action, then recompute the noise
         #  so that later when we weight noise, we're weighting the bounded noise.
         perturbed_action = np.clip(perturbed_action, lower, upper)
-        noise = perturbed_action - self.U
+        noise = perturbed_action - self.u_mu
 
         perturbed_action_square = perturbed_action.reshape(num_samples, self.horizon, self.nu)
         results = parallel_rollout(self.pool, phy, perturbed_action_square, sub_time_s, get_result_func)
@@ -94,11 +94,11 @@ class MujocoMPPI:
         weighted_avg_noise = np.sum(weights[:, None] * noise, axis=0)
 
         # Covariance matrix adaptation:
-        U_square = self.U.reshape(self.horizon, self.nu)
-        self.noise_sigma_diag = weights[None] @ np.mean((U_square[None] - perturbed_action_square) ** 2, axis=1)
+        U_square = self.u_mu.reshape(self.horizon, self.nu)
+        self.u_sigma_diag = weights[None] @ np.mean((U_square[None] - perturbed_action_square) ** 2, axis=1)
 
-        self.U += weighted_avg_noise
-        action = self.U[:self.nu]
+        self.u_mu += weighted_avg_noise
+        action = self.u_mu[:self.nu]
 
         return action
 
@@ -106,7 +106,7 @@ class MujocoMPPI:
         """
         Resets the control samples.
         """
-        self.U = np.zeros([self.horizon * self.nu])
+        self.u_mu = np.zeros([self.horizon * self.nu])
         # resetting the RNG makes things a bit more deterministic, so easier for debugging
         self.noise_rng = np.random.RandomState(self.seed)
 

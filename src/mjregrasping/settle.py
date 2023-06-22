@@ -3,7 +3,7 @@ from typing import Optional, Callable, Tuple
 import numpy as np
 
 from mjregrasping.movie import MjMovieMaker
-from mjregrasping.rollout import control_step, get_result_tuple, no_results, list_of_tuples_to_tuple_of_lists
+from mjregrasping.rollout import control_step, get_result_tuple, no_results, list_of_tuples_to_tuple_of_arrays
 from mjregrasping.viz import Viz
 
 
@@ -28,4 +28,4 @@ def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mo
 
         results.append(result_tuple)
 
-    return list_of_tuples_to_tuple_of_lists(results)
+    return list_of_tuples_to_tuple_of_arrays(results)

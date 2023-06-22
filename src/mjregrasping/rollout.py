@@ -19,8 +19,8 @@ def no_results(*args, **kwargs):
 
 
 # noinspection PyTypeChecker
-def list_of_tuples_to_tuple_of_lists(results: List[Tuple]) -> Tuple[List]:
-    return tuple(list(result) for result in zip(*results))
+def list_of_tuples_to_tuple_of_arrays(results: List[Tuple]) -> Tuple[np.array]:
+    return tuple(np.array(result) for result in zip(*results))
 
 
 def rollout(phy, controls, sub_time_s, get_result_func=no_results, get_result_args=None):
@@ -38,7 +38,7 @@ def rollout(phy, controls, sub_time_s, get_result_func=no_results, get_result_ar
 
         results.append(result_tuple)
 
-    return list_of_tuples_to_tuple_of_lists(results)
+    return list_of_tuples_to_tuple_of_arrays(results)
 
 
 def get_result_tuple(get_result_func, phy, *get_result_args):
