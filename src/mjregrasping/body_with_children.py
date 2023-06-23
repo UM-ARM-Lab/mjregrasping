@@ -47,6 +47,10 @@ class Children:
                     self.geom_indices.append(geom_idx)
                     self.geom_names.append(model.geom(geom_idx).name)
 
+        self.body_indices = np.array(self.body_indices)
+        self.geom_indices = np.array(self.geom_indices)
+        self.qpos_indices = np.array(self.qpos_indices)
+
 
 class Object(Children):
 

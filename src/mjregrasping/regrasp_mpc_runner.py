@@ -1,5 +1,6 @@
 import logging
 import multiprocessing
+import time
 from concurrent.futures.thread import ThreadPoolExecutor
 from pathlib import Path
 
@@ -46,7 +47,8 @@ class Runner:
             self.setup_scene(phy, self.viz)
 
             mov = MjMovieMaker(m)
-            mov_path = self.root / f'seed_{seed}.mp4'
+            now = int(time.time())
+            mov_path = self.root / f'seed_{seed}_{now}.mp4'
             logger.info(f"Saving movie to {mov_path}")
             mov.start(mov_path, fps=12)
 
@@ -61,6 +63,7 @@ class Runner:
                 logger.info(f'dt: {perf_counter() - t0:.4f}')
                 logger.info(f"{seed=} {result=}")
 
+            mov.close()
     def make_goal(self, objects):
         raise NotImplementedError()
         # goal = ObjectPointGoal(dfield=None,

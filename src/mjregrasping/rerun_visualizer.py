@@ -41,9 +41,20 @@ class MjReRun:
         rr.log_scalar(f'contact/num_contacts', len(phy.d.contact))
 
         self.viz_bodies(phy.m, phy.d)
+        self.viz_sites(phy)
         self.viz_contacts(phy)
 
+    def viz_sites(self, phy: Physics):
+        for site_id in range(phy.m.nsite):
+            name = phy.m.site(site_id).name
+            pos = phy.d.site_xpos[site_id]
+            rr.log_point(entity_path=f'sites/{name}', position=pos)
+
     def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData):
+        """
+        Rerun, or possibly my code, seems to have some serious problems with efficiency when logging meshes,
+        so this method is very hacked at the moment.
+        """
         for geom_id in range(m.ngeom):
             geom = m.geom(geom_id)
             geom_type = geom.type
@@ -63,10 +74,13 @@ class MjReRun:
             elif geom_type == mjtGeom.mjGEOM_SPHERE:
                 log_sphere(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_MESH:
-                mesh_file_contents = self.get_mesh_file_contents(geom, m)
+                # mesh_file_contents = self.get_mesh_file_contents(geom, m)
+                mesh_file_contents = None
                 # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
                 # has NO POS OR QUAT, but instead that info goes in the <body> tag
-                log_mesh(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), mesh_file_contents)
+                parent_bodyid = m.body(geom_bodyid).parentid
+                if m.body(parent_bodyid).name != 'val_base':
+                    log_skeleton(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), d.body(parent_bodyid))
             else:
                 logger.debug(f"Unsupported geom type {geom_type}")
                 continue
@@ -102,6 +116,24 @@ class MjReRun:
                       positions=positions,
                       colors=colors,
                       radii=radii)
+
+    def viz_eqs(self, phy: Physics):
+        rr.log_cleared('eqs', recursive=True)
+        for eq_constraint_idx in range(phy.m.neq):
+            eq = phy.m.eq(eq_constraint_idx)
+            if eq.active and eq.type == mjtEq.mjEQ_CONNECT:
+                eq_marker.header.frame_id = "world"
+                eq_marker.scale.x = 0.005
+                eq_marker.pose.orientation.w = 1
+                eq_marker.color = ColorRGBA(*to_rgba("y"))
+                eq_marker.color.a = 0.4
+                eq_marker.ns = f"eq_{eq.name}"
+                eq_marker.points.append(Point(*phy.d.xpos[eq.obj1id][0]))
+                eq_marker.points.append(Point(*phy.d.xpos[eq.obj2id][0]))
+                eqs_markers.markers.append(eq_marker)
+
+        self.eq_constraints_pub.publish(clear_all_marker)
+        self.eq_constraints_pub.publish(eqs_markers)
 
 
 def make_entity_path(*names):
@@ -175,9 +207,17 @@ def log_sphere(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
                  color=tuple(model.rgba))
 
 
-def log_mesh(body_name, model, data, mesh_file_contents):
-    transform = get_transform(data)
+def log_skeleton(body_name, model, data, parent_data):
     entity_path = make_entity_path(body_name, model.name)
+    rr.log_point(entity_path=entity_path,
+                 position=data.xpos)
+    rr.log_line_strip(entity_path=entity_path,
+                      positions=[data.xpos, parent_data.xpos])
+
+
+def log_mesh_body(body_name, model, data, mesh_file_contents):
+    entity_path = make_entity_path(body_name, model.name)
+    transform = get_transform(data)
     rr.log_mesh_file(entity_path=entity_path,
                      mesh_format=rr.MeshFormat.GLB,
                      mesh_file=mesh_file_contents,

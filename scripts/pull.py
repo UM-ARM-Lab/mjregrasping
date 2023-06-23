@@ -6,11 +6,10 @@ from transformations import quaternion_from_euler
 
 from mjregrasping.body_with_children import Object
 from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.grasping import activate_grasp
+from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.regrasp_mpc_runner import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-from mjregrasping.settle import settle
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
@@ -42,8 +41,8 @@ class Pull(Runner):
 
     def make_goal(self, phy, objects):
         goal_point = np.array([0.8, 0.21, 0.2])
-        goal_body_idx = -1
-        goal = ObjectPointGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
+        goal_rope_loc = 1
+        goal = ObjectPointGoal(goal_point, 0.03, goal_rope_loc, objects, self.viz)
         return goal
 
 
@@ -51,7 +50,7 @@ def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     runner = Pull()
-    runner.run([5], "floor_obstacles")
+    runner.run([2], "floor_obstacles")
 
 
 if __name__ == "__main__":

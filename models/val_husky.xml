@@ -1,6 +1,6 @@
 <mujoco model="val">
     <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
-    <option viscosity="1" timestep="0.005"/>
+    <option viscosity="1" timestep="0.004"/>
     <default>
         <geom solref="0.002 1"/>
     </default>

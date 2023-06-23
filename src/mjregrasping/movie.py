@@ -42,4 +42,3 @@ class MjMovieMaker:
     def close(self):
         """ Save the movie as a .mp4 file """
         self.writer.close()
-        # reset for next time

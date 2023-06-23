@@ -13,14 +13,14 @@ hp = {
     "weight_deactivation_thresh":         0.05,
     "cost_activation_thresh":             0.25,
     "grasp_weight":                       20.0,
-    "smoothness_weight":                  0.1,
-    "controllability_weight":             3.0,
+    "smoothness_weight":                  0.25,
+    "controllability_weight":             4.0,
     "finger_weight":                      1.0,
     "desired_finger_q":                   0.10,
     "open_finger_q":                      0.30,
     "pull_cost_weight":                   0.005,
-    "unstable_weight":                    1000,
-    "state_history_size":                 15,
+    "unstable_weight":                    100,
+    "state_history_size":                 10,
     "iters":                              5,
     "max_move_to_goal_iters":             600,
     "max_grasp_iters":                    100,
@@ -57,7 +57,7 @@ hp = {
     "running_cost_weight":                0.02,
     "point_dist_weight":                  2.0,
     "needs_regrasp_again":                10,
-    "frac_max_dq":                        0.2,
+    "frac_max_dq":                        0.5,
     "q_joint_weight":                     0.5,
     "cma_sigma":                          0.3,
     "cma_opts":                           {
@@ -67,7 +67,7 @@ hp = {
         'tolx':      1e-2,
         'bounds':    [0, 1],
     },
-    "grasp_goal_radius":                  0.025,
+    "grasp_goal_radius":                  0.035,
 }
 
 

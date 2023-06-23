@@ -49,7 +49,7 @@ class RegraspMPPI(MujocoMPPI):
         self.rollout_results, self.cost, costs_by_term = self.regrasp_parallel_rollout(phy, goal, u_samples,
                                                                                        num_samples,
                                                                                        sub_time_s, exploration_weight,
-                                                                                       viz=None)
+                                                                                       viz=viz)
 
         cost_term_names = goal.move_cost_names() + ['smoothness', 'ever_not_grasping']
         for cost_term_name, costs_for_term in zip(cost_term_names, costs_by_term.T):
@@ -81,8 +81,11 @@ class RegraspMPPI(MujocoMPPI):
         command = u_mu_square[0]
         return command
 
-    def regrasp_parallel_rollout(self, phy, goal, u_samples, num_samples, sub_time_s, exploration_weight, viz=None):
+    def regrasp_parallel_rollout(self, phy, goal, u_samples, num_samples, sub_time_s, exploration_weight, viz):
         u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
+
+        if not viz.p.viz_planning:
+            viz = None
 
         # We must also copy model here because EQs are going to be changing
         args_sets = [(phy.copy_all(), self.rope_body_indices, goal, sub_time_s, exploration_weight, *args_i) for args_i
@@ -121,7 +124,12 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
     if viz:
         viz.viz(phy, is_planning=True)
 
-    results = [goal.get_results(phy)]
+    results_0 = goal.get_results(phy)
+    left_tool_pos, right_tool_pos = results_0[:2]
+    do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices)
+    release_dynamics(phy)
+    results = [results_0]
+
     costs = []
     for t, u in enumerate(u_sample):
         control_step(phy, u, sub_time_s=sub_time_s)
@@ -136,11 +144,6 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
 
         results.append(results_t)
         costs.append(costs_t)
-
-        left_tool_pos, right_tool_pos = results_t[:2]
-
-        do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices, 2)
-        release_dynamics(phy)
 
     results = np.stack(results, dtype=object, axis=1)
 
@@ -164,7 +167,7 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
     return results, cost, costs_by_term
 
 
-def do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices, grasp_radius_factor):
+def do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices):
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
     for i, tool_pos in enumerate([left_tool_pos, right_tool_pos]):
@@ -182,13 +185,16 @@ def do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices, gr
         pos = phy.d.xpos[body_idx]
         d = np.linalg.norm(tool_pos - pos, axis=-1)
         best_idx = d.argmin()
+        best_body_idx = body_idx[best_idx]
         best_d = d[best_idx]
         best_offset = offset[best_idx]
+        offset_body = np.array([best_offset, 0, 0])
         # if we're close enough, activate the grasp constraint
-        if best_d < hp["grasp_goal_radius"] * grasp_radius_factor:
-            eq.obj2id = best_idx
+        if best_d < hp["grasp_goal_radius"]:
+            eq.obj2id = best_body_idx
             eq.active = 1
-            eq.data[3:6] = best_offset
+            eq.data[3:6] = offset_body
+            print(f'{offset_body=}')
             did_new_grasp = True
     return did_new_grasp
 

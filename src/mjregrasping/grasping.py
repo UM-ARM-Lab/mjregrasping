@@ -1,8 +1,7 @@
 import mujoco
 import numpy as np
 
-from mjregrasping.grasp_state_utils import grasp_location_to_indices, grasp_offset, \
-    grasp_locations_to_indices_and_offsets
+from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets
 from mjregrasping.physics import Physics
 
 

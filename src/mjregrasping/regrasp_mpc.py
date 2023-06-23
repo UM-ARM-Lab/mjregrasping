@@ -1,7 +1,6 @@
 import itertools
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from copy import copy
 from enum import Enum, auto
 from typing import Optional, Dict, List
 
@@ -18,8 +17,7 @@ from mjregrasping.body_with_children import Objects
 from mjregrasping.buffer import Buffer
 from mjregrasping.change_grasp_eq import change_eq
 from mjregrasping.goal_funcs import get_tool_positions
-from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost, get_rope_points, \
-    RegraspGoal
+from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost, RegraspGoal
 from mjregrasping.grasp_state import GraspState
 from mjregrasping.grasp_state_utils import grasp_location_to_indices, grasp_indices_to_locations, grasp_offset
 from mjregrasping.grasping import deactivate_eq, compute_eq_errors, gripper_idx_to_eq_name, activate_grasp
@@ -171,52 +169,6 @@ def grasp_loc_recursive(is_grasping, i: int, grasp_locations: List):
         yield from grasp_loc_recursive(is_grasping, i + 1, grasp_locations + [0])
 
 
-class ProgressField:
-
-    def __init__(self, idx: int, rope_body_indices):
-        self.idx = idx
-        self.rope_body_indices = rope_body_indices
-        self.dataset = []
-        self.state_histories = [Buffer(hp['state_history_size']) for _ in self.rope_body_indices]
-
-    def predict(self, p, u=None):
-        """
-
-        Args:
-            p: A point np.array([x, y, z])
-            u: An action. Not sure how this is represented yet, if at all?
-
-        Returns:
-            A scalar > 0 representing expected progress
-
-        """
-        raise NotImplementedError()
-
-    def update(self, phy: Physics):
-        rope_points = copy(get_rope_points(phy, self.rope_body_indices))  # copy otherwise it gets overwritten
-        for rope_point, state_history in zip(rope_points, self.state_histories):
-            state_history.insert(rope_point)
-
-        # TODO: implement a bunch of GPs or something simpler
-        data_dict = {
-            'p': phy.d.body(self.rope_body_indices[self.idx]).xpos,
-            'u': phy.d.ctrl,
-        }
-        self.dataset.append(data_dict)
-
-        # Visualize progress
-        for i, state_history in enumerate(self.state_histories):
-            if not state_history.full():
-                continue
-            point_history = np.array(state_history.data)
-            deltas = norm(point_history[1:] - point_history[:-1], axis=-1)
-            rr.log_scalar(f'progress/{i}/mean', np.mean(deltas))
-            rr.log_scalar(f'progress/{i}/max', np.max(deltas))
-
-    def viz(self):
-        pass
-
-
 def grasp_weights_from_current_state(rope_body_indices, m):
     current_grasp = GraspState.from_mujoco(rope_body_indices, m)
     grasp_weights = []
@@ -251,8 +203,7 @@ class RegraspMPC:
         self.viz = viz
         self.op_goal = goal
         self.objects = objects
-        self.rope_body_indices = np.array(self.objects.rope.body_indices)
-        self.n_b = len(self.rope_body_indices)
+        self.rope_body_indices = self.objects.rope.body_indices
         self.n_g = hp['n_g']
         self.mov = mov
         self.is_gasping_rng = np.random.RandomState(0)
@@ -262,7 +213,6 @@ class RegraspMPC:
         self.state_history = Buffer(hp['state_history_size'])
         self.max_dq = None
         self.reset_trap_detection()
-        self.progress_fields = [ProgressField(i, self.rope_body_indices) for i in range(self.n_b)]
 
     def reset_trap_detection(self):
         self.state_history.reset()
@@ -288,9 +238,6 @@ class RegraspMPC:
                 return Result(Status.SUCCESS, f"Goal reached! ({itr} iters)", None)
 
             self.viz.viz(phy)
-
-            for pf in self.progress_fields:
-                pf.update(phy)
 
             # these weights are from 0 to 1 and are used to weight the cost terms for each potential grasp
             grasp_w = self.op_goal.get_grasp_weights()
@@ -374,7 +321,7 @@ class RegraspMPC:
         self.reset_trap_detection()
 
         itr = 0
-        max_iters = 250
+        max_iters = 500
         sub_time_s = hp['plan_sub_time_s']
         warmstart_count = 0
         self.viz.viz(phy)
@@ -383,17 +330,18 @@ class RegraspMPC:
                 raise RuntimeError("ROS shutdown")
 
             if itr > max_iters:
-                break
+                return False
 
             regrasp_goal.viz_goal(phy)
             if regrasp_goal.satisfied(phy):
-                break
+                print("Goal reached!")
+                return True
 
             needs_regrasp = self.check_needs_regrasp(phy.d)
             if needs_regrasp:
                 print("trap detected!")
                 self.reset_trap_detection()
-                exploration_weight *= 2
+                exploration_weight = np.clip(exploration_weight * 4, 0, 100)
 
             while warmstart_count < hp['warmstart']:
                 command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, exploration_weight, viz=self.viz)
@@ -406,27 +354,28 @@ class RegraspMPC:
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy)
 
+            if self.mov:
+                self.mov.render(phy.d)
+
             left_tool_pos, right_tool_pos = get_tool_positions(phy)
-            did_new_grasp = do_grasps_if_close(phy, left_tool_pos, right_tool_pos, self.rope_body_indices, 1)
+            did_new_grasp = do_grasps_if_close(phy, left_tool_pos, right_tool_pos, self.rope_body_indices)
             if did_new_grasp:
+                print("New grasp!")
                 self.reset_trap_detection()
                 warmstart_count = 0
                 mppi.reset()
                 exploration_weight = initial_exploration_weight
             did_release = release_dynamics(phy)
             if did_release:
+                print("Released!")
                 self.reset_trap_detection()
                 warmstart_count = 0
-                exploration_weight = initial_exploration_weight
                 mppi.reset()
+                exploration_weight = initial_exploration_weight
 
             mppi.roll()
 
             itr += 1
-
-        grasp_best = GraspState.from_mujoco(self.rope_body_indices, phy.m)
-        logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}" + Fore.RESET)
-        return grasp_best
 
     def run_old(self, phy):
         for self.itr in range(hp['iters']):

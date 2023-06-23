@@ -9,7 +9,9 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 def softmax(x, temp):
     x = x / temp
-    return np.exp(x) / np.exp(x).sum()
+    x = x - x.max()
+    z = np.exp(x)
+    return z / z.sum()
 
 
 class MujocoMPPI:

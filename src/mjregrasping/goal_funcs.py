@@ -158,3 +158,12 @@ def get_nearest_body_idx_and_offset(phy, body_indices, tool_pos):
             min_offset = offset
 
     return min_body_idx, min_offset
+
+
+def get_keypoint(phy, body_idx, offset):
+    """
+    Get the position of the keypoint, which is specified by the body_idx and the offset along the Y axis of the body
+    """
+    xmat = phy.d.body(body_idx).xmat.reshape(3, 3)
+    keypoint = phy.d.xpos[body_idx] + xmat[:, 0] * offset
+    return keypoint
