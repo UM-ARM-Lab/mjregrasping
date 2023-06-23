@@ -167,7 +167,7 @@ class MjRViz:
                 geom_marker_msg.type = Marker.CUBE
                 geom_marker_msg.scale.x = 10
                 geom_marker_msg.scale.y = 10
-                geom_marker_msg.scale.z = 0.001
+                geom_marker_msg.scale.z = 0.0001
             else:
                 rospy.loginfo_once(f"Unsupported geom type {geom_type}")
                 continue
@@ -221,8 +221,8 @@ class MjRViz:
 
         contact_markers = MarkerArray()
         for contact_idx, contact in enumerate(phy.d.contact):
-            geom1_name = mj_id2name(phy.m, mju_str2Type("geom"), contact.geom1)
-            geom2_name = mj_id2name(phy.m, mju_str2Type("geom"), contact.geom2)
+            geom1_name = phy.m.geom(contact.geom1).name
+            geom2_name = phy.m.geom(contact.geom2).name
 
             contact_marker = Marker()
             contact_marker.action = Marker.ADD

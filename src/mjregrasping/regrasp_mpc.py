@@ -17,6 +17,7 @@ import rospy
 from mjregrasping.body_with_children import Objects
 from mjregrasping.buffer import Buffer
 from mjregrasping.change_grasp_eq import change_eq
+from mjregrasping.goal_funcs import get_tool_positions
 from mjregrasping.goals import ObjectPointGoal, GraspRopeGoal, get_contact_cost, get_rope_points, \
     RegraspGoal
 from mjregrasping.grasp_state import GraspState
@@ -27,7 +28,7 @@ from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.params import hp, Params
 from mjregrasping.physics import Physics
-from mjregrasping.regrasping_mppi import RegraspMPPI
+from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasps_if_close, release_dynamics
 from mjregrasping.rerun_visualizer import log_box
 from mjregrasping.rollout import control_step, rollout, expand_result
 from mjregrasping.settle import settle
@@ -259,10 +260,9 @@ class RegraspMPC:
         self.mppi = MujocoMPPI(pool=self.pool, nu=mppi_nu, seed=seed, noise_sigma=np.deg2rad(2), horizon=hp['horizon'],
                                temp=hp['temp'])
         self.state_history = Buffer(hp['state_history_size'])
+        self.max_dq = None
         self.reset_trap_detection()
         self.progress_fields = [ProgressField(i, self.rope_body_indices) for i in range(self.n_b)]
-
-        self.max_dq = None
 
     def reset_trap_detection(self):
         self.state_history.reset()
@@ -358,6 +358,77 @@ class RegraspMPC:
             itr += 1
 
     def run(self, phy):
+
+        # copy model and data since each solution should be different/independent
+        num_samples = hp['regrasp_n_samples']
+
+        regrasp_goal = RegraspGoal(self.op_goal, hp['grasp_goal_radius'], self.objects, self.viz)
+        initial_exploration_weight = 0.02
+        exploration_weight = initial_exploration_weight
+
+        # TODO: seed properly
+        mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=0, horizon=hp['regrasp_horizon'],
+                           noise_sigma=np.deg2rad(5),
+                           n_g=self.n_g, rope_body_indices=self.rope_body_indices, temp=hp['regrasp_temp'])
+        mppi.reset()
+        self.reset_trap_detection()
+
+        itr = 0
+        max_iters = 250
+        sub_time_s = hp['plan_sub_time_s']
+        warmstart_count = 0
+        self.viz.viz(phy)
+        while True:
+            if rospy.is_shutdown():
+                raise RuntimeError("ROS shutdown")
+
+            if itr > max_iters:
+                break
+
+            regrasp_goal.viz_goal(phy)
+            if regrasp_goal.satisfied(phy):
+                break
+
+            needs_regrasp = self.check_needs_regrasp(phy.d)
+            if needs_regrasp:
+                print("trap detected!")
+                self.reset_trap_detection()
+                exploration_weight *= 2
+
+            while warmstart_count < hp['warmstart']:
+                command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, exploration_weight, viz=self.viz)
+                self.mppi_viz(mppi, regrasp_goal, phy, None, sub_time_s)
+                warmstart_count += 1
+
+            command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, exploration_weight, viz=self.viz)
+            self.mppi_viz(mppi, regrasp_goal, phy, None, sub_time_s)
+
+            control_step(phy, command, sub_time_s)
+            self.viz.viz(phy)
+
+            left_tool_pos, right_tool_pos = get_tool_positions(phy)
+            did_new_grasp = do_grasps_if_close(phy, left_tool_pos, right_tool_pos, self.rope_body_indices, 1)
+            if did_new_grasp:
+                self.reset_trap_detection()
+                warmstart_count = 0
+                mppi.reset()
+                exploration_weight = initial_exploration_weight
+            did_release = release_dynamics(phy)
+            if did_release:
+                self.reset_trap_detection()
+                warmstart_count = 0
+                exploration_weight = initial_exploration_weight
+                mppi.reset()
+
+            mppi.roll()
+
+            itr += 1
+
+        grasp_best = GraspState.from_mujoco(self.rope_body_indices, phy.m)
+        logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}" + Fore.RESET)
+        return grasp_best
+
+    def run_old(self, phy):
         for self.itr in range(hp['iters']):
             if rospy.is_shutdown():
                 self.close()
@@ -420,52 +491,6 @@ class RegraspMPC:
                 all_costs_dicts.append(costs_dict)
                 all_grasps.append(grasp)
                 viz_regrasp_solutions_and_costs(all_costs_dicts, all_grasps)
-
-    def compute_new_grasp_mppi(self, parent_phy: Physics):
-        # copy model and data since each solution should be different/independent
-        phy = parent_phy.copy_all()
-        num_samples = hp['regrasp_n_samples']
-
-        regrasp_goal = RegraspGoal(self.op_goal, hp['grasp_goal_radius'], self.objects, self.viz)
-
-        # TODO: seed properly
-        mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=0, horizon=hp['regrasp_horizon'],
-                           noise_sigma=np.deg2rad(5),
-                           n_g=self.n_g, rope_body_indices=self.rope_body_indices, temp=hp['regrasp_temp'])
-        itr = 0
-        max_iters = 100
-        sub_time_s = hp['plan_sub_time_s']
-        warmstart_count = 0
-        while True:
-            self.viz.viz(phy, is_planning=True)
-
-            if rospy.is_shutdown():
-                raise RuntimeError("ROS shutdown")
-
-            if itr > max_iters:
-                break
-
-            regrasp_goal.viz_goal(phy)
-            # if regrasp_goal.satisfied(phy):
-            #     break
-
-            while warmstart_count < hp['warmstart']:
-                release, command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
-                self.mppi_viz(mppi, regrasp_goal, phy, None, sub_time_s)
-                warmstart_count += 1
-
-            release, command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
-            self.mppi_viz(mppi, regrasp_goal, phy, None, sub_time_s)
-
-            control_step(phy, command, sub_time_s)
-
-            mppi.roll()
-
-            itr += 1
-
-        # logger.info(Fore.GREEN + f"Best grasp: {grasp_best=}, {fbest=:.2f}" + Fore.RESET)
-        # return grasp_best
-        return None
 
     def compute_new_grasp_cma(self, phy: Physics):
         grasp0 = GraspState.from_mujoco(self.rope_body_indices, phy.m)
@@ -834,7 +859,7 @@ class RegraspMPC:
             sorted_traj_idx = sorted_traj_indices[i]
             cost_normalized = mppi.cost_normalized[sorted_traj_idx]
             c = cm.RdYlGn(1 - cost_normalized)
-            result_i = mppi.rollout_results[sorted_traj_idx]
+            result_i = mppi.rollout_results[:, sorted_traj_idx]
             goal.viz_result(result_i, i, color=c, scale=0.002)
             rospy.sleep(0.01)  # needed otherwise messages get dropped :( I hate ROS...
 

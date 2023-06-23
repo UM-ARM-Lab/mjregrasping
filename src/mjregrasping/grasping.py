@@ -85,3 +85,9 @@ def activate_grasp(phy, name, loc, rope_body_indices):
         grasp_eq.data[0:3] = offset_body
         grasp_eq.data[3:6] = np.array([0, 0, 0.17])
         grasp_eq.data[6:10] = g_b_quat
+
+
+def get_finger_qs(phy):
+    leftgripper_q = phy.d.qpos[phy.m.actuator("leftgripper_vel").trnid[0]]
+    rightgripper_q = phy.d.qpos[phy.m.actuator("rightgripper_vel").trnid[0]]
+    return leftgripper_q, rightgripper_q

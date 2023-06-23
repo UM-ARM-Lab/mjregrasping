@@ -24,6 +24,8 @@ class MujocoMPPI:
         # dimensions of state and control
         self.temp = temp
 
+        # noise parameters
+        self.initial_noise_sigma = noise_sigma
         self.u_sigma_diag = np.ones(nu) * noise_sigma
         self.noise_rng = np.random.RandomState(seed)
 

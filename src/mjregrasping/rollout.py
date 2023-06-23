@@ -1,10 +1,9 @@
 import logging
-from concurrent.futures import ThreadPoolExecutor
-from typing import Tuple, List
 
 import mujoco
 import numpy as np
 
+import rerun as rr
 from mjregrasping.grasping import compute_eq_errors
 from mjregrasping.physics import Physics
 
@@ -18,37 +17,23 @@ def no_results(*args, **kwargs):
     return (None,)
 
 
-# noinspection PyTypeChecker
-def list_of_tuples_to_tuple_of_arrays(results: List[Tuple]) -> Tuple[np.array]:
-    return tuple(np.array(result) for result in zip(*results))
-
-
 def rollout(phy, controls, sub_time_s, get_result_func=no_results, get_result_args=None):
     if get_result_args is None:
         get_result_args = []
     # run for the initial data, so that the current state is returned in the output
-    results: List[Tuple] = [get_result_tuple(get_result_func, phy, *get_result_args)]
+    results = [get_result_func(phy, *get_result_args)]
 
     for t in range(controls.shape[0]):
         qvel_target = controls[t]
 
         control_step(phy, qvel_target, sub_time_s=sub_time_s)
 
-        result_tuple: Tuple = get_result_tuple(get_result_func, phy, *get_result_args)
+        results_t = get_result_func(phy, *get_result_args)
 
-        results.append(result_tuple)
+        results.append(results_t)
 
-    return list_of_tuples_to_tuple_of_arrays(results)
-
-
-def get_result_tuple(get_result_func, phy, *get_result_args):
-    result_tuple = get_result_func(phy, *get_result_args)
-
-    # make sure we copy otherwise the data gets overwritten
-    result_tuple = tuple(np.copy(result) for result in result_tuple)
-
-    return result_tuple
-
+    results = np.stack(results, dtype=object, axis=1)
+    return results
 
 def control_step(phy: Physics, qvel_target, sub_time_s: float):
     m = phy.m
@@ -93,8 +78,7 @@ def parallel_rollout(pool, phy, controls_samples, sub_time_s: float, get_result_
     # within a rollout you're not changing the _model_, so we use copy_data since it's faster
     args_sets = [(phy.copy_data(), controls, sub_time_s, get_result_func) for controls in controls_samples]
     futures = [pool.submit(rollout, *args) for args in args_sets]
-    results = [f.result() for f in futures]
-    results = tuple(np.array(result_i) for result_i in zip(*results))
+    results = np.stack([f.result() for f in futures], dtype=object, axis=1)
     return results
 
 

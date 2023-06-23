@@ -1,4 +1,5 @@
 import logging
+from functools import lru_cache
 from pathlib import Path
 
 import mujoco
@@ -6,7 +7,7 @@ import numpy as np
 import rerun as rr
 from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
-from trimesh.creation import box, cylinder, capsule
+from trimesh.creation import box, cylinder
 
 from mjregrasping.physics import Physics
 from mjregrasping.rviz import get_parent_child_names, MujocoXmlMeshParser
@@ -39,7 +40,8 @@ class MjReRun:
 
         rr.log_scalar(f'contact/num_contacts', len(phy.d.contact))
 
-        # self.viz_bodies(phy.m, phy.d)
+        self.viz_bodies(phy.m, phy.d)
+        self.viz_contacts(phy)
 
     def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData):
         for geom_id in range(m.ngeom):
@@ -50,33 +52,56 @@ class MjReRun:
             entity_name = f"{parent_name}/{child_name}"
 
             if geom_type == mjtGeom.mjGEOM_BOX:
-                log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
+                # log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
+                log_bbox_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_CYLINDER:
-                log_cylinder(entity_name, m.geom(geom_id), d.geom(geom_id))
+                pass
+                # log_cylinder(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_CAPSULE:
                 log_capsule(entity_name, m.geom(geom_id), d.geom(geom_id))
                 pass
             elif geom_type == mjtGeom.mjGEOM_SPHERE:
                 log_sphere(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_MESH:
-                mesh_name = mj_id2name(m, mujoco.mjtObj.mjOBJ_MESH, geom.dataid)
-                # skip the model prefix, e.g. val/my_mesh
-                if '/' in mesh_name:
-                    mesh_name = mesh_name.split("/")[1]
-                mesh_file = Path(self.mj_xml_parser.get_mesh(mesh_name))
-                mesh_file = mesh_file.stem + ".glb"
-                if mesh_file is None:
-                    raise RuntimeError(f"Mesh {mesh_name} not found in XML file")
-                mesh_file = Path.home() / "mjregrasping_ws/src/mjregrasping/models/meshes" / mesh_file
-
-                if not mesh_file.exists():
-                    raise RuntimeError(f"Mesh {mesh_file} not found on disk")
+                mesh_file_contents = self.get_mesh_file_contents(geom, m)
                 # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
                 # has NO POS OR QUAT, but instead that info goes in the <body> tag
-                log_mesh(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), mesh_file)
+                log_mesh(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), mesh_file_contents)
             else:
-                logger.error(f"Unsupported geom type {geom_type}")
+                logger.debug(f"Unsupported geom type {geom_type}")
                 continue
+
+    @lru_cache
+    def get_mesh_file_contents(self, geom, m):
+        mesh_name = mj_id2name(m, mujoco.mjtObj.mjOBJ_MESH, geom.dataid)
+        # skip the model prefix, e.g. val/my_mesh
+        if '/' in mesh_name:
+            mesh_name = mesh_name.split("/")[1]
+        mesh_file = Path(self.mj_xml_parser.get_mesh(mesh_name))
+        mesh_file = mesh_file.stem + ".glb"
+        if mesh_file is None:
+            raise RuntimeError(f"Mesh {mesh_name} not found in XML file")
+        mesh_file = Path.home() / "mjregrasping_ws/src/mjregrasping/models/meshes" / mesh_file
+        if not mesh_file.exists():
+            raise RuntimeError(f"Mesh {mesh_file} not found on disk")
+        with open(mesh_file, 'rb') as f:
+            mesh_file_contents = f.read()
+        return mesh_file_contents
+
+    def viz_contacts(self, phy: Physics):
+        rr.log_cleared('contacts', recursive=True)
+        positions = []
+        radii = []
+        colors = []
+        for contact_idx, contact in enumerate(phy.d.contact):
+            positions.append(contact.pos)
+            radii.append(0.01)
+            colors.append((255, 0, 0, 128))
+
+        rr.log_points(entity_path="contacts",
+                      positions=positions,
+                      colors=colors,
+                      radii=radii)
 
 
 def make_entity_path(*names):
@@ -104,12 +129,21 @@ def log_plane(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
 
 def log_capsule(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     entity_path = make_entity_path(body_name, model.name)
-    transform = get_transform(data)
-    mesh = capsule(radius=model.size[0], height=2 * model.size[1], transform=transform, count=[6, 6])
-    rr.log_mesh(entity_path=entity_path,
-                positions=mesh.vertices,
-                indices=mesh.faces,
-                albedo_factor=model.rgba)
+    xmat = data.xmat.reshape(3, 3)
+    start = data.xpos - model.size[1] * xmat[:, 2]
+    end = data.xpos + model.size[1] * xmat[:, 2]
+    rr.log_line_strip(entity_path=entity_path + '/line',
+                      positions=np.stack([start, end]),
+                      stroke_width=model.size[0],
+                      color=tuple(model.rgba))
+    rr.log_point(entity_path=entity_path + '/start',
+                 position=start,
+                 radius=model.size[0],
+                 color=tuple(model.rgba))
+    rr.log_point(entity_path=entity_path + '/end',
+                 position=end,
+                 radius=model.size[0],
+                 color=tuple(model.rgba))
 
 
 def log_cylinder(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
@@ -122,6 +156,17 @@ def log_cylinder(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
                 albedo_factor=model.rgba)
 
 
+def log_line(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
+    entity_path = make_entity_path(body_name, model.name)
+    xmat = data.xmat.reshape(3, 3)
+    start = data.xpos - model.size[1] * xmat[:, 2]
+    end = data.xpos + model.size[1] * xmat[:, 2]
+    rr.log_line_strip(entity_path=entity_path,
+                      positions=np.stack([start, end]),
+                      stroke_width=model.size[0],
+                      color=tuple(model.rgba))
+
+
 def log_sphere(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     entity_path = make_entity_path(body_name, model.name)
     rr.log_point(entity_path=entity_path,
@@ -130,15 +175,9 @@ def log_sphere(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
                  color=tuple(model.rgba))
 
 
-def log_mesh(body_name, model, data, mesh_file):
+def log_mesh(body_name, model, data, mesh_file_contents):
     transform = get_transform(data)
     entity_path = make_entity_path(body_name, model.name)
-    if entity_path not in prim_mesh_cache:
-        with open(mesh_file, 'rb') as f:
-            mesh_file_contents = f.read()
-        prim_mesh_cache[entity_path] = mesh_file_contents
-    else:
-        mesh_file_contents = prim_mesh_cache[entity_path]
     rr.log_mesh_file(entity_path=entity_path,
                      mesh_format=rr.MeshFormat.GLB,
                      mesh_file=mesh_file_contents,
@@ -148,6 +187,17 @@ def log_mesh(body_name, model, data, mesh_file):
 def log_box_from_geom(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     transform = get_transform(data)
     log_box(make_entity_path(body_name, model.name), model.size * 2, transform, model.rgba)
+
+
+def log_bbox_from_geom(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
+    xquat = np.zeros(4)
+    mujoco.mju_mat2Quat(xquat, data.xmat)
+    entity_path = make_entity_path(body_name, model.name)
+    rr.log_obb(entity_path=entity_path,
+               half_size=model.size,
+               position=data.xpos,
+               rotation_q=xquat,
+               color=tuple(model.rgba))
 
 
 def log_box(entity_path, size, transform, color):

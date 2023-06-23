@@ -109,10 +109,15 @@ def get_results_common(objects: Objects, phy: Physics):
     joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
     joint_positions = phy.d.qpos[joint_indices_for_actuators]
     contact_cost = get_contact_cost(phy, objects)
-    left_tool_pos = phy.d.site('left_tool').xpos
-    right_tool_pos = phy.d.site('right_tool').xpos
+    left_tool_pos, right_tool_pos = get_tool_positions(phy)
     is_unstable = phy.d.warning.number.sum() > 0
     return left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable
+
+
+def get_tool_positions(phy):
+    left_tool_pos = phy.d.site('left_tool').xpos
+    right_tool_pos = phy.d.site('right_tool').xpos
+    return left_tool_pos, right_tool_pos
 
 
 def get_rope_points(phy, rope_body_indices):
