@@ -569,16 +569,21 @@ class RegraspGoal(MPPIGoal):
         left_tool_pos, right_tool_pos, _, contact_cost, is_unstable = get_results_common(self.objects, phy)
         is_grasping = get_is_grasping(phy.m)
         rope_points = get_rope_points(phy, self.objects.rope.body_indices)
-        leftgripper_q, rightgripper_q = get_finger_qs(phy)
+        finger_qs = get_finger_qs(phy)
         keypoint = get_keypoint(phy, self.op_goal.body_idx, self.op_goal.offset)
 
         return result(left_tool_pos, right_tool_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint,
-                      leftgripper_q,
-                      rightgripper_q)
+                      finger_qs)
 
-    def cost(self, results, exploration_weight):
-        left_tool_pos, right_tool_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, leftgripper_q, rightgripper_q = as_floats(
+    def cost(self, results, is_grasping0):
+        w_goal = self.viz.p.w_goal
+        w_regrasp = self.viz.p.w_regrasp_point
+        desired_grasp_locs = np.array([self.viz.p.left_regrasp_point, self.viz.p.right_regrasp_point])
+
+        left_tool_pos, right_tool_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs = as_floats(
             results)
+
+        desired_is_grasping = desired_grasp_locs > 0
 
         keypoint_dist = norm(keypoint - self.op_goal.goal_point, axis=-1)
 
@@ -586,31 +591,51 @@ class RegraspGoal(MPPIGoal):
 
         goal_cost = keypoint_dist * hp['point_dist_weight']
 
-        # Compute the minimum distance between each gripper and each point on the rope and min over rope points
-        # then mask by needs_grasp
+        maintain_finger_qs = np.array(
+            [hp['finger_q_open'] if is_g_i else hp['finger_q_closed'] for is_g_i in is_grasping0])
+        maintain_grasps_cost = (np.sum(np.abs(finger_qs - maintain_finger_qs), axis=-1))
+
+        # Exploration costs
+        desired_finger_qs = np.array(
+            [hp['finger_q_open'] if is_g_i else hp['finger_q_closed'] for is_g_i in desired_is_grasping])
+        maintain_grasps_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1))
+
         tool_pos = np.stack([left_tool_pos, right_tool_pos], axis=0)  # [n_g, 3]
         dists = pairwise_squared_distances(tool_pos, rope_points)  # [n_g, n_p]
         min_dists = dists.min(axis=-1)  # [n_g]
         not_grasping = np.logical_not(is_grasping)
-        min_dists_nongrasping = np.sum(min_dists * not_grasping, -1) * hp['grasp_weight'] * exploration_weight
+        min_dists_nongrasping = np.sum(min_dists * not_grasping, -1) * hp['grasp_weight']
 
-        # Encourage grasping the point we care about bringing to the goal
         controllability = norm(tool_pos - keypoint[None], axis=-1)
         controllability_nongrasping = np.sum(controllability * not_grasping, -1)
-        controllability_cost = controllability_nongrasping * hp['controllability_weight'] * exploration_weight
+        controllability_cost = controllability_nongrasping * hp['controllability_weight']
 
-        finger_error = abs(leftgripper_q - hp['desired_finger_q']) + abs(rightgripper_q - hp['desired_finger_q'])
-        finger_cost = finger_error * hp['finger_weight']
-        # TODO: what should the release cost be?
-        # finger_qs = np.stack([leftgripper_q, rightgripper_q], axis=-1)
-        # release_grasping = np.dot(is_grasping, 1 - finger_qs)  # 1 is fully open
-        # release_cost = release_grasping * exploration_weight
         release_cost = 0
 
-        return contact_cost, goal_cost, unstable_cost, finger_cost, min_dists_nongrasping, controllability_cost, release_cost
+        min_dists_nongrasping *= exploration_weight
+        controllability_cost *= exploration_weight
+        release_cost *= exploration_weight
 
-    def move_cost_names(self):
-        return ["contact", "goal", "unstable", "finger", "min_dists_nongrasping", "controllability", "release"]
+        return (
+            contact_cost,
+            unstable_cost,
+            w_goal * goal_cost,
+            w_goal * maintain_grasps_cost,
+            min_dists_nongrasping,
+            controllability_cost,
+            release_cost
+        )
+
+    def cost_names(self):
+        return [
+            "contact",
+            "unstable",
+            "goal",
+            "maintain_grasps_cost",
+            "min_dists_nongrasping",
+            "controllability",
+            "release",
+        ]
 
     def viz_result(self, result, idx: int, scale, color):
         left_tool_pos = as_float(result[0])

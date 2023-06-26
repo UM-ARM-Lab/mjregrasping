@@ -2,10 +2,11 @@ import time
 
 import numpy as np
 import rerun as rr
+from numpy.linalg import norm
 
 from mjregrasping.goals import as_float
 from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.grasping import gripper_idx_to_eq_name, get_finger_qs
+from mjregrasping.grasping import gripper_idx_to_eq_name
 from mjregrasping.mujoco_mppi import MujocoMPPI, softmax
 from mjregrasping.params import hp
 from mjregrasping.rerun_visualizer import log_line_with_std
@@ -34,7 +35,7 @@ class RegraspMPPI(MujocoMPPI):
         u_mu_square[-1] = 0
         self.u_mu = u_mu_square.reshape(-1)
 
-    def command(self, phy, goal, sub_time_s, num_samples, exploration_weight, viz=None):
+    def command(self, phy, goal, sub_time_s, num_samples, viz=None):
         u_sigma_diag_rep = np.tile(self.u_sigma_diag, self.horizon)
         u_sigma_mat = np.diagflat(u_sigma_diag_rep)
 
@@ -48,10 +49,10 @@ class RegraspMPPI(MujocoMPPI):
 
         self.rollout_results, self.cost, costs_by_term = self.regrasp_parallel_rollout(phy, goal, u_samples,
                                                                                        num_samples,
-                                                                                       sub_time_s, exploration_weight,
+                                                                                       sub_time_s,
                                                                                        viz=viz)
 
-        cost_term_names = goal.move_cost_names() + ['smoothness', 'ever_not_grasping']
+        cost_term_names = goal.cost_names() + ['smoothness', 'ever_not_grasping']
         for cost_term_name, costs_for_term in zip(cost_term_names, costs_by_term.T):
             rr.log_scalar(f'regrasp_goal/{cost_term_name}', np.mean(costs_for_term))
 
@@ -81,14 +82,14 @@ class RegraspMPPI(MujocoMPPI):
         command = u_mu_square[0]
         return command
 
-    def regrasp_parallel_rollout(self, phy, goal, u_samples, num_samples, sub_time_s, exploration_weight, viz):
+    def regrasp_parallel_rollout(self, phy, goal, u_samples, num_samples, sub_time_s, viz):
         u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
 
         if not viz.p.viz_planning:
             viz = None
 
         # We must also copy model here because EQs are going to be changing
-        args_sets = [(phy.copy_all(), self.rope_body_indices, goal, sub_time_s, exploration_weight, *args_i) for args_i
+        args_sets = [(phy.copy_all(), self.rope_body_indices, goal, sub_time_s, *args_i) for args_i
                      in
                      zip(u_samples_square, )]
 
@@ -119,16 +120,15 @@ class RegraspMPPI(MujocoMPPI):
         return results, costs, costs_by_term
 
 
-def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight, u_sample, viz=None):
+def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, u_sample, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """
     if viz:
         viz.viz(phy, is_planning=True)
 
     results_0 = goal.get_results(phy)
-    left_tool_pos, right_tool_pos = results_0[:2]
-    do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices)
-    # release_dynamics(phy)
+    do_grasp_dynamics(phy, rope_body_indices, results_0)
     results = [results_0]
+    is_grasping0 = results_0[3]
 
     costs = []
     for t, u in enumerate(u_sample):
@@ -140,7 +140,7 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
 
         # If we haven't created a new grasp, we should add the grasp cost
         # This encourages grasping as quickly as possible
-        costs_t = goal.cost(results_t, exploration_weight)
+        costs_t = goal.cost(results_t, is_grasping0)
 
         results.append(results_t)
         costs.append(costs_t)
@@ -152,7 +152,8 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
     costs = np.stack(costs, axis=0)
     per_time_cost = np.dot(gammas, np.sum(costs, axis=-1))
 
-    smoothness_costs = np.linalg.norm(u_sample[1:] - u_sample[:-1], axis=-1)
+    u_diff_normalized = (u_sample[1:] - u_sample[:-1]) / norm(u_sample[1:], axis=-1, keepdims=True)
+    smoothness_costs = norm(u_diff_normalized, axis=-1)
     smoothness_cost = np.dot(gammas[:-1], smoothness_costs) * hp['smoothness_weight']
 
     is_grasping = as_float(results[3])
@@ -167,54 +168,37 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
     return results, cost, costs_by_term
 
 
-def do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices):
+def do_grasp_dynamics(phy, rope_body_indices, results):
+    left_tool_pos = results[0]
+    right_tool_pos = results[1]
+    finger_qs = results[7]
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
-    new_grasp_i = None
-    for i, tool_pos in enumerate([left_tool_pos, right_tool_pos]):
+    for i, (tool_pos, finger_q) in enumerate(zip([left_tool_pos, right_tool_pos], finger_qs)):
         name = gripper_idx_to_eq_name(i)
         eq = phy.m.eq(name)
         is_grasping = bool(eq.active)
         if is_grasping:
-            continue
+            # if the finger is open, release
+            if finger_q > hp['finger_q_open']:
+                eq.active = 0
+        else:
+            # compute the loc [0, 1] of the closest point on the rope to the gripper
+            # to do this, finely discretize into a piecewise linear function that maps loc ∈ [0,1] to R^3
+            # then find the loc that minimizes the distance to the gripper
+            locs = np.linspace(0, 1, 25)
+            body_idx, offset, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs, rope_body_indices)
+            d = norm(tool_pos - xpos, axis=-1)
+            best_idx = d.argmin()
+            best_body_idx = body_idx[best_idx]
+            best_d = d[best_idx]
+            best_offset = offset[best_idx]
+            best_offset_body = np.array([best_offset, 0, 0])
+            # if we're close enough and gripper angle is small enough, activate the grasp constraint
+            if best_d < hp["grasp_goal_radius"] and finger_q < hp['finger_q_closed']:
+                eq.obj2id = best_body_idx
+                eq.active = 1
+                eq.data[3:6] = best_offset_body
+                did_new_grasp = True
 
-        # compute the loc [0, 1] of the closest point on the rope to the gripper
-        # to do this, finely discretize into a piecewise linear function that maps loc ∈ [0,1] to R^3
-        # then find the loc that minimizes the distance to the gripper
-        locs = np.linspace(0, 1, 25)
-        body_idx, offset, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs, rope_body_indices)
-        d = np.linalg.norm(tool_pos - xpos, axis=-1)
-        best_idx = d.argmin()
-        best_body_idx = body_idx[best_idx]
-        best_d = d[best_idx]
-        best_offset = offset[best_idx]
-        best_offset_body = np.array([best_offset, 0, 0])
-        # if we're close enough, activate the grasp constraint
-        if best_d < hp["grasp_goal_radius"]:
-            eq.obj2id = best_body_idx
-            eq.active = 1
-            eq.data[3:6] = best_offset_body
-            new_grasp_i = i
-            did_new_grasp = True
-
-    # if we made a new grasp, release the other hand
-    if did_new_grasp:
-        other_hand = 1 - new_grasp_i
-        other_eq = phy.m.eq(gripper_idx_to_eq_name(other_hand))
-        other_eq.active = 0
     return did_new_grasp
-
-
-def release_dynamics(phy):
-    leftgripper_q, rightgripper_q = get_finger_qs(phy)
-    left_eq = phy.m.eq('left')
-    right_eq = phy.m.eq('right')
-    did_release = False
-    if leftgripper_q > hp['open_finger_q'] and bool(left_eq.active):
-        left_eq.active = 0
-        did_release = True
-    if rightgripper_q > hp['open_finger_q'] and bool(right_eq.active):
-        right_eq.active = 0
-        did_release = True
-
-    return did_release

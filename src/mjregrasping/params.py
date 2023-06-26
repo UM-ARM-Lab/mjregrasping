@@ -1,3 +1,4 @@
+import numpy as np
 from mjregrasping.cfg import ParamsConfig
 
 from dynamic_reconfigure.encoding import Config
@@ -13,11 +14,11 @@ hp = {
     "weight_deactivation_thresh":         0.05,
     "cost_activation_thresh":             0.25,
     "grasp_weight":                       20.0,
-    "smoothness_weight":                  0.25,
-    "controllability_weight":             4.0,
+    "smoothness_weight":                  1.0,
+    "controllability_weight":             1.0,
     "finger_weight":                      1.0,
-    "desired_finger_q":                   0.10,
-    "open_finger_q":                      0.30,
+    "finger_q_open":                      0.30,
+    "finger_q_closed":                    0.15,
     "pull_cost_weight":                   0.005,
     "unstable_weight":                    100,
     "state_history_size":                 10,
@@ -48,25 +49,8 @@ hp = {
     "contact_exponent":                   0.5,
     "max_contact_cost":                   1,
     "contact_cost":                       3.0,
-    "f_eq_err_weight":                    4.0,
-    "f_goal_weight":                      2.0,
-    "f_final_goal_weight":                5.0,
-    "f_settle_weight":                    0.25,
-    "f_contact_weight":                   1.0,
-    "pull_gripper_to_goal_solref":        0.2,
-    "running_cost_weight":                0.02,
-    "point_dist_weight":                  2.0,
-    "needs_regrasp_again":                10,
     "frac_max_dq":                        0.5,
     "q_joint_weight":                     0.5,
-    "cma_sigma":                          0.3,
-    "cma_opts":                           {
-        'popsize':   5,
-        'seed':      1,
-        'maxfevals': 25,
-        'tolx':      1e-2,
-        'bounds':    [0, 1],
-    },
     "grasp_goal_radius":                  0.03,
 }
 
