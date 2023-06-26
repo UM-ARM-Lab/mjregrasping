@@ -310,7 +310,7 @@ class RegraspMPC:
         num_samples = hp['regrasp_n_samples']
 
         regrasp_goal = RegraspGoal(self.op_goal, hp['grasp_goal_radius'], self.objects, self.viz)
-        initial_exploration_weight = 0.02
+        initial_exploration_weight = 0.01
         exploration_weight = initial_exploration_weight
 
         # TODO: seed properly
@@ -324,6 +324,7 @@ class RegraspMPC:
         max_iters = 500
         sub_time_s = hp['plan_sub_time_s']
         warmstart_count = 0
+        regrasp_timer = 10
         self.viz.viz(phy)
         while True:
             if rospy.is_shutdown():
@@ -341,7 +342,7 @@ class RegraspMPC:
             if needs_regrasp:
                 print("trap detected!")
                 self.reset_trap_detection()
-                exploration_weight = np.clip(exploration_weight * 4, 0, 100)
+                exploration_weight = np.clip(exploration_weight * 4, 0, 25)
 
             while warmstart_count < hp['warmstart']:
                 command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, exploration_weight, viz=self.viz)
@@ -358,20 +359,25 @@ class RegraspMPC:
                 self.mov.render(phy.d)
 
             left_tool_pos, right_tool_pos = get_tool_positions(phy)
-            did_new_grasp = do_grasps_if_close(phy, left_tool_pos, right_tool_pos, self.rope_body_indices)
-            if did_new_grasp:
-                print("New grasp!")
-                self.reset_trap_detection()
-                warmstart_count = 0
-                mppi.reset()
-                exploration_weight = initial_exploration_weight
-            did_release = release_dynamics(phy)
-            if did_release:
-                print("Released!")
-                self.reset_trap_detection()
-                warmstart_count = 0
-                mppi.reset()
-                exploration_weight = initial_exploration_weight
+            if regrasp_timer == 0:  # only try to regrasp every so often
+                did_new_grasp = do_grasps_if_close(phy, left_tool_pos, right_tool_pos, self.rope_body_indices)
+                regrasp_timer = 10
+                if did_new_grasp:
+                    print("New grasp!")
+                    settle(phy, sub_time_s, self.viz)
+                    self.reset_trap_detection()
+                    warmstart_count = 0
+                    mppi.reset()
+                    exploration_weight = initial_exploration_weight
+                # did_release = release_dynamics(phy)
+                # if did_release:
+                #     print("Released!")
+                #     self.reset_trap_detection()
+                #     warmstart_count = 0
+                #     mppi.reset()
+                #     exploration_weight = initial_exploration_weight
+            else:
+                regrasp_timer -= 1
 
             mppi.roll()
 

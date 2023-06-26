@@ -43,9 +43,9 @@ class Untangle(Runner):
 
     def make_goal(self, phy, objects):
         goal_point = np.array([0.78, 0.04, 1.25])
-        goal_body_idx = -1
+        loc = 1
         # goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
-        goal = ObjectPointGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
+        goal = ObjectPointGoal(goal_point, 0.05, loc, objects, self.viz)
         return goal
 
 

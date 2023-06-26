@@ -67,7 +67,7 @@ hp = {
         'tolx':      1e-2,
         'bounds':    [0, 1],
     },
-    "grasp_goal_radius":                  0.035,
+    "grasp_goal_radius":                  0.03,
 }
 
 

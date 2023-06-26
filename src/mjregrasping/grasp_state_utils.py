@@ -1,5 +1,7 @@
 import numpy as np
 
+from mjregrasping.physics import Physics
+
 
 def grasp_location_to_indices(grasp_locations, rope_body_indices):
     grasp_indices = grasp_locations * (1 + rope_body_indices.max() - rope_body_indices.min()) + rope_body_indices.min()
@@ -23,3 +25,13 @@ def grasp_locations_to_indices_and_offsets(grasp_locations, rope_body_indices):
     grasp_indices = grasp_location_to_indices(grasp_locations, rope_body_indices)
     offsets = grasp_offset(grasp_indices, grasp_locations, rope_body_indices)
     return grasp_indices, offsets
+
+
+def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_locations, rope_body_indices):
+    grasp_indices = grasp_location_to_indices(grasp_locations, rope_body_indices)
+    offsets = grasp_offset(grasp_indices, grasp_locations, rope_body_indices)
+    body_xpos = phy.d.xpos[grasp_indices]
+    body_xmat = phy.d.xmat[grasp_indices].reshape(-1, 3, 3)
+    body_x_axis = body_xmat[:, :, 0]
+    xpos = body_xpos + body_x_axis * offsets[:, None]
+    return grasp_indices, offsets, xpos

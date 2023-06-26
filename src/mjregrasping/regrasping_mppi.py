@@ -4,8 +4,8 @@ import numpy as np
 import rerun as rr
 
 from mjregrasping.goals import as_float
-from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets
-from mjregrasping.grasping import gripper_idx_to_eq_name, deactivate_eq, get_finger_qs
+from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets_and_xpos
+from mjregrasping.grasping import gripper_idx_to_eq_name, get_finger_qs
 from mjregrasping.mujoco_mppi import MujocoMPPI, softmax
 from mjregrasping.params import hp
 from mjregrasping.rerun_visualizer import log_line_with_std
@@ -127,7 +127,7 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
     results_0 = goal.get_results(phy)
     left_tool_pos, right_tool_pos = results_0[:2]
     do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices)
-    release_dynamics(phy)
+    # release_dynamics(phy)
     results = [results_0]
 
     costs = []
@@ -170,6 +170,7 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, exploration_weight
 def do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices):
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
+    new_grasp_i = None
     for i, tool_pos in enumerate([left_tool_pos, right_tool_pos]):
         name = gripper_idx_to_eq_name(i)
         eq = phy.m.eq(name)
@@ -181,21 +182,26 @@ def do_grasps_if_close(phy, left_tool_pos, right_tool_pos, rope_body_indices):
         # to do this, finely discretize into a piecewise linear function that maps loc ∈ [0,1] to R^3
         # then find the loc that minimizes the distance to the gripper
         locs = np.linspace(0, 1, 25)
-        body_idx, offset = grasp_locations_to_indices_and_offsets(locs, rope_body_indices)
-        pos = phy.d.xpos[body_idx]
-        d = np.linalg.norm(tool_pos - pos, axis=-1)
+        body_idx, offset, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs, rope_body_indices)
+        d = np.linalg.norm(tool_pos - xpos, axis=-1)
         best_idx = d.argmin()
         best_body_idx = body_idx[best_idx]
         best_d = d[best_idx]
         best_offset = offset[best_idx]
-        offset_body = np.array([best_offset, 0, 0])
+        best_offset_body = np.array([best_offset, 0, 0])
         # if we're close enough, activate the grasp constraint
         if best_d < hp["grasp_goal_radius"]:
             eq.obj2id = best_body_idx
             eq.active = 1
-            eq.data[3:6] = offset_body
-            print(f'{offset_body=}')
+            eq.data[3:6] = best_offset_body
+            new_grasp_i = i
             did_new_grasp = True
+
+    # if we made a new grasp, release the other hand
+    if did_new_grasp:
+        other_hand = 1 - new_grasp_i
+        other_eq = phy.m.eq(gripper_idx_to_eq_name(other_hand))
+        other_eq.active = 0
     return did_new_grasp
 
 
