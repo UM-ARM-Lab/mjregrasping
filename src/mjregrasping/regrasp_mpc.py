@@ -54,14 +54,14 @@ class RegraspMPC:
 
         # TODO: seed properly
         mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=0, horizon=hp['regrasp_horizon'],
-                           noise_sigma=np.deg2rad(5),
+                           noise_sigma=np.deg2rad(2),
                            n_g=self.n_g, rope_body_indices=self.rope_body_indices, temp=hp['regrasp_temp'])
         mppi.reset()
         self.reset_trap_detection()
 
         itr = 0
         max_iters = 5000
-        sub_time_s = hp['plan_sub_time_s']
+        sub_time_s = hp['sub_time_s']
         warmstart_count = 0
         self.viz.viz(phy)
         while True:
@@ -75,11 +75,6 @@ class RegraspMPC:
             if regrasp_goal.satisfied(phy):
                 print("Goal reached!")
                 return True
-
-            needs_regrasp = self.check_needs_regrasp(phy.d)
-            if needs_regrasp:
-                print("trap detected!")
-                self.reset_trap_detection()
 
             while warmstart_count < hp['warmstart']:
                 command = mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)

@@ -7,10 +7,10 @@ import rerun as rr
 from numpy.linalg import norm
 
 from mjregrasping.body_with_children import Objects
-from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_action_cost, get_results_common, get_rope_points, \
     get_keypoint
-from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets
+from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets, \
+    grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_is_grasping, get_finger_qs
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -270,6 +270,13 @@ class ObjectPointGoal(MPPIGoal):
         self.viz_sphere(self.goal_point, self.goal_radius)
 
 
+def get_finger_cost(finger_qs, desired_is_grasping):
+    desired_finger_qs = np.array(
+        [hp['finger_q_closed'] if is_g_i else hp['finger_q_open'] for is_g_i in desired_is_grasping])
+    finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1))
+    return finger_cost
+
+
 class RegraspGoal(MPPIGoal):
 
     def __init__(self, op_goal, grasp_goal_radius, objects, viz: Viz):
@@ -296,15 +303,20 @@ class RegraspGoal(MPPIGoal):
         finger_qs = get_finger_qs(phy)
         keypoint = get_keypoint(phy, self.op_goal.body_idx, self.op_goal.offset)
 
+        desired_regrasp_locs = np.array([self.viz.p.left_regrasp_point, self.viz.p.right_regrasp_point])
+        _, _, desired_regrasp_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, desired_regrasp_locs,
+                                                                                     self.objects.rope.body_indices)
+
         return result(left_tool_pos, right_tool_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint,
-                      finger_qs)
+                      finger_qs, desired_regrasp_xpos)
 
     def cost(self, results, is_grasping0):
-        w_goal = self.viz.p.w_goal
-        w_regrasp = self.viz.p.w_regrasp_point
+        w_goal = self.viz.p.config['w_goal']
+        w_regrasp = self.viz.p.config['w_regrasp_point']
         desired_grasp_locs = np.array([self.viz.p.left_regrasp_point, self.viz.p.right_regrasp_point])
 
-        left_tool_pos, right_tool_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs = as_floats(
+        # TODO: return matrix of tool positions, this assumes 2 grippers
+        left_tool_pos, right_tool_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, desired_regrasp_xpos = as_floats(
             results)
 
         desired_is_grasping = desired_grasp_locs > 0
@@ -313,41 +325,25 @@ class RegraspGoal(MPPIGoal):
 
         unstable_cost = is_unstable * hp['unstable_weight']
 
-        goal_cost = keypoint_dist * hp['point_dist_weight']
+        goal_cost = keypoint_dist * hp['goal_weight']
 
-        maintain_finger_qs = np.array(
-            [hp['finger_q_open'] if is_g_i else hp['finger_q_closed'] for is_g_i in is_grasping0])
-        maintain_grasps_cost = (np.sum(np.abs(finger_qs - maintain_finger_qs), axis=-1))
+        maintain_grasps_cost = get_finger_cost(finger_qs, is_grasping0) * hp['finger_weight']
 
         # Exploration costs
-        desired_finger_qs = np.array(
-            [hp['finger_q_open'] if is_g_i else hp['finger_q_closed'] for is_g_i in desired_is_grasping])
-        maintain_grasps_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1))
+        regrasp_finger_cost = get_finger_cost(finger_qs, desired_is_grasping) * hp['finger_weight']
 
         tool_pos = np.stack([left_tool_pos, right_tool_pos], axis=0)  # [n_g, 3]
-        dists = pairwise_squared_distances(tool_pos, rope_points)  # [n_g, n_p]
-        min_dists = dists.min(axis=-1)  # [n_g]
-        not_grasping = np.logical_not(is_grasping)
-        min_dists_nongrasping = np.sum(min_dists * not_grasping, -1) * hp['grasp_weight']
-
-        controllability = norm(tool_pos - keypoint[None], axis=-1)
-        controllability_nongrasping = np.sum(controllability * not_grasping, -1)
-        controllability_cost = controllability_nongrasping * hp['controllability_weight']
-
-        release_cost = 0
-
-        min_dists_nongrasping *= exploration_weight
-        controllability_cost *= exploration_weight
-        release_cost *= exploration_weight
+        regrasp_dists = norm(desired_regrasp_xpos - tool_pos, axis=-1)
+        needs_grasp = desired_is_grasping * (1 - is_grasping)
+        regrasp_pos_cost = np.sum(regrasp_dists * needs_grasp, -1) * hp['regrasp_weight']
 
         return (
             contact_cost,
             unstable_cost,
             w_goal * goal_cost,
             w_goal * maintain_grasps_cost,
-            min_dists_nongrasping,
-            controllability_cost,
-            release_cost
+            w_regrasp * regrasp_finger_cost,
+            w_regrasp * regrasp_pos_cost,
         )
 
     def cost_names(self):
@@ -356,9 +352,8 @@ class RegraspGoal(MPPIGoal):
             "unstable",
             "goal",
             "maintain_grasps_cost",
-            "min_dists_nongrasping",
-            "controllability",
-            "release",
+            "regrasp_finger_cost",
+            "regrasp_pos_cost",
         ]
 
     def viz_result(self, result, idx: int, scale, color):

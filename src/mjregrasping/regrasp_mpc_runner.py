@@ -55,13 +55,13 @@ class Runner:
             goal = self.make_goal(phy, objects)
 
             with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-                from time import perf_counter
-                t0 = perf_counter()
+                self.viz.p.w_goal = 1.0
+                self.viz.p.w_regrasp_point = 0.0
+                self.viz.p.update()
+
                 mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=self.viz, goal=goal, objects=objects, seed=seed,
                                  mov=mov)
-                result = mpc.run(phy)
-                logger.info(f'dt: {perf_counter() - t0:.4f}')
-                logger.info(f"{seed=} {result=}")
+                mpc.run(phy)
 
             mov.close()
     def make_goal(self, objects):

@@ -152,7 +152,9 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, u_sample, viz=None
     costs = np.stack(costs, axis=0)
     per_time_cost = np.dot(gammas, np.sum(costs, axis=-1))
 
-    u_diff_normalized = (u_sample[1:] - u_sample[:-1]) / norm(u_sample[1:], axis=-1, keepdims=True)
+    # FIXME: do a better smoothness cost that is more than just one time step, do the full correlation or something
+    #  also how do we treat magnitude vs direction?
+    u_diff_normalized = (u_sample[1:] - u_sample[:-1])
     smoothness_costs = norm(u_diff_normalized, axis=-1)
     smoothness_cost = np.dot(gammas[:-1], smoothness_costs) * hp['smoothness_weight']
 

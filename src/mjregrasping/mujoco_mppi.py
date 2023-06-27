@@ -8,8 +8,8 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def softmax(x, temp):
-    x = x / temp
     x = x - x.max()
+    x = x / temp
     z = np.exp(x)
     return z / z.sum()
 
