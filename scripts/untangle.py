@@ -3,7 +3,7 @@ import logging
 
 import numpy as np
 
-from mjregrasping.body_with_children import Object
+from mjregrasping.mujoco_objects import Object
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
@@ -41,11 +41,11 @@ class Untangle(Runner):
         robot_q2[-1] = 0.05  # close right gripper
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
-    def make_goal(self, phy, objects):
+    def make_goal(self, phy):
         goal_point = np.array([0.78, 0.04, 1.25])
         loc = 1
-        # goal = CombinedGoal(goal_point, 0.05, goal_body_idx, objects, self.viz)
-        goal = ObjectPointGoal(goal_point, 0.05, loc, objects, self.viz)
+        # goal = CombinedGoal(goal_point, 0.05, goal_body_idx, self.viz)
+        goal = ObjectPointGoal(goal_point, 0.05, loc, self.viz)
         return goal
 
 

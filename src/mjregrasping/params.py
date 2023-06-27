@@ -15,7 +15,7 @@ hp = {
     "finger_weight":                      0.25,
     "smoothness_weight":                  0.04,
     "controllability_weight":             1.0,
-    "finger_q_open":                      0.30,
+    "finger_q_open":                      0.4
     "finger_q_closed":                    0.07,
     "unstable_weight":                    100,
     "state_history_size":                 10,

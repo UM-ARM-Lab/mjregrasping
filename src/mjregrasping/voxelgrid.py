@@ -2,7 +2,7 @@ import mujoco
 import numpy as np
 
 import rospy
-from mjregrasping.body_with_children import Objects
+from mjregrasping.mujoco_objects import Objects
 from mjregrasping.physics import Physics
 from visualization_msgs.msg import MarkerArray
 

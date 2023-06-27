@@ -4,7 +4,7 @@ import logging
 import numpy as np
 from transformations import quaternion_from_euler
 
-from mjregrasping.body_with_children import Object
+from mjregrasping.mujoco_objects import Object
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
@@ -39,10 +39,10 @@ class Pull(Runner):
         robot_q2[9] = 0.1
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
-    def make_goal(self, phy, objects):
+    def make_goal(self, phy):
         goal_point = np.array([0.8, 0.21, 0.2])
         goal_rope_loc = 1
-        goal = ObjectPointGoal(goal_point, 0.03, goal_rope_loc, objects, self.viz)
+        goal = ObjectPointGoal(goal_point, 0.03, goal_rope_loc, self.viz)
         return goal
 
 

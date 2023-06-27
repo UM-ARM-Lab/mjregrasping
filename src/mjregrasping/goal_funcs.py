@@ -4,7 +4,7 @@ import logging
 import numpy as np
 from numpy.linalg import norm
 
-from mjregrasping.body_with_children import Objects
+from mjregrasping.mujoco_objects import Objects
 from mjregrasping.geometry import point_to_line_segment
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -75,18 +75,18 @@ def compute_ring_vecs(ring_position, ring_z_axis, R):
     return dx, x
 
 
-def get_contact_cost(phy: Physics, objects: Objects):
+def get_contact_cost(phy: Physics):
     # TODO: use SDF to compute near-contact cost to avoid getting too close
     # doing the contact cost calculation here means we don't need to return the entire data.contact array,
     # which makes things simpler and possibly faster, since this operation can't be easily vectorized.
-    all_obstacle_geoms = objects.obstacle.geom_names + ['floor']
+    all_obstacle_geoms = phy.o.obstacle.geom_names + ['floor']
     contact_cost = 0
     for contact in phy.d.contact:
         geom_name1 = phy.m.geom(contact.geom1).name
         geom_name2 = phy.m.geom(contact.geom2).name
-        if (geom_name1 in all_obstacle_geoms and geom_name2 in objects.val_collision_geom_names) or \
-                (geom_name2 in all_obstacle_geoms and geom_name1 in objects.val_collision_geom_names) or \
-                val_self_collision(geom_name1, geom_name2, objects):
+        if (geom_name1 in all_obstacle_geoms and geom_name2 in phy.o.val_collision_geom_names) or \
+                (geom_name2 in all_obstacle_geoms and geom_name1 in phy.o.val_collision_geom_names) or \
+                val_self_collision(geom_name1, geom_name2, phy.o):
             contact_cost += 1
     max_expected_contacts = 6.0
     contact_cost /= max_expected_contacts
@@ -105,19 +105,19 @@ def get_action_cost(joint_positions):
     return action_cost
 
 
-def get_results_common(objects: Objects, phy: Physics):
+def get_results_common(phy: Physics):
     joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
     joint_positions = phy.d.qpos[joint_indices_for_actuators]
-    contact_cost = get_contact_cost(phy, objects)
-    left_tool_pos, right_tool_pos = get_tool_positions(phy)
+    contact_cost = get_contact_cost(phy)
+    tools_pos = get_tool_positions(phy)
     is_unstable = phy.d.warning.number.sum() > 0
-    return left_tool_pos, right_tool_pos, joint_positions, contact_cost, is_unstable
+    return tools_pos, joint_positions, contact_cost, is_unstable
 
 
 def get_tool_positions(phy):
     left_tool_pos = phy.d.site('left_tool').xpos
     right_tool_pos = phy.d.site('right_tool').xpos
-    return left_tool_pos, right_tool_pos
+    return np.stack([left_tool_pos, right_tool_pos], 0)
 
 
 def get_rope_points(phy, rope_body_indices):
@@ -167,3 +167,10 @@ def get_keypoint(phy, body_idx, offset):
     xmat = phy.d.body(body_idx).xmat.reshape(3, 3)
     keypoint = phy.d.xpos[body_idx] + xmat[:, 0] * offset
     return keypoint
+
+
+def get_finger_cost(finger_qs, desired_is_grasping):
+    desired_finger_qs = np.array(
+        [0.75 * hp['finger_q_closed'] if is_g_i else 1.25 * hp['finger_q_open'] for is_g_i in desired_is_grasping])
+    finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1))
+    return finger_cost

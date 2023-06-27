@@ -3,8 +3,7 @@ import logging
 import mujoco
 import numpy as np
 
-import rerun as rr
-from mjregrasping.grasping import compute_eq_errors
+from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.physics import Physics
 
 MAX_VEL_TILL_ERROR_RAD = np.deg2rad(3)
@@ -34,6 +33,7 @@ def rollout(phy, controls, sub_time_s, get_result_func=no_results, get_result_ar
 
     results = np.stack(results, dtype=object, axis=1)
     return results
+
 
 def control_step(phy: Physics, qvel_target, sub_time_s: float):
     m = phy.m

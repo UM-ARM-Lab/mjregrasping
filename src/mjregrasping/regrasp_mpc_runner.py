@@ -9,7 +9,6 @@ import rerun as rr
 
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.body_with_children import Objects
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
@@ -40,9 +39,8 @@ class Runner:
     def run(self, seeds, obstacle_name):
         for seed in seeds:
             m = mujoco.MjModel.from_xml_path(self.xml_path)
-            objects = Objects(m, obstacle_name)
             d = mujoco.MjData(m)
-            phy = Physics(m, d)
+            phy = Physics(m, d, obstacle_name)
 
             self.setup_scene(phy, self.viz)
 
@@ -52,26 +50,26 @@ class Runner:
             logger.info(f"Saving movie to {mov_path}")
             mov.start(mov_path, fps=12)
 
-            goal = self.make_goal(phy, objects)
+            goal = self.make_goal(phy)
 
             with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
                 self.viz.p.w_goal = 1.0
                 self.viz.p.w_regrasp_point = 0.0
                 self.viz.p.update()
 
-                mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=self.viz, goal=goal, objects=objects, seed=seed,
+                mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=self.viz, goal=goal, seed=seed,
                                  mov=mov)
                 mpc.run(phy)
 
             mov.close()
-    def make_goal(self, objects):
+    def make_goal(self):
         raise NotImplementedError()
         # goal = ObjectPointGoal(dfield=None,
         #                        viz=self.viz,
         #                        goal_point=goal_point,
         #                        body_idx=goal_body_idx,
         #                        goal_radius=0.05,
-        #                        objects=objects)
+        #                        )
 
     def setup_scene(self, phy: Physics, viz: Viz):
         pass

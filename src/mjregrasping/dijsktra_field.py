@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 
 import rospy
-from mjregrasping.body_with_children import Objects
+from mjregrasping.mujoco_objects import Objects
 from mjregrasping.physics import Physics
 from mjregrasping.voxelgrid import VoxelGrid, point_to_idx
 from visualization_msgs.msg import Marker, MarkerArray

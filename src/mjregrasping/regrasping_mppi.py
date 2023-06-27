@@ -6,7 +6,7 @@ from numpy.linalg import norm
 
 from mjregrasping.goals import as_float
 from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.grasping import gripper_idx_to_eq_name
+from mjregrasping.grasping import get_grasp_constraints
 from mjregrasping.mujoco_mppi import MujocoMPPI, softmax
 from mjregrasping.params import hp
 from mjregrasping.rerun_visualizer import log_line_with_std
@@ -16,10 +16,9 @@ from mjregrasping.rollout import control_step
 class RegraspMPPI(MujocoMPPI):
     """ The regrasping problem has a slightly different action representation and rollout function """
 
-    def __init__(self, pool, nu, seed, horizon, noise_sigma, n_g, rope_body_indices, temp=1.):
+    def __init__(self, pool, nu, seed, horizon, noise_sigma, n_g, temp=1.):
         # TODO: add an additional gripper action for releasing initially
         super().__init__(pool, nu, seed, horizon, noise_sigma, temp, None)
-        self.rope_body_indices = rope_body_indices
         self.n_g = n_g  # number of grippers
         self.rng = np.random.RandomState(seed)
         self.u_sigma_diag = np.ones(nu) * self.initial_noise_sigma
@@ -89,9 +88,7 @@ class RegraspMPPI(MujocoMPPI):
             viz = None
 
         # We must also copy model here because EQs are going to be changing
-        args_sets = [(phy.copy_all(), self.rope_body_indices, goal, sub_time_s, *args_i) for args_i
-                     in
-                     zip(u_samples_square, )]
+        args_sets = [(phy.copy_all(), goal, sub_time_s, *args_i) for args_i in zip(u_samples_square, )]
 
         if viz:
             results = []
@@ -120,15 +117,15 @@ class RegraspMPPI(MujocoMPPI):
         return results, costs, costs_by_term
 
 
-def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, u_sample, viz=None):
+def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """
     if viz:
         viz.viz(phy, is_planning=True)
 
     results_0 = goal.get_results(phy)
-    do_grasp_dynamics(phy, rope_body_indices, results_0)
+    do_grasp_dynamics(phy, results_0)
     results = [results_0]
-    is_grasping0 = results_0[3]
+    is_grasping0 = results_0[2]
 
     costs = []
     for t, u in enumerate(u_sample):
@@ -158,7 +155,7 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, u_sample, viz=None
     smoothness_costs = norm(u_diff_normalized, axis=-1)
     smoothness_cost = np.dot(gammas[:-1], smoothness_costs) * hp['smoothness_weight']
 
-    is_grasping = as_float(results[3])
+    is_grasping = as_float(results[2])
     no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
     ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping']
 
@@ -170,15 +167,13 @@ def regrasp_rollout(phy, rope_body_indices, goal, sub_time_s, u_sample, viz=None
     return results, cost, costs_by_term
 
 
-def do_grasp_dynamics(phy, rope_body_indices, results):
-    left_tool_pos = results[0]
-    right_tool_pos = results[1]
-    finger_qs = results[7]
+def do_grasp_dynamics(phy, results):
+    tools_pos = results[0]
+    finger_qs = results[6]
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
-    for i, (tool_pos, finger_q) in enumerate(zip([left_tool_pos, right_tool_pos], finger_qs)):
-        name = gripper_idx_to_eq_name(i)
-        eq = phy.m.eq(name)
+    eqs = get_grasp_constraints(phy.m)
+    for tool_pos, finger_q, eq in zip(tools_pos, finger_qs, eqs):
         is_grasping = bool(eq.active)
         if is_grasping:
             # if the finger is open, release
@@ -189,7 +184,7 @@ def do_grasp_dynamics(phy, rope_body_indices, results):
             # to do this, finely discretize into a piecewise linear function that maps loc ∈ [0,1] to R^3
             # then find the loc that minimizes the distance to the gripper
             locs = np.linspace(0, 1, 25)
-            body_idx, offset, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs, rope_body_indices)
+            body_idx, offset, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
             d = norm(tool_pos - xpos, axis=-1)
             best_idx = d.argmin()
             best_body_idx = body_idx[best_idx]
