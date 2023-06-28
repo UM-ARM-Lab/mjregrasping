@@ -60,8 +60,7 @@ class Runner:
                 mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=self.viz, goal=goal, seed=seed,
                                  mov=mov)
                 mpc.run(phy)
-
-            mov.close()
+                mpc.close()
     def make_goal(self):
         raise NotImplementedError()
         # goal = ObjectPointGoal(dfield=None,

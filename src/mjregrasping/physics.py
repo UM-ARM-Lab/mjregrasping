@@ -1,4 +1,5 @@
 from copy import copy
+from typing import Optional
 
 import mujoco
 
@@ -10,11 +11,12 @@ class Physics:
     d: mujoco.MjData
     o: Objects
 
-    def __init__(self, m: mujoco.MjModel, d: mujoco.MjData, obstacle_name):
+    def __init__(self, m: mujoco.MjModel, d: mujoco.MjData, obstacle_name: Optional[str] = None):
         self.m = m
         self.d = d
         self.obstacle_name = obstacle_name
-        self.o = Objects(m, obstacle_name)
+        if obstacle_name is not None:
+            self.o = Objects(m, obstacle_name)
 
     def __copy__(self):
         raise NotImplementedError("Use .copy_data() or .copy_all() to avoid ambiguity")

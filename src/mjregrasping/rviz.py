@@ -13,7 +13,7 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics
-from mjregrasping.ring_utils import make_ring_mat
+from mjregrasping.magnetic_fields import make_ring_mat
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -427,6 +427,7 @@ def plot_ring_rviz(pub, ring_position, ring_z_axis, radius, idx=0):
 
     for x_i in x:
         ring_msg.points.append(Point(x_i[0], x_i[1], x_i[2]))
+    ring_msg.points.append(ring_msg.points[0])
     markers_msg = MarkerArray()
     markers_msg.markers.append(ring_msg)
 

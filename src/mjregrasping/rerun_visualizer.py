@@ -15,15 +15,19 @@ from mjregrasping.rviz import get_parent_child_names, MujocoXmlMeshParser
 logger = logging.getLogger(f'rosout.{__name__}')
 
 
+def init():
+    rr.set_time_seconds('sim_time', 0.0)
+    rr.log_view_coordinates("world", up="+Z", timeless=True)
+    rr.log_arrow('world_x', [0, 0, 0], [1, 0, 0], color=(255, 0, 0), width_scale=0.02)
+    rr.log_arrow('world_y', [0, 0, 0], [0, 1, 0], color=(0, 255, 0), width_scale=0.02)
+    rr.log_arrow('world_z', [0, 0, 0], [0, 0, 1], color=(0, 0, 255), width_scale=0.02)
+
+
 class MjReRun:
 
     def __init__(self, xml_path):
         self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
-        rr.set_time_seconds('sim_time', 0.0)
-        rr.log_view_coordinates("world", up="+Z", timeless=True)
-        rr.log_arrow('world_x', [0, 0, 0], [1, 0, 0], color=(255, 0, 0), width_scale=0.02)
-        rr.log_arrow('world_y', [0, 0, 0], [0, 1, 0], color=(0, 255, 0), width_scale=0.02)
-        rr.log_arrow('world_z', [0, 0, 0], [0, 0, 1], color=(0, 0, 255), width_scale=0.02)
+        init()
 
     def viz(self, phy: Physics):
         rr.set_time_seconds('sim_time', phy.d.time)

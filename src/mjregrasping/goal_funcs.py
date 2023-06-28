@@ -8,71 +8,8 @@ from mjregrasping.mujoco_objects import Objects
 from mjregrasping.geometry import point_to_line_segment
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.ring_utils import make_ring_mat
 
 logger = logging.getLogger(f'rosout.{__name__}')
-
-
-def compute_threading_dir(ring_position, ring_z_axis, R, p, I=1, mu=1):
-    """
-    Compute the direction of a virtual magnetic field that will pull the rope through the ring.
-
-    Args:
-        ring_position: [3] The position of the origin of the ring in world coordinates
-        ring_z_axis: [3] The axis point out up and out of the ring in world coordinates
-        R: [1] radius of the ring in meters.
-        p: [b, 3] the positions at which you want to compute the field
-        I: [1] current, higher means stronger field. If you only care about direction, using 1 is fine.
-        mu: [1] another scalar that controls the strength of the field. If you only care about direction, using 1 is fine.
-
-    Returns:
-        [b, 3] the direction of the field at p
-
-    """
-    dx, x = compute_ring_vecs(ring_position, ring_z_axis, R)
-    # We need a batch cross product
-    b = p.shape[0]
-    n = dx.shape[0]
-    dx_repeated = np.repeat(dx[None], b, axis=0)
-    x_repeated = np.repeat(x[None], b, axis=0)
-    p_repeated = np.repeat(p[:, None], n, axis=1)
-    dp_repeated = p_repeated - x_repeated
-    cross_product = np.cross(dx_repeated, dp_repeated)
-    db = I * R * cross_product / np.linalg.norm(dp_repeated, axis=-1, keepdims=True) ** 3
-    b = np.sum(db, axis=-2)
-    b *= mu / (4 * np.pi)
-
-    return b
-
-
-def compute_ring_vecs(ring_position, ring_z_axis, R):
-    """
-    Compute the direction sub-quantities needed for compute_threading_dir
-
-    Args:
-        ring_position: [3] The position of the origin of the ring in world coordinates
-        ring_z_axis: [3] The axis point out up and out of the ring in world coordinates
-        R: [1] radius of the ring in meters.
-
-    Returns:
-        [n, 3] the direction of the conductor (ring) at each ring point
-        [n, 3] the position of the ring points
-
-    """
-    delta_angle = 0.1
-    angles = np.arange(0, 2 * np.pi, delta_angle)
-    zeros = np.zeros_like(angles)
-    ones = np.ones_like(angles)
-    x = np.stack([R * np.cos(angles), R * np.sin(angles), zeros, ones], -1)
-    ring_mat = make_ring_mat(ring_position, ring_z_axis)
-    x = (x @ ring_mat.T)[:, :3]
-    zeros = np.zeros_like(angles)
-    dx = np.stack([-np.sin(angles), np.cos(angles), zeros], -1)
-    # only rotate here
-    ring_rot = ring_mat.copy()[:3, :3]
-    dx = (dx @ ring_rot.T)
-    dx = dx / np.linalg.norm(dx, axis=-1, keepdims=True)  # normalize
-    return dx, x
 
 
 def get_contact_cost(phy: Physics):
@@ -170,7 +107,8 @@ def get_keypoint(phy, body_idx, offset):
 
 
 def get_finger_cost(finger_qs, desired_is_grasping):
+    # 2
     desired_finger_qs = np.array(
-        [0.75 * hp['finger_q_closed'] if is_g_i else 1.25 * hp['finger_q_open'] for is_g_i in desired_is_grasping])
+        [hp['finger_q_closed'] if is_g_i else 2 * hp['finger_q_open'] for is_g_i in desired_is_grasping])
     finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1))
     return finger_cost

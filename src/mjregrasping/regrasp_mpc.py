@@ -67,6 +67,8 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
+            self.get_mab_reward(phy)
+
             while warmstart_count < hp['warmstart']:
                 command = self.mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
                 self.mppi_viz(self.mppi, regrasp_goal, phy, command, sub_time_s)
@@ -85,8 +87,7 @@ class RegraspMPC:
             did_new_grasp = do_grasp_dynamics(phy, results)
             if did_new_grasp:
                 print("New grasp!")
-                settle(phy, sub_time_s, self.viz, is_planning=False, ctrl=phy.d.ctrl)
-                self.reset_trap_detection()
+                settle(phy, sub_time_s, self.viz, is_planning=False)
                 warmstart_count = 0
                 self.mppi.reset()
 
@@ -94,23 +95,19 @@ class RegraspMPC:
 
             itr += 1
 
-    def check_needs_regrasp(self, phy):
+    def get_mab_reward(self, phy):
         latest_q = self.get_q_for_trap_detection(phy)
         self.state_history.insert(latest_q)
         qs = np.array(self.state_history.data)
-        if len(qs) < 2:
-            dq = 0
-        else:
+        if self.state_history.full():
             # distance between the newest and oldest q in the buffer
             # the mean takes the average across joints.
             dq = (np.abs(qs[-1] - qs[0]) / len(self.state_history)).mean()
-        self.max_dq = max(self.max_dq, dq)
-        has_not_moved = dq < hp['frac_max_dq'] * self.max_dq
-        needs_regrasp = self.state_history.full() and has_not_moved
-        rr.log_scalar('needs_regrasp/dq', dq, color=[0, 255, 0])
-        rr.log_scalar('needs_regrasp/max_dq', self.max_dq, color=[0, 0, 255])
-        rr.log_scalar('needs_regrasp/dq_threshold', self.max_dq * hp['frac_max_dq'], color=[255, 0, 0])
-        return needs_regrasp
+            self.max_dq = max(self.max_dq, dq)
+            frac_dq = dq / self.max_dq
+            rr.log_scalar('mab/dq', dq, color=[0, 255, 0])
+            rr.log_scalar('mab/max_dq', self.max_dq, color=[0, 0, 255])
+            rr.log_scalar('mab/frac_dq', frac_dq, color=[255, 0, 255])
 
     def get_q_for_trap_detection(self, phy):
         return np.concatenate(

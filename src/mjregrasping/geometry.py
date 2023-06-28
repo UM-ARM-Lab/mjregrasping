@@ -31,11 +31,15 @@ def pairwise_squared_distances(a, b):
     return dist
 
 
+def squared_norm(x, **kwargs):
+    return np.sum(np.square(x), axis=-1, **kwargs)
+
+
 def main():
     p1 = np.array([0, 0])
     p2 = np.array([1, 0.2])
     p3 = np.array([0.5, -0.1])
-    nearest_point, _ = dist(p1, p2, p3)
+    nearest_point, _ = point_to_line_segment(p1, p2, p3)
 
     plt.axis("equal")
     plt.plot([p1[0], p2[0]], [p1[1], p2[1]], 'k-')

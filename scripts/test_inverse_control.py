@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import logging
+from time import perf_counter
 
 import mujoco
 import numpy as np
@@ -7,6 +8,7 @@ import rerun as rr
 
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
+from mjregrasping.ik import position_jacobian
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
@@ -32,48 +34,25 @@ def main():
     phy = Physics(m, d)
     mujoco.mj_forward(phy.m, phy.d)
 
-    for i in range(350):
-        # compute the "end-effector" jacobian which relates the
-        # joint velocities to the end-effector velocity
-        # where the ee_offset specifies the location/offset from the end-effector body
-        ee_offset = np.zeros(3)
-        body_idx = phy.m.body("drive50").id
-        Jp = np.zeros((3, phy.m.nv))
-        Jr = np.zeros((3, phy.m.nv))
-        mujoco.mj_jac(m, d, Jp, Jr, ee_offset, body_idx)
-        J = np.concatenate((Jp, -Jr), axis=0)
-        deduplicated_indices = np.array([0, 1,
-                                         2, 3, 4, 5, 6, 7, 8,
-                                         9,
-                                         11, 12, 13, 14, 15, 16, 17,
-                                         18])
-        J = J[:, deduplicated_indices]
-        J_T = J.T
+    body_idx = phy.m.body("drive10").id
+    target_point = np.array([1.046, 0.13, 0.1])
+    current_target_point = target_point
+    rng = np.random.RandomState(0)
+    t0 = perf_counter()
 
-        target_point = np.array([1.0, 0.0, 0.5])
-        # TODO: account for ee_offset here
-        current_ee_pos = phy.d.body("drive50").xpos
-        ee_vel_p = target_point - current_ee_pos  # Order of subtraction matters here!
-        ee_vel = np.concatenate((ee_vel_p, np.zeros(3)), axis=0)
+    for i in range(1000):
+        ctrl, position_error = position_jacobian(phy, body_idx, current_target_point)
 
-        # print(ee_vel)
-        eps = 1e-3
-        ctrl = J_T @ np.linalg.solve(J @ J_T + eps * np.eye(6), ee_vel)
-        # rescale to respect velocity limits
-        # TODO: use nullspace to respect joint limits by trying to move towards the home configuration
-        vmin = phy.m.actuator_ctrlrange[:, 0]
-        vmax = phy.m.actuator_ctrlrange[:, 1]
-
-        if np.any(ctrl > vmax):
-            offending_joint = np.argmax(ctrl)
-            ctrl = ctrl / np.max(ctrl) * vmax[offending_joint]
-        elif np.any(ctrl < vmin):
-            offending_joint = np.argmin(ctrl)
-            ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
+        # if i % 100 == 0 or position_error < 0.005:
+        #     print(f'dt: {perf_counter() - t0:.4f}')
+        #     t0 = perf_counter()
+        #     current_target_point = target_point + rng.uniform(-0.3, 0.3, size=3)
 
         np.copyto(phy.d.ctrl, ctrl)
         mujoco.mj_step(phy.m, phy.d, nstep=25)
+
         viz.viz(phy)
+        viz.sphere(ns='goal', position=current_target_point, radius=0.01, color=(0, 1, 0, 1), frame_id='world', idx=0)
         rospy.sleep(0.002)
 
 
