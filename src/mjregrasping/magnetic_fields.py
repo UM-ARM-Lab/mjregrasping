@@ -50,67 +50,6 @@ def skeleton_field_dir(skeleton, r):
     return b
 
 
-def compute_threading_dir(ring_position, ring_z_axis, R, p):
-    """
-    Compute the direction of a virtual magnetic field that will pull the rope through the ring.
-    Assumes μ and I are 1.
-
-    Args:
-        ring_position: [3] The position of the origin of the ring in world coordinates
-        ring_z_axis: [3] The axis point out up and out of the ring in world coordinates
-        R: [1] radius of the ring in meters.
-        p: [b, 3] the positions at which you want to compute the field
-
-    Returns:
-        [b, 3] the direction of the field at p
-
-    """
-    dx, x = compute_ring_vecs(ring_position, ring_z_axis, R)
-    # We need a batch cross product
-    b = p.shape[0]
-    n = dx.shape[0]
-    dx_repeated = np.repeat(dx[None], b, axis=0)
-    x_repeated = np.repeat(x[None], b, axis=0)
-    p_repeated = np.repeat(p[:, None], n, axis=1)
-    dp_repeated = p_repeated - x_repeated
-    cross_product = np.cross(dx_repeated, dp_repeated)
-    db = R * cross_product / np.linalg.norm(dp_repeated, axis=-1, keepdims=True) ** 3
-    b = np.sum(db, axis=-2)
-    b *= 1 / (4 * np.pi)
-
-    return b
-
-
-def compute_ring_vecs(ring_position, ring_z_axis, R):
-    """
-    Compute the direction sub-quantities needed for compute_threading_dir
-
-    Args:
-        ring_position: [3] The position of the origin of the ring in world coordinates
-        ring_z_axis: [3] The axis point out up and out of the ring in world coordinates
-        R: [1] radius of the ring in meters.
-
-    Returns:
-        [n, 3] the direction of the conductor (ring) at each ring point
-        [n, 3] the position of the ring points
-
-    """
-    delta_angle = 0.1
-    angles = np.arange(0, 2 * np.pi, delta_angle)
-    zeros = np.zeros_like(angles)
-    ones = np.ones_like(angles)
-    x = np.stack([R * np.cos(angles), R * np.sin(angles), zeros, ones], -1)
-    ring_mat = make_ring_mat(ring_position, ring_z_axis)
-    x = (x @ ring_mat.T)[:, :3]
-    zeros = np.zeros_like(angles)
-    dx = np.stack([-np.sin(angles), np.cos(angles), zeros], -1)
-    # only rotate here
-    ring_rot = ring_mat.copy()[:3, :3]
-    dx = (dx @ ring_rot.T)
-    dx = dx / np.linalg.norm(dx, axis=-1, keepdims=True)  # normalize
-    return dx, x
-
-
 def make_ring_mat(ring_position, ring_z_axis):
     """
     Make the 4x4 transform matrix that transforms from the canonical ring frame to the world frame.
@@ -134,3 +73,14 @@ def make_ring_mat(ring_position, ring_z_axis):
     ring_mat[:3, 2] = ring_z_axis
     ring_mat[:3, 3] = ring_position
     return ring_mat
+
+
+def make_ring_skeleton(position, z_axis, radius, delta_angle=0.5):
+    angles = np.arange(0, 2 * np.pi, delta_angle)
+    angles = np.append(angles, 0)
+    zeros = np.zeros_like(angles)
+    ones = np.ones_like(angles)
+    ring_skeleton_canonical = np.stack([radius * np.cos(angles), radius * np.sin(angles), zeros, ones], -1)
+    ring_mat = make_ring_mat(position, z_axis)
+    skeleton = (ring_skeleton_canonical @ ring_mat.T)[:, :3]
+    return skeleton

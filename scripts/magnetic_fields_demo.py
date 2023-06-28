@@ -2,7 +2,7 @@ import numpy as np
 import rerun as rr
 from numpy.linalg import norm
 
-from mjregrasping.magnetic_fields import skeleton_field_dir
+from mjregrasping.magnetic_fields import skeleton_field_dir, make_ring_skeleton
 
 
 def main():
@@ -26,12 +26,9 @@ def main():
         [0.5, -0.2, 1],
         [0.5, -0.2, 0],
     ])
+    skeleton = make_ring_skeleton(position=np.array([0.5, 1, 1]), z_axis=np.array([1, 0, 0]), radius=0.5)
 
-    ring_position = np.array([0, 1, 1])
-    ring_z_axis = np.array([0, 1, 0])
-    R = 0.5  # radius
     max_norm = 0.2
-
     n1 = 50
     n2 = 25
     ys = np.linspace(0.35, 0.45, n1)
@@ -42,11 +39,10 @@ def main():
     p = np.stack([xs, Ys.flatten(), Zs.flatten()], axis=1)
 
     for t in range(50000):
-        # b = compute_threading_dir(ring_position, ring_z_axis, R, p)
         b = skeleton_field_dir(skeleton, p)
         p = p + b * 0.05
 
-        if t % 5 == 0:
+        if t % 25 == 0:
             rr.log_points('field', p, colors=(0, 0, 255, 200), radii=0.01)
             # for i, (p_i, b_i) in enumerate(zip(p, b)):
             #     if norm(b_i) > max_norm:
