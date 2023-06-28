@@ -179,6 +179,7 @@ def do_grasp_dynamics(phy, results):
             # if the finger is open, release
             if finger_q > hp['finger_q_open']:
                 eq.active = 0
+                did_new_grasp = True
         else:
             # compute the loc [0, 1] of the closest point on the rope to the gripper
             # to do this, finely discretize into a piecewise linear function that maps loc ∈ [0,1] to R^3

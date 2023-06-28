@@ -7,17 +7,18 @@ from dynamic_reconfigure.server import Server
 hp = {
     "regrasp_horizon":        15,
     "regrasp_n_samples":      32,
-    "regrasp_temp":           0.2,  # FIXME: re-tune this?
+    "regrasp_temp":           0.1,
     "n_g":                    2,
     "goal_weight":            1.0,
     "grasp_weight":           20.0,
     "regrasp_weight":         1.0,
     "finger_weight":          0.25,
     "smoothness_weight":      0.1,
+    "regrasp_near_weight":    0.1,
     "controllability_weight": 1.0,
-    "finger_q_open":          0.4,
-    "finger_q_closed":        0.07,
     "unstable_weight":        100,
+    "finger_q_open":          0.4,
+    "finger_q_closed":        0.08,
     "state_history_size":     10,
     "warmstart":              10,
     "sub_time_s":             0.1,
@@ -35,7 +36,7 @@ hp = {
     "contact_cost":           3.0,
     "frac_max_dq":            0.5,
     "q_joint_weight":         0.5,
-    "grasp_goal_radius":      0.04,
+    "grasp_goal_radius":      0.045,
 }
 
 

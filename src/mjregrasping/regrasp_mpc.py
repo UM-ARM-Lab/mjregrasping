@@ -21,9 +21,10 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 class RegraspMPC:
 
-    def __init__(self, mppi_nu: int, pool: ThreadPoolExecutor, viz: Viz, goal,
-                 seed: int = 1, mov: Optional[MjMovieMaker] = None):
+    def __init__(self, pool: ThreadPoolExecutor, mppi_nu: int, skeletons, goal, seed: int, viz: Viz,
+                 mov: Optional[MjMovieMaker] = None):
         self.mppi_nu = mppi_nu
+        self.skeletons = skeletons
         self.pool = pool
         self.viz = viz
         self.op_goal = goal
@@ -42,10 +43,11 @@ class RegraspMPC:
         self.state_history.reset()
         self.max_dq = 0
 
-    def run(self, phy):
+    def run(self, phy, attach_pos):
         num_samples = hp['regrasp_n_samples']
 
-        regrasp_goal = RegraspGoal(self.op_goal, hp['grasp_goal_radius'], self.viz)
+        regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, hp['grasp_goal_radius'], self.viz)
+        regrasp_goal.recompute_candidates(phy, attach_pos)
 
         self.mppi.reset()
         self.reset_trap_detection()
@@ -67,7 +69,9 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
-            self.get_mab_reward(phy)
+            if self.get_mab_reward(phy) < 0.2 and itr % 10 == 0:
+                regrasp_goal.recompute_candidates(phy, attach_pos)
+                self.reset_trap_detection()
 
             while warmstart_count < hp['warmstart']:
                 command = self.mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
@@ -108,6 +112,9 @@ class RegraspMPC:
             rr.log_scalar('mab/dq', dq, color=[0, 255, 0])
             rr.log_scalar('mab/max_dq', self.max_dq, color=[0, 0, 255])
             rr.log_scalar('mab/frac_dq', frac_dq, color=[255, 0, 255])
+            return frac_dq
+        else:
+            return np.inf
 
     def get_q_for_trap_detection(self, phy):
         return np.concatenate(

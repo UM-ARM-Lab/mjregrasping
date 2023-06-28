@@ -28,6 +28,7 @@ class Runner:
         rospy.init_node("regrasp_mpc_runner")
 
         self.xml_path = xml_path
+        self.skeletons = self.get_skeletons()
         self.tfw = TF2Wrapper()
         self.mjviz = MjRViz(xml_path, self.tfw)
         self.p = Params()
@@ -51,16 +52,17 @@ class Runner:
             mov.start(mov_path, fps=12)
 
             goal = self.make_goal(phy)
+            attach_pos = self.get_attach_pos(phy)
 
             with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
                 self.viz.p.w_goal = 1.0
                 self.viz.p.w_regrasp_point = 0.0
                 self.viz.p.update()
 
-                mpc = RegraspMPC(pool=pool, mppi_nu=phy.m.nu, viz=self.viz, goal=goal, seed=seed,
-                                 mov=mov)
-                mpc.run(phy)
+                mpc = RegraspMPC(pool, phy.m.nu, self.skeletons, goal, seed, self.viz, mov)
+                mpc.run(phy, attach_pos)
                 mpc.close()
+
     def make_goal(self):
         raise NotImplementedError()
         # goal = ObjectPointGoal(dfield=None,
@@ -72,3 +74,9 @@ class Runner:
 
     def setup_scene(self, phy: Physics, viz: Viz):
         pass
+
+    def get_skeletons(self):
+        raise NotImplementedError()
+
+    def get_attach_pos(self, phy):
+        raise NotImplementedError()

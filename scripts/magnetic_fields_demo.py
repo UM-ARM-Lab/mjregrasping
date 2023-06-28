@@ -4,7 +4,7 @@ import hjson
 import numpy as np
 import rerun as rr
 
-from mjregrasping.magnetic_fields import get_h_signature, discretize_path, make_ring_skeleton
+from mjregrasping.magnetic_fields import get_h_signature, discretize_path, make_ring_skeleton, load_skeletons
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.viz_magnetic_fields import animate_field
 
@@ -24,9 +24,7 @@ def main():
 
 def h_signature_demo():
     # skeletons = get_example_skeletons()
-    with open('models/computer_rack_skeleton.hjson', 'r') as f:
-        skeletons = hjson.load(f)
-    skeletons = {name: np.array(skeleton) for name, skeleton in skeletons.items()}
+    skeletons = load_skeletons('models/computer_rack_skeleton.hjson')
 
     # Computing H-signature of paths
     log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True)
@@ -34,11 +32,10 @@ def h_signature_demo():
     z = 0.43
     all_hs = []
     for y in np.linspace(0.01, 1, 10):
-        path = discretize_path(np.array([[0, y, z], [1., y, z], [1., y, z + 0.2], [0, y, z + 0.2], [0, y, z]]))
-
         # integrate the magnetic field along the trajectory
         from time import perf_counter
         t0 = perf_counter()
+        path = np.array([[0, y, z], [1., y, z], [1., y, z + 0.2], [0, y, z + 0.2], [0, y, z]])
         h = get_h_signature(path, skeletons)
         all_hs.append(h)
         print(f'{y=:.2f} {h=} computing H-signature: {perf_counter() - t0:.4f}s')

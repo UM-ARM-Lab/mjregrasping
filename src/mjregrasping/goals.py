@@ -6,11 +6,14 @@ import numpy as np
 import rerun as rr
 from numpy.linalg import norm
 
-from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_finger_cost, get_action_cost
+from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_finger_cost, get_action_cost, \
+    get_tool_positions
 from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets_and_xpos, \
     grasp_locations_to_indices_and_offsets
 from mjregrasping.grasping import get_is_grasping, get_finger_qs
 from mjregrasping.ik import jacobian_ik_is_reachable
+from mjregrasping.magnetic_fields import get_h_signature
+from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
@@ -191,7 +194,7 @@ class ObjectPointGoal(MPPIGoal):
         self.viz_sphere(self.goal_point, self.goal_radius)
 
 
-def get_regrasp_costs(finger_qs, is_grasping, regrasp_locs, regrasp_xpos, tools_pos):
+def get_regrasp_costs(finger_qs, is_grasping, regrasp_locs, regrasp_xpos, tools_pos, rope_points):
     """
 
     Args:
@@ -200,6 +203,7 @@ def get_regrasp_costs(finger_qs, is_grasping, regrasp_locs, regrasp_xpos, tools_
         regrasp_locs:  Whether the gripper should grasp ∈ [0-1]
         regrasp_xpos: The 3d position in space corresponding to the regrasp_locs
         tools_pos: The current 3d position of the tool tips
+        rope_points: The 3d position of all the rope points
 
     Returns:
         Costs for finger joint angles and tool tip positions
@@ -210,7 +214,11 @@ def get_regrasp_costs(finger_qs, is_grasping, regrasp_locs, regrasp_xpos, tools_
     regrasp_dists = norm(regrasp_xpos - tools_pos, axis=-1)
     needs_grasp = reach_is_grasping * (1 - is_grasping)
     regrasp_pos_cost = np.sum(regrasp_dists * needs_grasp, -1) * hp['regrasp_weight']
-    return regrasp_finger_cost, regrasp_pos_cost
+
+    dists = pairwise_squared_distances(regrasp_xpos, rope_points)
+    min_dist = np.min(dists)
+    regrasp_near_cost = min_dist * hp['regrasp_near_weight']
+    return regrasp_finger_cost, regrasp_pos_cost, regrasp_near_cost
 
 
 def ray_based_reachability(candidates_xpos, phy, tools_pos, max_d=0.7):
@@ -251,12 +259,14 @@ def ik_based_reachability(candidates_xpos, phy, tools_pos):
 
 class RegraspGoal(MPPIGoal):
 
-    def __init__(self, op_goal, grasp_goal_radius, viz: Viz):
+    def __init__(self, op_goal, skeletons, grasp_goal_radius, viz: Viz):
         super().__init__(viz)
         self.op_goal = op_goal
+        self.skeletons = skeletons
         self.grasp_goal_radius = grasp_goal_radius
         self.n_g = hp['n_g']
         self.reach_rng = np.random.RandomState(0)
+        self.homotopy_rng = np.random.RandomState(1)
 
     def satisfied(self, phy):
         return self.op_goal.satisfied(phy)
@@ -277,9 +287,54 @@ class RegraspGoal(MPPIGoal):
                                                                                   phy.o.rope.body_indices)
         keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
 
-        # Reachability planner
-        # - minimize geodesic distance to the keypoint (loc)
-        # - subject to reachability constraint, which might be hard but should probably involve collision-free IK?
+        _, _, reach_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, self.reach_locs)
+        _, _, homotopy_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, self.homotopy_locs)
+
+        return result(tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, reach_xpos,
+                      homotopy_xpos)
+
+    def gen_grasp_for_new_homotopy(self, is_grasping, phy, tools_pos, attach_pos):
+        robot_base_pos = phy.d.body('val_base').xpos
+        h0 = []
+        # from mjregrasping.rerun_visualizer import log_skeletons
+        # log_skeletons(self.skeletons, color=(0, 255, 0, 255), timeless=True)
+        for tool_pos in tools_pos:
+            path = np.stack([robot_base_pos, tool_pos, attach_pos, robot_base_pos], axis=0)
+            h = get_h_signature(path, self.skeletons)
+            h0.append(h)
+            # rr.log_line_strip('path/0', path, ext={'hs': str(h0)})
+        h0 = np.reshape(np.array(h0) * is_grasping[:, None], -1)
+        # Uniformly randomly sample a new grasp
+        # reject if it's the same as the current grasp
+        # reject if it's not reachable
+        # check if it's H-signature is different
+        allowable_is_grasping = np.array([[0, 1], [1, 0], [1, 1]])
+        while True:
+            homotopy_is_grasping = allowable_is_grasping[self.homotopy_rng.randint(0, 3)]
+            homotopy_locs = self.homotopy_rng.uniform(0, 1, 2)
+            homotopy_locs = -1 * (1 - homotopy_is_grasping) + homotopy_locs * homotopy_is_grasping
+
+            # homotopy_is_grasping = np.array([1, 1])
+            # homotopy_locs = np.array([0.85, 0.95])
+            _, _, homotopy_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, homotopy_locs)
+
+            hi = []
+            for i, pos in enumerate(homotopy_xpos):
+                path = np.stack([robot_base_pos, pos, attach_pos, robot_base_pos], axis=0)
+                h = get_h_signature(path, self.skeletons)
+                hi.append(h)
+                # rr.log_line_strip(f'path/{i + 1}', path, ext={'hs': str(hi)})
+            hi = np.reshape(np.array(hi) * homotopy_is_grasping[:, None], -1)
+
+            reachable_matrix = ray_based_reachability(homotopy_xpos, phy, tools_pos)
+            homotopy_not_grasping = np.logical_not(homotopy_is_grasping)
+            reachable_or_not_grasping = np.logical_or(np.diagonal(reachable_matrix), homotopy_not_grasping)
+            valid = np.all(reachable_or_not_grasping) and np.any(h0 != hi) and np.any(homotopy_is_grasping)
+            if valid:
+                break
+        return homotopy_locs
+
+    def gen_grasp_for_controllability(self, is_grasping, phy, tools_pos):
         not_grasping = 1 - is_grasping
         p_reach_gripper = softmax(not_grasping, 0.1)
         reach_is_grasping = self.reach_rng.binomial(1, p_reach_gripper)
@@ -287,28 +342,16 @@ class RegraspGoal(MPPIGoal):
         candidates_bodies, candidates_offsets, candidates_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy,
                                                                                                                  candidates_reach_locs)
         is_reachable = ray_based_reachability(candidates_xpos, phy, tools_pos)
-
         geodesics_costs = np.square(candidates_reach_locs - self.op_goal.loc)
         combined_costs = geodesics_costs + 1000 * (1 - is_reachable)
         best_idx = np.argmin(combined_costs, axis=-1)
         reach_locs = candidates_reach_locs[best_idx]
         reach_locs = reach_locs * reach_is_grasping + -1 * (1 - reach_is_grasping)
-
-        _, _, reach_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, reach_locs)
-
-        # Homotopy planner
-        # Find a new grasp configuration that results in a new homotopy class,
-        # and satisfies stretchability and reachability constraints
-        # We can start by trying rejection sampling?
-        homotopy_locs = np.array([0.6, -1.0])
-        _, _, homotopy_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, homotopy_locs)
-
-        return result(tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint,
-                      finger_qs, reach_locs, reach_xpos, homotopy_locs, homotopy_xpos)
+        return reach_locs
 
     def cost(self, results, is_grasping0):
-        (tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, reach_locs, reach_xpos,
-         homotopy_locs, homotopy_xpos) = as_floats(results)
+        (tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, reach_xpos,
+         homotopy_xpos) = as_floats(results)
 
         keypoint_dist = norm(keypoint - self.op_goal.goal_point, axis=-1)
 
@@ -318,16 +361,23 @@ class RegraspGoal(MPPIGoal):
 
         maintain_grasps_cost = get_finger_cost(finger_qs, is_grasping0) * hp['finger_weight']
 
+        # NOTE: reading class variables from multiple processes without any protection!
         # Reach costs
-        reach_finger_cost, reach_pos_cost = get_regrasp_costs(finger_qs, is_grasping, reach_locs, reach_xpos, tools_pos)
+        reach_finger_cost, reach_pos_cost, reach_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+                                                                               self.reach_locs, reach_xpos, tools_pos,
+                                                                               rope_points)
 
         # Homotopy costs
-        homotopy_finger_cost, homotopy_pos_cost = get_regrasp_costs(finger_qs, is_grasping, homotopy_locs, homotopy_xpos, tools_pos)
+        homotopy_finger_cost, homotopy_pos_cost, homotopy_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+                                                                                        self.homotopy_locs,
+                                                                                        homotopy_xpos, tools_pos,
+                                                                                        rope_points)
 
         # TODO: MAB should choose these weights
         w_goal = self.viz.p.config['w_goal']
         w_reach = self.viz.p.config['w_reach']
         w_homotopy = self.viz.p.config['w_homotopy']
+        # w_grasp_nearest = self.viz.p.config['w_grasp_nearest']
         return (
             contact_cost,
             unstable_cost,
@@ -335,8 +385,10 @@ class RegraspGoal(MPPIGoal):
             w_goal * maintain_grasps_cost,
             w_reach * reach_finger_cost,
             w_reach * reach_pos_cost,
+            w_reach * reach_near_cost,
             w_homotopy * homotopy_finger_cost,
             w_homotopy * homotopy_pos_cost,
+            w_homotopy * homotopy_near_cost,
         )
 
     def cost_names(self):
@@ -345,12 +397,47 @@ class RegraspGoal(MPPIGoal):
             "unstable",
             "goal",
             "maintain_grasps_cost",
-            "regrasp_finger_cost",
-            "regrasp_pos_cost",
+            "reach_finger_cost",
+            "reach_pos_cost",
+            "reach_near_cost",
+            "homotopy_finger_cost",
+            "homotopy_pos_cost",
+            "homotopy_near_cost",
         ]
 
     def viz_result(self, result, idx: int, scale, color):
         tools_pos = as_float(result[0])
         keypoints = as_float(result[5])
+        t0 = 0
+        reach_xpos = as_float(result[7])[t0]
+        homotopy_xpos = as_float(result[8])[t0]
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
+
+        self.viz.sphere('left_reach_xpos', reach_xpos[0], radius=0.02, color='b', frame_id='world', idx=0)
+        self.viz.sphere('right_reach_xpos', reach_xpos[1], radius=0.02, color='b', frame_id='world', idx=0)
+        self.viz.sphere('left_homotopy_xpos', homotopy_xpos[0], radius=0.02, color='g', frame_id='world', idx=0)
+        self.viz.sphere('right_homotopy_xpos', homotopy_xpos[1], radius=0.02, color='g', frame_id='world', idx=0)
+
+    def recompute_candidates(self, phy, attach_pos):
+        from time import perf_counter
+        t0 = perf_counter()
+        tools_pos = get_tool_positions(phy)
+        is_grasping = get_is_grasping(phy.m)
+
+        # Reachability planner
+        # - minimize geodesic distance to the keypoint (loc)
+        # - subject to reachability constraint, which might be hard but should probably involve collision-free IK?
+        self.reach_locs = self.gen_grasp_for_controllability(is_grasping, phy, tools_pos)
+
+        # Homotopy planner
+        # Find a new grasp configuration that results in a new homotopy class,
+        # and satisfies reachability constraints
+        # We can start by trying rejection sampling?
+        if attach_pos is None:
+            self.homotopy_locs = np.array([-1, -1])
+        else:
+            self.homotopy_locs = self.gen_grasp_for_new_homotopy(is_grasping, phy, tools_pos, attach_pos)
+
+        print(f'Recompute candidates: {perf_counter() - t0:.4f}')
+        return self.reach_locs, self.homotopy_locs

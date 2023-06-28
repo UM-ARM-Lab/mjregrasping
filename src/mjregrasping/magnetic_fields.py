@@ -1,5 +1,6 @@
 from typing import Dict
 
+import hjson
 import numpy as np
 from numpy.linalg import norm
 
@@ -52,6 +53,17 @@ def skeleton_field_dir(skeleton, r):
     return b
 
 
+def make_ring_skeleton(position, z_axis, radius, delta_angle=0.5):
+    angles = np.arange(0, 2 * np.pi, delta_angle)
+    angles = np.append(angles, 0)
+    zeros = np.zeros_like(angles)
+    ones = np.ones_like(angles)
+    ring_skeleton_canonical = np.stack([radius * np.cos(angles), radius * np.sin(angles), zeros, ones], -1)
+    ring_mat = make_ring_mat(position, z_axis)
+    skeleton = (ring_skeleton_canonical @ ring_mat.T)[:, :3]
+    return skeleton
+
+
 def make_ring_mat(ring_position, ring_z_axis):
     """
     Make the 4x4 transform matrix that transforms from the canonical ring frame to the world frame.
@@ -77,18 +89,8 @@ def make_ring_mat(ring_position, ring_z_axis):
     return ring_mat
 
 
-def make_ring_skeleton(position, z_axis, radius, delta_angle=0.5):
-    angles = np.arange(0, 2 * np.pi, delta_angle)
-    angles = np.append(angles, 0)
-    zeros = np.zeros_like(angles)
-    ones = np.ones_like(angles)
-    ring_skeleton_canonical = np.stack([radius * np.cos(angles), radius * np.sin(angles), zeros, ones], -1)
-    ring_mat = make_ring_mat(position, z_axis)
-    skeleton = (ring_skeleton_canonical @ ring_mat.T)[:, :3]
-    return skeleton
-
-
 def get_h_signature(path, skeletons: Dict):
+    # NOTE: this function seems to slow down a lot when called from multiple parallel processes?
     path_discretized = discretize_path(path)
     path_deltas = np.diff(path_discretized, axis=0)
     hs = []
@@ -97,7 +99,8 @@ def get_h_signature(path, skeletons: Dict):
         h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
         h = h.round(1)  # round to nearest integer since the output should really either be 0 or 1
         hs.append(h)
-    return np.array(hs)
+    hs = np.array(hs)
+    return hs
 
 
 def discretize_path(path, n=1000):
@@ -112,3 +115,9 @@ def discretize_path(path, n=1000):
                               delta_lengths[i_s - 1][:, None]
     discretized_path_points = np.insert(discretized_path_points, 0, path[0], axis=0)
     return discretized_path_points
+
+
+def load_skeletons(skeleton_filename):
+    with open(skeleton_filename, 'r') as f:
+        skeletons = hjson.load(f)
+    return {k: np.array(v) for k, v in skeletons.items()}

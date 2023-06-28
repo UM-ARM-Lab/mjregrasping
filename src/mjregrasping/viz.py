@@ -1,3 +1,5 @@
+from matplotlib.colors import to_rgba
+
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.params import Params
@@ -24,8 +26,8 @@ class Viz:
             plot_sphere_rviz(pub=self.markers_pub, position=position, radius=radius, frame_id=frame_id, color=color,
                              label=f'{ns}', idx=idx)
         if self.p.rr:
-            # TODO: also show in rerun
-            pass
+            rr_color = to_rgba(color)
+            rr.log_point(f'{ns}/{idx}', position, color=rr_color, radius=radius)
 
     def lines(self, positions, ns: str, idx: int, scale: float, color):
         if self.p.rviz:
@@ -40,10 +42,11 @@ class Viz:
             )
 
         if self.p.rr:
+            rr_color = to_rgba(color)
             rr.log_line_strip(
                 entity_path=f'{ns}/{idx}',
                 positions=positions,
-                color=color,
+                color=rr_color,
                 stroke_width=scale,
             )
 

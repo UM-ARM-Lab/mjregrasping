@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 
+from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.mujoco_objects import Object
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
@@ -11,6 +12,7 @@ from mjregrasping.regrasp_mpc_runner import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 
 logger = logging.getLogger(f'rosout.{__name__}')
+
 
 
 class Untangle(Runner):
@@ -48,6 +50,11 @@ class Untangle(Runner):
         goal = ObjectPointGoal(goal_point, 0.05, loc, self.viz)
         return goal
 
+    def get_skeletons(self):
+        return load_skeletons("models/computer_rack_skeleton.hjson")
+
+    def get_attach_pos(self, phy):
+        return phy.d.body("attach").xpos
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
