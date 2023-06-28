@@ -1,3 +1,5 @@
+from typing import Dict
+
 import numpy as np
 from numpy.linalg import norm
 
@@ -86,12 +88,16 @@ def make_ring_skeleton(position, z_axis, radius, delta_angle=0.5):
     return skeleton
 
 
-def get_h_signature(path, skeleton):
+def get_h_signature(path, skeletons: Dict):
     path_discretized = discretize_path(path)
     path_deltas = np.diff(path_discretized, axis=0)
-    bs = skeleton_field_dir(skeleton, path_discretized[:-1])
-    h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
-    return h
+    hs = []
+    for skeleton in skeletons.values():
+        bs = skeleton_field_dir(skeleton, path_discretized[:-1])
+        h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
+        h = h.round(1)  # round to nearest integer since the output should really either be 0 or 1
+        hs.append(h)
+    return np.array(hs)
 
 
 def discretize_path(path, n=1000):
@@ -102,6 +108,7 @@ def discretize_path(path, n=1000):
     total_length = np.sum(delta_lengths)
     l_s = np.linspace(1e-3, total_length, n)
     i_s = np.searchsorted(delta_cumsums, l_s)
-    discretized_path_points = path[i_s - 1] + (l_s - delta_cumsums[i_s - 1])[:, None] * path_deltas[i_s - 1] / delta_lengths[i_s - 1][:, None]
+    discretized_path_points = path[i_s - 1] + (l_s - delta_cumsums[i_s - 1])[:, None] * path_deltas[i_s - 1] / \
+                              delta_lengths[i_s - 1][:, None]
     discretized_path_points = np.insert(discretized_path_points, 0, path[0], axis=0)
     return discretized_path_points

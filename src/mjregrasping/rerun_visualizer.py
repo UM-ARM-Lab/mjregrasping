@@ -1,6 +1,7 @@
 import logging
 from functools import lru_cache
 from pathlib import Path
+from typing import Dict
 
 import mujoco
 import numpy as np
@@ -268,3 +269,8 @@ def log_line_with_std(entity_path, x, *args, **kwargs):
     rr.log_scalar(f'{entity_path}/μ', mean, *args, **kwargs)
     rr.log_scalar(f'{entity_path}/μ-σ', low, *args, **kwargs)
     rr.log_scalar(f'{entity_path}/μ+σ', high, *args, **kwargs)
+
+
+def log_skeletons(skeletons: Dict[str, np.ndarray], **kwargs):
+    for name, skeleton in skeletons.items():
+        rr.log_line_strip(f'skeleton/{name}', skeleton, **kwargs)
