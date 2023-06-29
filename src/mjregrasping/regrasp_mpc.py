@@ -1,4 +1,3 @@
-import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
@@ -15,8 +14,6 @@ from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, regrasp
 from mjregrasping.rollout import control_step
 from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
-
-logger = logging.getLogger(f'rosout.{__name__}')
 
 
 class RegraspMPC:

@@ -1,0 +1,2 @@
+This folder contains test scripts that either isolate some component or algorithm.
+Things like running just the homotopy-planner on a given saved input scene, or visualizing the magnetic field calculations.

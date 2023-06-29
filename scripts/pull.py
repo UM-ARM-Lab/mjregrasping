@@ -1,17 +1,14 @@
 #!/usr/bin/env python3
-import logging
 
 import numpy as np
 from transformations import quaternion_from_euler
 
-from mjregrasping.mujoco_objects import Object
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.mujoco_objects import Object
 from mjregrasping.regrasp_mpc_runner import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-
-logger = logging.getLogger(f'rosout.{__name__}')
 
 
 class Pull(Runner):

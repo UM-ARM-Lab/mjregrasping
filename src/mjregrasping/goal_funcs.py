@@ -1,15 +1,12 @@
 """ Free functions used by the goals """
-import logging
 
 import numpy as np
 from numpy.linalg import norm
 
-from mjregrasping.mujoco_objects import Objects
 from mjregrasping.geometry import point_to_line_segment
+from mjregrasping.mujoco_objects import Objects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-
-logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def get_contact_cost(phy: Physics):

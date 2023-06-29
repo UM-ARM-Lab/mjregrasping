@@ -1,11 +1,14 @@
 import pickle
+from pathlib import Path
 
 import mujoco
 
 from mjregrasping.physics import Physics
 
+DEFAULT_PATH = Path("states/data_and_eq.pkl")
 
-def save_data_and_eq(phy: Physics):
+
+def save_data_and_eq(phy: Physics, path=DEFAULT_PATH):
     data_and_eq = {
         'data': phy.d,
         'eq':   {},
@@ -17,13 +20,13 @@ def save_data_and_eq(phy: Physics):
             'data':   eq.data.copy(),
             'obj2id': eq.obj2id.copy(),
         }
-    with open("data_and_eq.pkl", "wb") as f:
+    with path.open("wb") as f:
         pickle.dump(data_and_eq, f)
 
 
-def load_data_and_eq(m: mujoco.MjModel, forward=True):
+def load_data_and_eq(m: mujoco.MjModel, forward=True, path=DEFAULT_PATH):
     """ Modifies the model in place and returns a new instance of MjData """
-    with open("data_and_eq.pkl", "rb") as f:
+    with path.open("rb") as f:
         data_and_eq = pickle.load(f)
     for eq_idx in range(m.neq):
         eq = m.eq(eq_idx)

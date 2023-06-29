@@ -1,4 +1,3 @@
-import logging
 from copy import deepcopy
 
 import mujoco
@@ -6,6 +5,7 @@ import numpy as np
 import rerun as rr
 from numpy.linalg import norm
 
+from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_finger_cost, get_action_cost, \
     get_tool_positions
 from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets_and_xpos, \
@@ -13,12 +13,9 @@ from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offset
 from mjregrasping.grasping import get_is_grasping, get_finger_qs
 from mjregrasping.ik import jacobian_ik_is_reachable
 from mjregrasping.magnetic_fields import get_h_signature
-from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
-
-logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def as_floats(results):

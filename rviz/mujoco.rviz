@@ -4,13 +4,13 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
-        - /Mujoco1
         - /Mujoco1/all1/Namespaces1
         - /Mujoco1/contacts1/Namespaces1
-        - /Markers1
         - /Markers1/Namespaces1
-      Splitter Ratio: 0.8388888835906982
-    Tree Height: 750
+        - /MotionPlanning1
+        - /MotionPlanning1/Planned Path1
+      Splitter Ratio: 0.4909909963607788
+    Tree Height: 361
   - Class: rviz/Selection
     Name: Selection
   - Class: rviz/Tool Properties
@@ -70,101 +70,7 @@ Visualization Manager:
           Marker Topic: /all
           Name: all
           Namespaces:
-            cc_sphere/cc_sphere/cc_sphere: true
-            computer_rack/attach/rack_attach: true
-            computer_rack/computer/case: true
-            computer_rack/computer/port: true
-            computer_rack/computer_rack/wall: true
-            computer_rack/rack1/rack1_bottom: true
-            computer_rack/rack1/rack1_post1: true
-            computer_rack/rack1/rack1_post2: true
-            computer_rack/rack1/rack1_post3: true
-            computer_rack/rack1/rack1_post4: true
-            computer_rack/rack2/box1: true
-            computer_rack/rack2/rack2_bottom: true
-            computer_rack/rack2/rack2_post1: true
-            computer_rack/rack2/rack2_post2: true
-            computer_rack/rack2/rack2_post3: true
-            computer_rack/rack2/rack2_post4: true
-            computer_rack/rack2/rack2_top: true
-            floor/floor/floor: true
-            rope/B_1/G1: true
-            rope/B_1/G1b1: true
-            rope/B_1/G1b2: true
-            rope/B_2/G2: true
-            rope/B_2/G2b1: true
-            rope/B_2/G2b2: true
-            rope/B_3/G3: true
-            rope/B_3/G3b1: true
-            rope/B_3/G3b2: true
-            rope/B_4/G4: true
-            rope/B_4/G4b1: true
-            rope/B_4/G4b2: true
-            rope/B_5/G5: true
-            rope/B_5/G5b1: true
-            rope/B_5/G5b2: true
-            rope/B_6/G6: true
-            rope/B_6/G6b1: true
-            rope/B_6/G6b2: true
-            rope/B_7/G7: true
-            rope/B_7/G7b1: true
-            rope/B_7/G7b2: true
-            rope/B_8/G8: true
-            rope/B_8/G8b1: true
-            rope/B_8/G8b2: true
-            rope/B_9/G9: true
-            rope/B_9/G9b1: true
-            rope/B_9/G9b2: true
-            rope/B_first/G0: true
-            rope/B_first/G0b1: true
-            rope/B_first/G0b2: true
-            rope/B_last/G10: true
-            rope/B_last/G10b1: true
-            rope/B_last/G10b2: true
-            val_base/back_lidar/back_ark_lidar_mesh: true
-            val_base/base_link/base_link_mesh: true
-            val_base/battery/battery: true
-            val_base/drive1/drive1_mesh: true
-            val_base/drive10/drive7_housing_mesh: true
-            val_base/drive2/joint2_mesh: true
-            val_base/drive3/joint3_mesh: true
-            val_base/drive4/drive4_mesh: true
-            val_base/drive41/drive41_mesh: true
-            val_base/drive42/drive42_mesh: true
-            val_base/drive43/drive43_mesh: true
-            val_base/drive44/drive44_mesh: true
-            val_base/drive45/drive45_mesh: true
-            val_base/drive46/drive46_mesh: true
-            val_base/drive47/drive47_mesh: true
-            val_base/drive5/drive5_mesh: true
-            val_base/drive50/drive47_housing_mesh: true
-            val_base/drive56/drive56_mesh: true
-            val_base/drive57/drive57_mesh: true
-            val_base/drive6/drive6_mesh: true
-            val_base/drive7/drive7_mesh: true
-            val_base/front_left_wheel_link/front_left_wheel: true
-            val_base/front_lidar/front_ark_lidar_mesh: true
-            val_base/front_right_wheel_link/front_right_wheel: true
-            val_base/left_finger_pad/left_finger_pad: true
-            val_base/left_finger_pad2/left_finger_pad2: true
-            val_base/leftforearm/left_forearm_bracket: true
-            val_base/leftgripper2_link/leftgripper2: true
-            val_base/leftgripper_link/leftgripper: true
-            val_base/leftshoulder/left_shoulder_bracket: true
-            val_base/lefttube/lefttube_mesh: true
-            val_base/leftwrist/left_wrist_mesh: true
-            val_base/rear_left_wheel_link/rear_left_wheel: true
-            val_base/rear_right_wheel_link/rear_right_wheel: true
-            val_base/right_finger_pad/right_finger_pad: true
-            val_base/right_finger_pad2/right_finger_pad2: true
-            val_base/rightforearm/right_forearm_bracket: true
-            val_base/rightgripper2_link/rightgripper2: true
-            val_base/rightgripper_link/rightgripper: true
-            val_base/rightshoulder/right_shoulder_bracket: true
-            val_base/righttube/righttube_mesh: true
-            val_base/rightwrist/rightwrist_mesh: true
-            val_base/top_plate/top_plate_mesh: true
-            val_base/torso/torso: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -180,14 +86,7 @@ Visualization Manager:
           Marker Topic: /contacts
           Name: contacts
           Namespaces:
-            G0_rack_attach: true
-            G10_rack2_top: true
-            G10_right_finger_pad: true
-            G10_right_finger_pad2: true
-            G10_rightgripper: true
-            G8_rack2_top: true
-            G9_rack2_top: true
-            floor_cc_sphere: true
+            {}
           Queue Size: 100
           Value: true
         - Class: rviz/MarkerArray
@@ -195,8 +94,7 @@ Visualization Manager:
           Marker Topic: /eq_constraints
           Name: constraints
           Namespaces:
-            eq_attach: true
-            eq_right: true
+            {}
           Queue Size: 100
           Value: true
       Enabled: true
@@ -206,14 +104,7 @@ Visualization Manager:
       Marker Topic: /markers
       Name: Markers
       Namespaces:
-        ee_0: true
-        ee_1: true
-        goal: true
-        left_homotopy_xpos: true
-        left_reach_xpos: true
-        right_homotopy_xpos: true
-        right_reach_xpos: true
-        rope: false
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/InteractiveMarkers
@@ -225,6 +116,568 @@ Visualization Manager:
       Show Visual Aids: false
       Update Topic: /basic_3d_imarkers/update
       Value: false
+    - Acceleration_Scaling_Factor: 0.1
+      Class: moveit_rviz_plugin/MotionPlanning
+      Enabled: true
+      Move Group Namespace: ""
+      MoveIt_Allow_Approximate_IK: true
+      MoveIt_Allow_External_Program: false
+      MoveIt_Allow_Replanning: false
+      MoveIt_Allow_Sensor_Positioning: false
+      MoveIt_Planning_Attempts: 10
+      MoveIt_Planning_Time: 5
+      MoveIt_Use_Cartesian_Path: false
+      MoveIt_Use_Constraint_Aware_IK: true
+      MoveIt_Workspace:
+        Center:
+          X: 0
+          Y: 0
+          Z: 0
+        Size:
+          X: 2
+          Y: 2
+          Z: 2
+      Name: MotionPlanning
+      Planned Path:
+        Color Enabled: false
+        Interrupt Display: false
+        Links:
+          All Links Enabled: true
+          Expand Joint Details: false
+          Expand Link Details: false
+          Expand Tree: false
+          Link Tree Style: Links in Alphabetic Order
+          base:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive1:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive10:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive2:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive3:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive4:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive41:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive42:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive43:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive44:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive45:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive46:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive47:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive5:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive50:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive56:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive57:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive6:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive7:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_left:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_right:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          hdt_michigan_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          husky:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          lefttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          pedestal_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          righttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          robot_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          torso:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          world:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_baro_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_camera_center:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zed2i_left_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_left_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_mag_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_left_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_right_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+        Loop Animation: false
+        Robot Alpha: 0.5
+        Robot Color: 150; 50; 150
+        Show Robot Collision: false
+        Show Robot Visual: true
+        Show Trail: false
+        State Display Time: 0.05s
+        Trail Step Size: 1
+        Trajectory Topic: move_group/display_planned_path
+        Use Sim Time: false
+      Planning Metrics:
+        Payload: 1
+        Show Joint Torques: false
+        Show Manipulability: false
+        Show Manipulability Index: false
+        Show Weight Limit: false
+        TextHeight: 0.07999999821186066
+      Planning Request:
+        Colliding Link Color: 255; 0; 0
+        Goal State Alpha: 1
+        Goal State Color: 250; 128; 0
+        Interactive Marker Size: 0
+        Joint Violation Color: 255; 0; 255
+        Planning Group: left_side
+        Query Goal State: true
+        Query Start State: false
+        Show Workspace: false
+        Start State Alpha: 1
+        Start State Color: 0; 255; 0
+      Planning Scene Topic: move_group/monitored_planning_scene
+      Robot Description: robot_description
+      Scene Geometry:
+        Scene Alpha: 0.8999999761581421
+        Scene Color: 50; 230; 50
+        Scene Display Time: 0.009999999776482582
+        Show Scene Geometry: true
+        Voxel Coloring: Z-Axis
+        Voxel Rendering: Occupied Voxels
+      Scene Robot:
+        Attached Body Color: 150; 50; 150
+        Links:
+          All Links Enabled: true
+          Expand Joint Details: false
+          Expand Link Details: false
+          Expand Tree: false
+          Link Tree Style: Links in Alphabetic Order
+          base:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive1:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive10:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive2:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive3:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive4:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive41:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive42:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive43:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive44:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive45:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive46:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive47:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive5:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive50:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive56:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive57:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive6:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive7:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_left:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_right:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          hdt_michigan_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          husky:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          left_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          lefttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          pedestal_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          righttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          robot_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          torso:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          world:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_baro_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_camera_center:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zed2i_left_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_left_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_mag_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_left_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_right_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+        Robot Alpha: 1
+        Show Robot Collision: false
+        Show Robot Visual: true
+      Value: true
+      Velocity_Scaling_Factor: 0.1
   Enabled: true
   Global Options:
     Background Color: 59; 59; 59
@@ -253,7 +706,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.2944884300231934
+      Distance: 2.4158992767333984
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -261,25 +714,29 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.8921991586685181
-        Y: -0.32208481431007385
-        Z: 0.9090384244918823
+        X: 0.2906346619129181
+        Y: 0.3266066908836365
+        Z: 0.4382144510746002
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.15979735553264618
+      Pitch: 0.4647977948188782
       Target Frame: anim_camera
-      Yaw: 5.711796283721924
+      Yaw: 1.9086772203445435
     Saved: ~
 Window Geometry:
   Displays:
-    collapsed: true
+    collapsed: false
   Height: 1016
-  Hide Left Dock: true
+  Hide Left Dock: false
   Hide Right Dock: true
-  QMainWindow State: 000000ff00000000fd00000004000000000000016a000003bdfc020000003bfb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006100fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afc0000001f000003bd0000000000fffffffa000000000100000003fb0000001a0044006500620075006700560069007a00500061006e0065006c0000000000ffffffff0000000000000000fb0000000a0049006d0061006700650000000000ffffffff0000000000000000fb000000100044006900730070006c0061007900730000000000000002300000016a00fffffffb0000000c00630061006d0065007200610000000147000001d70000000000000000fb0000000c004d006500720072007200740000000262000000b90000000000000000fb0000000c004d006500720072007200740000000304000000f40000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072000000037d0000007a0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720000000385000000720000000000000000fb0000000a0049006d00610067006502000000020000001000000280000001e0fb000000220043006f006c006f007200460069006c00740065007200570069006400670065007400000001c3000000a60000000000000000fb0000001c0046006900640075006300690061006c00200049006d00610067006500000001fa0000015f0000000000000000fc0000028b000000e20000000000fffffffa000000000100000001fb0000000c00430061006d0065007200610000000000ffffffff0000000000000000fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fc00000184000001790000000000fffffffa000000000100000005fb0000000c004d006500720072007200740100000000ffffffff0000000000000000fb0000000c004d006500720072007200740100000000ffffffff0000000000000000fb0000000c004d006500720072007200740100000000ffffffff0000000000000000fb000000220043006f006c006f007200460069006c0074006500720057006900640067006500740000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670000000000000001f20000000000000000fb0000000c004d0065007200720072007400000002100000010e0000000000000000fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000000a0049006d0061006700650000000271000001870000000000000000fb0000000a0049006d006100670065010000032c000000cc0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000003c005400720061006a006500630074006f007200790020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000320069006e0070007500740020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000002e0061007500670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000003c005400720061006a006500630074006f007200790020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000000c004d0065007200720072007401000002cb000000e20000000000000000fb0000000c004d006500720072007200740100000268000000b60000000000000000fc00000390000000680000000000fffffffa000000000100000001fb0000001e0046006900640075006300690061006c00200049006d00610067006500730000000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000220043006f006c006f007200460069006c0074006500720057006900640067006500740000000352000000a60000000000000000fb0000000a0049006d006100670065000000028b0000016d0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e0067000000027f000001790000000000000000fc00000372000000860000000000fffffffa000000000100000002fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000000002fa0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e0067000000027f000001790000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000025c000000cb0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000032c000000cc0000000000000000fc00000372000000860000000000fffffffa000000000100000002fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000000002730000000000000000fb0000003c005400720061006a006500630074006f007200790020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fc000002f1000001070000000000fffffffa000000000100000001fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670100000000000002ee0000000000000000fb0000000c00630061006d00650072006100000002df000001190000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000033e000000ba0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000033e000000ba0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000039000000068000000000000000000000001000001c1000003bdfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000001f000003bd000000ad00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b20000000000000000000000020000077c000000f8fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000077c00000046fc0100000003fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000000005920000000000000000fb0000000800540069006d006500000000000000077c0000051200fffffffb0000000800540069006d0065010000000000000450000000000000000000000752000003bd00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730000000000ffffffff0000000000000000
+  MotionPlanning:
+    collapsed: false
+  MotionPlanning - Slider:
+    collapsed: false
+  QMainWindow State: 000000ff00000000fd0000000400000000000001ff000003bdfc020000003efb0000001200530065006c0065006300740069006f006e00000001e10000009b0000006100fffffffb0000001e0054006f006f006c002000500072006f007000650072007400690065007302000001ed000001df00000185000000a3fb000000120056006900650077007300200054006f006f02000001df000002110000018500000122fb000000200054006f006f006c002000500072006f0070006500720074006900650073003203000002880000011d000002210000017afc0000001f00000238000000d700fffffffa000000020100000003fb0000001a0044006500620075006700560069007a00500061006e0065006c0000000000ffffffff0000000000000000fb0000000a0049006d0061006700650000000000ffffffff0000000000000000fb000000100044006900730070006c0061007900730100000000000002300000016a00fffffffb0000000c00630061006d0065007200610000000147000001d70000000000000000fb0000000c004d006500720072007200740000000262000000b90000000000000000fb0000000c004d006500720072007200740000000304000000f40000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072000000037d0000007a0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720000000385000000720000000000000000fb0000000a0049006d00610067006502000000020000001000000280000001e0fb000000220043006f006c006f007200460069006c00740065007200570069006400670065007400000001c3000000a60000000000000000fb0000001c0046006900640075006300690061006c00200049006d00610067006500000001fa0000015f0000000000000000fc0000028b000000e20000000000fffffffa000000000100000001fb0000000c00430061006d0065007200610000000000ffffffff0000000000000000fb0000002000730065006c0065006300740069006f006e00200062007500660066006500720200000138000000aa0000023a00000294fb00000014005700690064006500530074006500720065006f02000000e6000000d2000003ee0000030bfb0000000c004b0069006e0065006300740200000186000001060000030c00000261fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fc00000184000001790000000000fffffffa000000000100000005fb0000000c004d006500720072007200740100000000ffffffff0000000000000000fb0000000c004d006500720072007200740100000000ffffffff0000000000000000fb0000000c004d006500720072007200740100000000ffffffff0000000000000000fb000000220043006f006c006f007200460069006c0074006500720057006900640067006500740000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670000000000000001f20000000000000000fb0000000c004d0065007200720072007400000002100000010e0000000000000000fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000000a0049006d0061006700650000000271000001870000000000000000fb0000000a0049006d006100670065010000032c000000cc0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000003c005400720061006a006500630074006f007200790020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000320069006e0070007500740020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000002e0061007500670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000003c005400720061006a006500630074006f007200790020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000000c004d0065007200720072007401000002cb000000e20000000000000000fb0000000c004d006500720072007200740100000268000000b60000000000000000fc00000390000000680000000000fffffffa000000000100000001fb0000001e0046006900640075006300690061006c00200049006d00610067006500730000000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000220043006f006c006f007200460069006c0074006500720057006900640067006500740000000352000000a60000000000000000fb0000000a0049006d006100670065000000028b0000016d0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e0067000000027f000001790000000000000000fc00000372000000860000000000fffffffa000000000100000002fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000000002fa0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e0067000000027f000001790000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000025c000000cb0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000032c000000cc0000000000000000fc00000372000000860000000000fffffffa000000000100000002fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000000002730000000000000000fb0000003c005400720061006a006500630074006f007200790020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fc000002f1000001070000000000fffffffa000000000100000001fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e00670100000000000002ee0000000000000000fb0000000c00630061006d00650072006100000002df000001190000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000033e000000ba0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c00650072010000033e000000ba0000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000323000000680000000000000000fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000390000000680000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000000000000000fb000000280020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000004900fffffffb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e0067010000025d0000017f0000017400ffffff00000001000001c1000003bdfc0200000003fb0000001e0054006f006f006c002000500072006f00700065007200740069006500730100000041000000780000000000000000fb0000000a00560069006500770073000000001f000003bd000000ad00fffffffb0000001200530065006c0065006300740069006f006e010000025a000000b20000000000000000000000020000077c000000f8fc0100000001fb0000000a00560069006500770073030000004e00000080000002e100000197000000030000077c00000046fc0100000003fb000000260041006e0069006d006100740069006f006e0043006f006e00740072006f006c006c006500720100000000000005920000000000000000fb0000000800540069006d006500000000000000077c0000051200fffffffb0000000800540069006d006501000000000000045000000000000000000000054d000003bd00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730000000000ffffffff0000000000000000
   Selection:
     collapsed: false
   Time:
