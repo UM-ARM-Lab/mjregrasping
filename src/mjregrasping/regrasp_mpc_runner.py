@@ -52,7 +52,6 @@ class Runner:
             mov.start(mov_path, fps=12)
 
             goal = self.make_goal(phy)
-            attach_pos = self.get_attach_pos(phy)
 
             with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
                 self.viz.p.w_goal = 1.0
@@ -60,7 +59,7 @@ class Runner:
                 self.viz.p.update()
 
                 mpc = RegraspMPC(pool, phy.m.nu, self.skeletons, goal, seed, self.viz, mov)
-                mpc.run(phy, attach_pos)
+                mpc.run(phy)
                 mpc.close()
 
     def make_goal(self):
@@ -76,7 +75,4 @@ class Runner:
         pass
 
     def get_skeletons(self):
-        raise NotImplementedError()
-
-    def get_attach_pos(self, phy):
         raise NotImplementedError()

@@ -15,8 +15,6 @@ from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz
 from mjregrasping.viz import Viz
 
-logger = logging.getLogger(f'rosout.{__name__}')
-
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)

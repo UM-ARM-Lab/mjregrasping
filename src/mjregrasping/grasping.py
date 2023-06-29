@@ -1,7 +1,7 @@
 import mujoco
 import numpy as np
 
-from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets
 
 def get_is_grasping(m):
     eqs = get_grasp_constraints(m)

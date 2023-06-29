@@ -89,3 +89,35 @@ class Objects:
         self.val_self_collision_geom_names.remove('leftgripper2')
         self.val_self_collision_geom_names.remove('rightgripper')
         self.val_self_collision_geom_names.remove('rightgripper2')
+
+
+def parents_points(m: mujoco.MjModel, d: mujoco.MjData, body_name: str):
+    """
+    Returns the positions of a body and all its parents in order
+
+    Args:
+        m: model
+        d: data
+        body_name:
+
+    Returns:
+        A matrix [n, 3] of positions, where the first is the position of body_name and the last is always the root.
+        The world is not included because it is always 0,0,0
+
+    """
+    body = m.body(body_name)
+    body_id = body.id
+    if body_id == -1:
+        raise ValueError(f"body {body_name} not found")
+
+    if body_id == 0:
+        return np.zeros((1, 3))
+
+    positions = []
+    while body_id != 0:
+        positions.append(d.body(body_id).xpos)
+        body_id = m.body(body_id).parentid
+
+    positions = np.array(positions)
+    return positions
+

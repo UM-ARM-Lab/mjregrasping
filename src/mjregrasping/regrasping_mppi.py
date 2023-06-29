@@ -5,9 +5,10 @@ import rerun as rr
 from numpy.linalg import norm
 
 from mjregrasping.goals import as_float
-from mjregrasping.grasp_state_utils import grasp_locations_to_indices_and_offsets_and_xpos
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_constraints
-from mjregrasping.mujoco_mppi import MujocoMPPI, softmax
+from mjregrasping.mujoco_mppi import MujocoMPPI
+from mjregrasping.math import softmax
 from mjregrasping.params import hp
 from mjregrasping.rerun_visualizer import log_line_with_std
 from mjregrasping.rollout import control_step

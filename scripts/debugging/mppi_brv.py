@@ -2,7 +2,7 @@ import numpy as np
 import time
 import rerun as rr
 
-from mjregrasping.mujoco_mppi import softmax
+from mjregrasping.math import softmax
 
 
 def main():

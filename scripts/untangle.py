@@ -49,9 +49,6 @@ class Untangle(Runner):
     def get_skeletons(self):
         return load_skeletons("models/computer_rack_skeleton.hjson")
 
-    def get_attach_pos(self, phy):
-        return phy.d.body("attach").xpos
-
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)

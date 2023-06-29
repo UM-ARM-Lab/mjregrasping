@@ -7,6 +7,26 @@ class MjMovieMaker:
     def __init__(self, m: mujoco.MjModel, w=1280, h=720):
         """ Initialize a movie maker for a mujoco model """
         self.m = m
+        self.r = MjRenderer(m, w, h)
+        self.writer = None
+
+    def render(self, d: mujoco.MjData):
+        """ Render the current mujoco scene and store the resulting image """
+        self.writer.append_data(self.r.render(d))
+
+    def start(self, filename, fps):
+        """ Reset the movie maker """
+        self.writer = imageio.get_writer(filename, fps=fps)
+
+    def close(self):
+        """ Save the movie as a .mp4 file """
+        self.writer.close()
+
+
+class MjRenderer:
+    def __init__(self, m: mujoco.MjModel, w=1280, h=720):
+        """ Initialize a movie maker for a mujoco model """
+        self.m = m
         self.gl_ctx = mujoco.GLContext(w, h)
         self.gl_ctx.make_current()
         self.con = mujoco.MjrContext(m, 1)
@@ -17,7 +37,6 @@ class MjMovieMaker:
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
         self.cam.fixedcamid = 0
         self.img = np.zeros([h, w, 3], dtype=np.uint8)
-        self.writer = None
 
     def render(self, d: mujoco.MjData):
         """ Render the current mujoco scene and store the resulting image """
@@ -33,12 +52,4 @@ class MjMovieMaker:
         # render the scene from a mujoco camera and store the result in img
         mujoco.mjr_render(self.viewport, self.scene, self.con)
         mujoco.mjr_readPixels(rgb=self.img, depth=None, viewport=self.viewport, con=self.con)
-        self.writer.append_data(np.flipud(self.img))
-
-    def start(self, filename, fps):
-        """ Reset the movie maker """
-        self.writer = imageio.get_writer(filename, fps=fps)
-
-    def close(self):
-        """ Save the movie as a .mp4 file """
-        self.writer.close()
+        return np.flipud(self.img)

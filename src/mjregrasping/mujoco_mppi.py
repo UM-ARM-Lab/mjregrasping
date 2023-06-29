@@ -2,16 +2,10 @@ import logging
 
 import numpy as np
 
+from mjregrasping.math import softmax
 from mjregrasping.rollout import parallel_rollout
 
 logger = logging.getLogger(f'rosout.{__name__}')
-
-
-def softmax(x, temp):
-    x = x - x.max()
-    x = x / temp
-    z = np.exp(x)
-    return z / z.sum()
 
 
 class MujocoMPPI:

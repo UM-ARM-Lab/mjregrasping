@@ -45,9 +45,6 @@ class Pull(Runner):
     def get_skeletons(self):
         return {}
 
-    def get_attach_pos(self, phy):
-        return None
-
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)

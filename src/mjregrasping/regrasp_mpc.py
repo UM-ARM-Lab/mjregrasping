@@ -40,11 +40,11 @@ class RegraspMPC:
         self.state_history.reset()
         self.max_dq = 0
 
-    def run(self, phy, attach_pos):
+    def run(self, phy):
         num_samples = hp['regrasp_n_samples']
 
         regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, hp['grasp_goal_radius'], self.viz)
-        regrasp_goal.recompute_candidates(phy, attach_pos)
+        regrasp_goal.recompute_candidates(phy)
 
         self.mppi.reset()
         self.reset_trap_detection()
@@ -67,7 +67,7 @@ class RegraspMPC:
                 return True
 
             if self.get_mab_reward(phy) < 0.2 and itr % 10 == 0:
-                regrasp_goal.recompute_candidates(phy, attach_pos)
+                regrasp_goal.recompute_candidates(phy)
                 self.reset_trap_detection()
 
             while warmstart_count < hp['warmstart']:
