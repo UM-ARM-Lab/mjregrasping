@@ -72,4 +72,4 @@ class Viz:
             else:
                 self.rviz.viz(phy, is_planning, alpha=1.0)
         if self.p.rr:
-            self.mjrr.viz(phy)
+            self.mjrr.viz(phy, is_planning)

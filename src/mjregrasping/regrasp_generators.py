@@ -4,6 +4,7 @@ import mujoco
 import networkx as nx
 import numpy as np
 import rerun as rr
+from numpy.linalg import norm
 from pybio_ik import BioIK
 
 from mjregrasping.goal_funcs import get_tool_points, ray_based_reachability, get_rope_points
@@ -61,6 +62,7 @@ class HomotopyGenerator(RegraspGenerator):
         self.skeletons = skeletons
         self.tool_names = ["left_tool", "right_tool"]
         self.tool_bodies = ["drive50", "drive10"]
+        self.gripper_to_world_eq_names = ['left_world', 'right_world']
         self.bio_ik = BioIK("robot_description")
 
     def generate(self, phy):
@@ -68,12 +70,21 @@ class HomotopyGenerator(RegraspGenerator):
         if paths is None:
             print("No loops found, homotopy not helpful here!")
             return np.array([-1, -1])
+        for p in paths:
+            rr.log_line_strip('initial_paths', p)
 
         h = self.get_h_signature_for_paths(paths)
 
-        allowable_is_grasping = np.array([[0, 1], [1, 0], [1, 1]])
+        allowable_is_grasping = np.array([
+            [0, 1],
+            [1, 0],
+            # [0, 0],
+            # [1, 1],
+        ])
+        # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
+        #  Can we prove that there is always a way to change homotopy? Or prove a correct stopping condition?
         while True:
-            candidate_is_grasping = allowable_is_grasping[self.rng.randint(0, 3)]
+            candidate_is_grasping = allowable_is_grasping[self.rng.randint(0, len(allowable_is_grasping))]
             candidate_locs = self.rng.uniform(0, 1, 2)
             candidate_locs = -1 * (1 - candidate_is_grasping) + candidate_locs * candidate_is_grasping
             candidate_indices, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
@@ -84,35 +95,49 @@ class HomotopyGenerator(RegraspGenerator):
             ik_targets = {}
             for i in range(hp['n_g']):
                 tool_name = self.tool_names[i]
+                gripper_to_world_eq_name = self.gripper_to_world_eq_names[i]
                 eq = grasp_eqs[i]
                 # Set eq_active and qpos depending on the grasp
                 if candidate_is_grasping[i]:
                     eq.active = 1
                     eq.obj2id = candidate_indices[i]
                     ik_targets[tool_name] = candidate_pos[i] - IK_OFFSET
+                    gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
+                    gripper_to_world_eq.active = 1
+                    gripper_to_world_eq.data[3:6] = candidate_pos[i]
                 else:
                     eq.active = 0
-            # TODO: we really need collision free IK
-            q = self.bio_ik.ik(ik_targets, "both_arms")
-            if q is None:
+
+            # Estimate reachability using eq constraints in mujoco
+            for _ in range(10):
+                mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
+                # Check if the grasping grippers are near their targets
+                reached = True
+                for i in range(hp['n_g']):
+                    if candidate_is_grasping[i]:
+                        d = norm(phy_ik.d.site(self.tool_names[i]).xpos - candidate_pos[i])
+                        if d > 0.01:
+                            reached = False
+                # self.viz.viz(phy_ik, is_planning=True)
+                if reached:
+                    break
+            if not reached:
                 continue
 
-            # Update joint config then run mj_forward to update body poses
-            phy_ik.d.qpos[BOTH_ARMS_IK_Q_INDICES] = q
-            mujoco.mj_forward(phy_ik.m, phy_ik.d)
-            # self.viz.viz(phy_ik, is_planning=True)
-
             candidate_paths = self.find_rope_robot_paths(phy_ik)
+            if paths is None:  # shouldn't happen, having no grasps isn't allowed, but doesn't hurt to check.
+                continue
 
-            # for name, xpos in zip(self.tool_names, candidate_pos):
-            #     rr.log_point(f'tool_pos/{name}', xpos, radius=0.04)
-            # for p in candidate_paths:
-            #     rr.log_line_strip('candidate_path', p)
+            for name, xpos in zip(self.tool_names, candidate_pos):
+                rr.log_point(f'tool_pos/{name}', xpos, radius=0.04)
+            for p in candidate_paths:
+                rr.log_line_strip('candidate_path', p)
 
             candidate_h = self.get_h_signature_for_paths(candidate_paths)
 
             valid = np.any(h != candidate_h) and np.any(candidate_is_grasping)
             if valid:
+                self.viz.viz(phy_ik, is_planning=True)
                 return candidate_locs
 
     def get_h_signature_for_paths(self, paths):
@@ -148,7 +173,7 @@ class HomotopyGenerator(RegraspGenerator):
         if len(valid_cycles) == 0:
             return None
 
-        print(valid_cycles)
+        # print(valid_cycles)
 
         # Then convert those graph cycles into closed paths in 3D
         b_point = phy.d.body('val_base').xpos
@@ -209,7 +234,6 @@ class HomotopyGenerator(RegraspGenerator):
                 else:
                     raise RuntimeError(f"Unknown edge {edge}")
             cycle_points = np.stack(cycle_points, axis=0)
-            rr.log_line_strip(f'robot_rope_path/{valid_cycle}', cycle_points, color=(1., 1., 1., 1.))
             all_points.append(cycle_points)
         return all_points
 

@@ -30,7 +30,8 @@ class MjReRun:
         self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
         init()
 
-    def viz(self, phy: Physics):
+    def viz(self, phy: Physics, is_planning=False):
+        entity_prefix = 'planning/' if is_planning else ''
         rr.set_time_seconds('sim_time', phy.d.time)
 
         # 2D viz in rerun
@@ -45,17 +46,17 @@ class MjReRun:
 
         rr.log_scalar(f'contact/num_contacts', len(phy.d.contact))
 
-        self.viz_bodies(phy.m, phy.d)
-        self.viz_sites(phy)
-        self.viz_contacts(phy)
+        self.viz_bodies(phy.m, phy.d, entity_prefix)
+        self.viz_sites(phy, entity_prefix)
+        self.viz_contacts(phy, entity_prefix)
 
-    def viz_sites(self, phy: Physics):
+    def viz_sites(self, phy: Physics, entity_prefix):
         for site_id in range(phy.m.nsite):
             name = phy.m.site(site_id).name
             pos = phy.d.site_xpos[site_id]
             rr.log_point(entity_path=f'sites/{name}', position=pos)
 
-    def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData):
+    def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData, entity_prefix):
         """
         Rerun, or possibly my code, seems to have some serious problems with efficiency when logging meshes,
         so this method is very hacked at the moment.
@@ -65,7 +66,7 @@ class MjReRun:
             geom_type = geom.type
             geom_bodyid = geom.bodyid
             parent_name, child_name = get_parent_child_names(geom_bodyid, m)
-            entity_name = f"{parent_name}/{child_name}"
+            entity_name = f"{entity_prefix}{parent_name}/{child_name}"
 
             if geom_type == mjtGeom.mjGEOM_BOX:
                 # log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
@@ -107,7 +108,7 @@ class MjReRun:
             mesh_file_contents = f.read()
         return mesh_file_contents
 
-    def viz_contacts(self, phy: Physics):
+    def viz_contacts(self, phy: Physics, entity_prefix):
         rr.log_cleared('contacts', recursive=True)
         positions = []
         radii = []
@@ -117,16 +118,16 @@ class MjReRun:
             radii.append(0.01)
             colors.append((255, 0, 0, 128))
 
-        rr.log_points(entity_path="contacts",
+        rr.log_points(entity_path=f"{entity_prefix}contacts",
                       positions=positions,
                       colors=colors,
                       radii=radii)
 
-    def viz_eqs(self, phy: Physics):
+    def viz_eqs(self, phy: Physics, entity_prefix):
         rr.log_cleared('eqs', recursive=True)
         for eq_constraint_idx in range(phy.m.neq):
             eq = phy.m.eq(eq_constraint_idx)
-            if eq.active and eq.type == mjtEq.mjEQ_CONNECT:
+            if eq.active and eq.type == mujoco.mjtEq.mjEQ_CONNECT:
                 eq_marker.header.frame_id = "world"
                 eq_marker.scale.x = 0.005
                 eq_marker.pose.orientation.w = 1
