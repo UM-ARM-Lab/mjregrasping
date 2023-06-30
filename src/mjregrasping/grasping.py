@@ -3,15 +3,15 @@ import numpy as np
 
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets
 
+
 def get_is_grasping(m):
-    eqs = get_grasp_constraints(m)
+    eqs = get_grasp_eqs(m)
     is_grasping = np.array([m.eq_active[eq.id] for eq in eqs])
     return is_grasping
 
 
-def get_grasp_constraints(m):
+def get_grasp_eqs(m):
     return [m.eq('left'), m.eq('right')]
-
 
 
 def activate_grasp(phy, name, loc, rope_body_indices):

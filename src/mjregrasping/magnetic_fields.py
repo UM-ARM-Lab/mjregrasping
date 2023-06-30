@@ -109,7 +109,8 @@ def discretize_path(path, n=1000):
     delta_cumsums = np.cumsum(delta_lengths)
     delta_cumsums = np.insert(delta_cumsums, 0, 0)
     total_length = np.sum(delta_lengths)
-    l_s = np.linspace(1e-3, total_length, n)
+    ε = 1e-3
+    l_s = np.linspace(ε, total_length - ε, n)
     i_s = np.searchsorted(delta_cumsums, l_s)
     discretized_path_points = path[i_s - 1] + (l_s - delta_cumsums[i_s - 1])[:, None] * path_deltas[i_s - 1] / \
                               delta_lengths[i_s - 1][:, None]

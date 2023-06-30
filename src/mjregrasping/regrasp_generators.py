@@ -1,14 +1,25 @@
+import time
+
+import mujoco
 import networkx as nx
 import numpy as np
 import rerun as rr
+from pybio_ik import BioIK
 
 from mjregrasping.goal_funcs import get_tool_points, ray_based_reachability, get_rope_points
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.grasping import get_is_grasping
+from mjregrasping.grasping import get_is_grasping, get_grasp_eqs
 from mjregrasping.magnetic_fields import get_h_signature
 from mjregrasping.math import softmax
 from mjregrasping.mujoco_objects import parents_points
+from mjregrasping.params import hp
 from mjregrasping.viz import Viz
+
+BOTH_ARMS_IK_Q_INDICES = np.array([0, 1,
+                                   2, 3, 4, 5, 6, 7, 8,
+                                   11, 12, 13, 14, 15, 16, 17,
+                                   ])
+IK_OFFSET = np.array([0, 0, 0.145])
 
 
 class RegraspGenerator:
@@ -36,10 +47,11 @@ def pairwise(x):
 
 
 def from_to(i, j):
+    """ Inclusive of both i and j """
     if i < j:
-        return range(i, j)
+        return range(i, j + 1)
     else:
-        return range(i, j, -1)
+        return range(i, j - 1, -1)
 
 
 class HomotopyGenerator(RegraspGenerator):
@@ -47,6 +59,9 @@ class HomotopyGenerator(RegraspGenerator):
     def __init__(self, op_goal, skeletons, viz: Viz):
         super().__init__(op_goal, viz)
         self.skeletons = skeletons
+        self.tool_names = ["left_tool", "right_tool"]
+        self.tool_bodies = ["drive50", "drive10"]
+        self.bio_ik = BioIK("robot_description")
 
     def generate(self, phy):
         paths = self.find_rope_robot_paths(phy)
@@ -54,51 +69,54 @@ class HomotopyGenerator(RegraspGenerator):
             print("No loops found, homotopy not helpful here!")
             return np.array([-1, -1])
 
-        # rope_points = get_rope_points(phy)
-        # arm_points = [
-        #     parents_points(phy.m, phy.d, "drive50"),
-        #     parents_points(phy.m, phy.d, "drive10"),
-        # ]
-        # try:
-        #     attach_pos = phy.d.body('attach').xpos
-        # except KeyError:
-        #     return np.array([-1, -1])
-        h = []
-        for path in paths:
-            h_i = get_h_signature(path, self.skeletons)
-            h.append(h_i)
-            # rr.log_line_strip('path/0', path, ext={'hs': str(h)})
+        h = self.get_h_signature_for_paths(paths)
 
-        is_grasping = get_is_grasping(phy.m)
-        h = np.reshape(np.array(h) * is_grasping[:, None], -1)
-
-        # Uniformly randomly sample a new grasp
-        # reject if it's the same as the current grasp
-        # reject if it's not reachable
-        # check if it's H-signature is different
         allowable_is_grasping = np.array([[0, 1], [1, 0], [1, 1]])
         while True:
             candidate_is_grasping = allowable_is_grasping[self.rng.randint(0, 3)]
             candidate_locs = self.rng.uniform(0, 1, 2)
             candidate_locs = -1 * (1 - candidate_is_grasping) + candidate_locs * candidate_is_grasping
+            candidate_indices, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
 
-            _, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
-            candidate_arm_points = ik(candidate_pos)
+            # Construct phy_ik to match the candidate grasp
+            phy_ik = phy.copy_data()
+            grasp_eqs = get_grasp_eqs(phy_ik.m)
+            ik_targets = {}
+            for i in range(hp['n_g']):
+                tool_name = self.tool_names[i]
+                eq = grasp_eqs[i]
+                # Set eq_active and qpos depending on the grasp
+                if candidate_is_grasping[i]:
+                    eq.active = 1
+                    eq.obj2id = candidate_indices[i]
+                    ik_targets[tool_name] = candidate_pos[i] - IK_OFFSET
+                else:
+                    eq.active = 0
+            # TODO: we really need collision free IK
+            q = self.bio_ik.ik(ik_targets, "both_arms")
+            if q is None:
+                continue
 
-            candidate_h = []
-            for candidate_arm_points_i in candidate_arm_points:
-                path = self.make_closed_path(attach_pos, candidate_arm_points_i)
-                h_i = get_h_signature(path, self.skeletons)
-                candidate_h.append(h_i)
-                # rr.log_line_strip(f'path/{i + 1}', path, ext={'hs': str(hi)})
-            candidate_h = np.reshape(np.array(candidate_h) * candidate_is_grasping[:, None], -1)
+            # Update joint config then run mj_forward to update body poses
+            phy_ik.d.qpos[BOTH_ARMS_IK_Q_INDICES] = q
+            mujoco.mj_forward(phy_ik.m, phy_ik.d)
+            # self.viz.viz(phy_ik, is_planning=True)
 
-            reachable_matrix = ray_based_reachability(candidate_pos, phy, tools_pos)
-            candidate_not_grasping = np.logical_not(candidate_is_grasping)
-            reachable_or_not_grasping = np.logical_or(np.diagonal(reachable_matrix), candidate_not_grasping)
-            valid = np.all(reachable_or_not_grasping) and np.any(h != candidate_h) and np.any(candidate_is_grasping)
+            candidate_paths = self.find_rope_robot_paths(phy_ik)
+
+            # for name, xpos in zip(self.tool_names, candidate_pos):
+            #     rr.log_point(f'tool_pos/{name}', xpos, radius=0.04)
+            # for p in candidate_paths:
+            #     rr.log_line_strip('candidate_path', p)
+
+            candidate_h = self.get_h_signature_for_paths(candidate_paths)
+
+            valid = np.any(h != candidate_h) and np.any(candidate_is_grasping)
             if valid:
                 return candidate_locs
+
+    def get_h_signature_for_paths(self, paths):
+        return np.array([get_h_signature(path, self.skeletons) for path in paths])
 
     def find_rope_robot_paths(self, phy):
         # First construct a graph based on the current constraints/grasps
@@ -127,7 +145,6 @@ class HomotopyGenerator(RegraspGenerator):
             if len(cycle) == 3 and 'b' in cycle:
                 valid_cycles.append(cycle)
 
-
         if len(valid_cycles) == 0:
             return None
 
@@ -139,10 +156,7 @@ class HomotopyGenerator(RegraspGenerator):
             a_point = phy.d.body('attach').xpos
         except KeyError:
             a_point = None
-        arm_points = [
-            parents_points(phy.m, phy.d, "drive50"),
-            parents_points(phy.m, phy.d, "drive10"),
-        ]
+        arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in self.tool_bodies]
         grasped_indices = np.array([
             int(phy.m.eq("left").obj2id),
             int(phy.m.eq("right").obj2id)

@@ -121,3 +121,33 @@ def parents_points(m: mujoco.MjModel, d: mujoco.MjData, body_name: str):
     positions = np.array(positions)
     return positions
 
+
+def parent_q_indices(m: mujoco.MjModel, body_name: str):
+    """
+    Returns the indices of joints of parents of a body in order from lowest to highest
+
+    Args:
+        m: model
+        body_name: body name
+
+    Returns:
+        A matrix [n] of indices
+    """
+    body = m.body(body_name)
+    body_id = body.id
+    if body_id == -1:
+        raise ValueError(f"body {body_name} not found")
+
+    if body_id == 0:
+        return np.zeros((1, 3))
+
+    q_indices = []
+    while True:
+        q_index = m.body(body_id).jntadr[0]
+        q_indices.append(q_index)
+        body_id = m.body(body_id).parentid
+        if q_index <= 0:
+            break
+
+    q_indices = np.sort(q_indices)
+    return q_indices
