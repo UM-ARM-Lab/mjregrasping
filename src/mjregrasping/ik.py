@@ -1,5 +1,11 @@
+from typing import Optional
+
 import mujoco
 import numpy as np
+from numpy.linalg import norm
+
+from mjregrasping.params import hp
+from mjregrasping.viz import Viz
 
 
 def jacobian_ik_is_reachable(phy, body_idx, target_point, n_steps=100, pos_tol=0.005):
@@ -38,7 +44,6 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     ctrl[17] = 0  # ignore the gripper joint
     # TODO: use nullspace to respect joint limits by trying to move towards the home configuration
 
-
     # rescale to respect velocity limits
     vmin = phy.m.actuator_ctrlrange[:, 0]
     vmax = phy.m.actuator_ctrlrange[:, 1]
@@ -52,3 +57,20 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     position_error = np.linalg.norm(target_position - phy.d.body(body_idx).xpos)
 
     return ctrl, position_error
+
+
+def eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz: Optional[Viz] = None):
+    for _ in range(10):
+        mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
+        # Check if the grasping grippers are near their targets
+        reached = True
+        for i in range(hp['n_g']):
+            if candidate_is_grasping[i]:
+                d = norm(phy_ik.d.site(tool_names[i]).xpos - candidate_pos[i])
+                if d > 0.01:
+                    reached = False
+        if viz:
+            viz.viz(phy_ik, is_planning=True)
+        if reached:
+            return True
+    return False

@@ -1,15 +1,14 @@
-import time
+from copy import copy
 
-import mujoco
 import networkx as nx
 import numpy as np
 import rerun as rr
-from numpy.linalg import norm
 from pybio_ik import BioIK
 
 from mjregrasping.goal_funcs import get_tool_points, ray_based_reachability, get_rope_points
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_is_grasping, get_grasp_eqs
+from mjregrasping.ik import eq_sim_ik
 from mjregrasping.magnetic_fields import get_h_signature
 from mjregrasping.math import softmax
 from mjregrasping.mujoco_objects import parents_points
@@ -66,7 +65,8 @@ class HomotopyGenerator(RegraspGenerator):
         self.bio_ik = BioIK("robot_description")
 
     def generate(self, phy):
-        paths = self.find_rope_robot_paths(phy)
+        rope_points = copy(get_rope_points(phy))
+        paths = self.find_rope_robot_paths(phy, rope_points)
         if paths is None:
             print("No loops found, homotopy not helpful here!")
             return np.array([-1, -1])
@@ -83,14 +83,14 @@ class HomotopyGenerator(RegraspGenerator):
         ])
         # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
         #  Can we prove that there is always a way to change homotopy? Or prove a correct stopping condition?
-        while True:
+        for _ in range(100):
             candidate_is_grasping = allowable_is_grasping[self.rng.randint(0, len(allowable_is_grasping))]
             candidate_locs = self.rng.uniform(0, 1, 2)
             candidate_locs = -1 * (1 - candidate_is_grasping) + candidate_locs * candidate_is_grasping
             candidate_indices, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
 
             # Construct phy_ik to match the candidate grasp
-            phy_ik = phy.copy_data()
+            phy_ik = phy.copy_all()
             grasp_eqs = get_grasp_eqs(phy_ik.m)
             ik_targets = {}
             for i in range(hp['n_g']):
@@ -109,22 +109,11 @@ class HomotopyGenerator(RegraspGenerator):
                     eq.active = 0
 
             # Estimate reachability using eq constraints in mujoco
-            for _ in range(10):
-                mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
-                # Check if the grasping grippers are near their targets
-                reached = True
-                for i in range(hp['n_g']):
-                    if candidate_is_grasping[i]:
-                        d = norm(phy_ik.d.site(self.tool_names[i]).xpos - candidate_pos[i])
-                        if d > 0.01:
-                            reached = False
-                # self.viz.viz(phy_ik, is_planning=True)
-                if reached:
-                    break
+            reached = eq_sim_ik(self.tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz=None)
             if not reached:
                 continue
 
-            candidate_paths = self.find_rope_robot_paths(phy_ik)
+            candidate_paths = self.find_rope_robot_paths(phy_ik, rope_points)
             if paths is None:  # shouldn't happen, having no grasps isn't allowed, but doesn't hurt to check.
                 continue
 
@@ -140,10 +129,16 @@ class HomotopyGenerator(RegraspGenerator):
                 self.viz.viz(phy_ik, is_planning=True)
                 return candidate_locs
 
+        print("No valid different homotopies found")
+        return np.array([-1, -1])
+
     def get_h_signature_for_paths(self, paths):
+        if paths is None:
+            return None
         return np.array([get_h_signature(path, self.skeletons) for path in paths])
 
-    def find_rope_robot_paths(self, phy):
+    def find_rope_robot_paths(self, phy, rope_points):
+        # NOTE: passing in rope points because our Ik solver effect the rope state in stupid ways
         # First construct a graph based on the current constraints/grasps
         is_grasping = get_is_grasping(phy.m)
         graph = nx.Graph()
@@ -190,7 +185,6 @@ class HomotopyGenerator(RegraspGenerator):
         rope_points_indices = grasped_indices - rope_start_body_index
         rope_points_indices = is_grasping * rope_points_indices + (1 - is_grasping) * -1
         attach_index = int(phy.m.eq("attach").obj2id) - rope_start_body_index
-        rope_points = get_rope_points(phy)
 
         all_points = []
         for valid_cycle in valid_cycles:
@@ -246,8 +240,8 @@ class SlackGenerator(RegraspGenerator):
     def generate(self, phy):
         tools_pos = get_tool_points(phy)
         is_grasping = get_is_grasping(phy.m)
-        not_grasping = 1 - is_grasping
-        candidate_gripper_p = softmax(not_grasping, 0.1, sub_max=False)
+        not_grasping = 1 - is_grasping + 1e-3
+        candidate_gripper_p = softmax(not_grasping, 1.0, sub_max=True)
         candidate_is_grasping = self.rng.binomial(1, candidate_gripper_p)
         candidates_locs = np.linspace(0, 1, 10)
         candidates_bodies, candidates_offsets, candidates_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy,

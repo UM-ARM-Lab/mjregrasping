@@ -2,6 +2,7 @@
 
 import numpy as np
 
+from arc_utilities import ros_init
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.magnetic_fields import load_skeletons
@@ -50,6 +51,7 @@ class Untangle(Runner):
         return load_skeletons("models/computer_rack_skeleton.hjson")
 
 
+@ros_init.with_ros("untangle")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 

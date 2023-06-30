@@ -10,9 +10,12 @@ from mjregrasping.physics import Physics
 
 
 def main():
-    m = mujoco.MjModel.from_xml_path('models/untangle_scene.xml')
+    task = "pull"  # "untangle"
+    obstacle_name = 'floor'
+    m = mujoco.MjModel.from_xml_path(f'models/{task}_scene.xml')
+
     d = mujoco.MjData(m)
-    phy = Physics(m, d, "computer_rack")
+    phy = Physics(m, d, obstacle_name)
 
     q = np.array([
         -0.5, 0.4,  # torso
@@ -38,12 +41,12 @@ def main():
                 time.sleep(time_until_next_step)
 
     # Useful lines of code to run
-    activate_grasp(phy, 'right', 0.75, phy.o.rope.body_indices)
-    activate_grasp(phy, 'left', 0.45, phy.o.rope.body_indices)
+    activate_grasp(phy, 'right', 1.0, phy.o.rope.body_indices)
+    activate_grasp(phy, 'left', 0.0, phy.o.rope.body_indices)
     phy.m.eq("right").active = 0
     phy.m.eq("left").active = 0
     now = int(time.time())
-    save_data_and_eq(phy, Path(f"states/untangle/{now}.pkl"))
+    save_data_and_eq(phy, Path(f"states/{task}/{now}.pkl"))
 
 
 if __name__ == '__main__':

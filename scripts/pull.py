@@ -3,6 +3,7 @@
 import numpy as np
 from transformations import quaternion_from_euler
 
+from arc_utilities import ros_init
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
@@ -46,6 +47,7 @@ class Pull(Runner):
         return {}
 
 
+@ros_init.with_ros("pull")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 

@@ -68,6 +68,8 @@ class RegraspMPC:
 
             if self.get_mab_reward(phy) < 0.2 and itr % 10 == 0:
                 regrasp_goal.recompute_candidates(phy)
+                warmstart_count = 0
+                self.mppi.reset()
                 self.reset_trap_detection()
 
             while warmstart_count < hp['warmstart']:
@@ -91,6 +93,7 @@ class RegraspMPC:
                 settle(phy, sub_time_s, self.viz, is_planning=False)
                 warmstart_count = 0
                 self.mppi.reset()
+                self.reset_trap_detection()
 
             self.mppi.roll()
 

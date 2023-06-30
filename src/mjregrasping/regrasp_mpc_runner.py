@@ -25,7 +25,6 @@ class Runner:
     def __init__(self, xml_path):
         rr.init('regrasp_mpc_runner')
         rr.connect()
-        rospy.init_node("regrasp_mpc_runner")
 
         self.xml_path = xml_path
         self.skeletons = self.get_skeletons()
