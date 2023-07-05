@@ -34,6 +34,8 @@ def from_to(i, j):
 def h_equal(h1: List, h2: List):
     if np.shape(h1) != np.shape(h2):
         return False
+    if h1 == h2:
+        return True
     return np.allclose(np.sort(h1, axis=0), np.sort(h2, axis=0))
 
 
@@ -192,13 +194,13 @@ class HomotopyGenerator(RegraspGenerator):
                         edge_rope_points = initial_rope_points[from_to(i_point_idx, j_point_idx)]
                         graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
 
-            import matplotlib.pyplot as plt
-            loc_labels = nx.get_node_attributes(graph, 'loc')
-            pos_labels = nx.get_node_attributes(graph, 'xpos')
-            combined_labels = {k: f"{k}: {loc_labels[k]:.2f} {pos_labels[k]}" for k in graph.nodes}
-            nx.draw(graph, labels=combined_labels, node_size=1000)
-            plt.margins(x=0.4)
-            plt.show()
+            # import matplotlib.pyplot as plt
+            # loc_labels = nx.get_node_attributes(graph, 'loc')
+            # pos_labels = nx.get_node_attributes(graph, 'xpos')
+            # combined_labels = {k: f"{k}: {loc_labels[k]:.2f} {pos_labels[k]}" for k in graph.nodes}
+            # nx.draw(graph, labels=combined_labels, node_size=1000)
+            # plt.margins(x=0.4)
+            # plt.show()
 
             valid_cycles = []
             for cycle in nx.simple_cycles(graph, length_bound=3):

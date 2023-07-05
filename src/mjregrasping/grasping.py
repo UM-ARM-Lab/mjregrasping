@@ -54,13 +54,28 @@ def get_finger_qs(phy):
     return np.stack([leftgripper_q, rightgripper_q], axis=0)
 
 
+def get_grasp_locs(phy: Physics):
+    rope_length = get_rope_length(phy)
+    locs = []
+    for eq in get_grasp_eqs(phy.m):
+        if eq.active:
+            idx = int(eq.obj2id)
+            offset = eq.data[3]
+            loc = grasp_indices_to_locations(phy.o.rope.body_indices, idx) + (offset / rope_length)
+            locs.append(loc)
+        else:
+            locs.append(-1)
+    return np.array(locs)
+
+
 def get_loc_idx_offset_xpos(phy: Physics):
     rope_length = get_rope_length(phy)
     for eq in get_grasp_eqs(phy.m):
         if eq.active:
             idx = eq.obj2id
             offset = eq.data[3]
-            xpos = phy.d.xpos[idx] + phy.d.xmat[idx, :, 0] * offset
+            xmat = phy.d.xmat[idx].reshape(3, 3)
+            xpos = phy.d.xpos[idx] + xmat[:, 0] * offset
             loc = grasp_indices_to_locations(phy.o.rope.body_indices, idx) + (offset / rope_length)
             yield loc, idx, offset, xpos
         continue

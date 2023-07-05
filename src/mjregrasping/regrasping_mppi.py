@@ -126,7 +126,6 @@ def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
     results_0 = goal.get_results(phy)
     do_grasp_dynamics(phy, results_0)
     results = [results_0]
-    is_grasping0 = results_0[2]
 
     costs = []
     for t, u in enumerate(u_sample):
@@ -138,7 +137,7 @@ def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
 
         # If we haven't created a new grasp, we should add the grasp cost
         # This encourages grasping as quickly as possible
-        costs_t = goal.cost(results_t, is_grasping0)
+        costs_t = goal.cost(results_t)
 
         results.append(results_t)
         costs.append(costs_t)

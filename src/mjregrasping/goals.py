@@ -4,14 +4,14 @@ import numpy as np
 import rerun as rr
 from numpy.linalg import norm
 
-from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_finger_cost, get_action_cost, \
+from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_action_cost, \
     get_regrasp_costs
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, \
     grasp_locations_to_indices_and_offsets
-from mjregrasping.grasping import get_is_grasping, get_finger_qs
+from mjregrasping.grasping import get_is_grasping, get_finger_qs, get_grasp_locs
+from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
 from mjregrasping.slack_regrasp_generator import SlackGenerator
 from mjregrasping.viz import Viz
 
@@ -214,15 +214,23 @@ class RegraspGoal(MPPIGoal):
                                                                                   phy.o.rope.body_indices)
         keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
 
-        _, _, slack_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, self.slack_locs)
-        _, _, homotopy_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, self.homotopy_locs)
+        # TODO: MAB should choose these weights
+        if self.viz.p.config['w_goal'] == 1:
+            grasp_locs = self.current_locs
+        elif self.viz.p.config['w_slack'] == 1:
+            grasp_locs = self.slack_locs
+        elif self.viz.p.config['w_homotopy'] == 1:
+            grasp_locs = self.homotopy_locs
 
-        return result(tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, slack_xpos,
-                      homotopy_xpos)
+        _, _, grasp_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, grasp_locs)
 
-    def cost(self, results, is_grasping0):
-        (tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, slack_xpos,
-         homotopy_xpos) = as_floats(results)
+        return result(tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, grasp_locs,
+                      grasp_xpos)
+
+    def cost(self, results):
+        (tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, grasp_locs,
+         grasp_xpos) = as_floats(
+            results)
 
         keypoint_dist = norm(keypoint - self.op_goal.goal_point, axis=-1)
 
@@ -230,35 +238,17 @@ class RegraspGoal(MPPIGoal):
 
         goal_cost = keypoint_dist * hp['goal_weight']
 
-        maintain_grasps_cost = get_finger_cost(finger_qs, is_grasping0) * hp['finger_weight']
-
         # NOTE: reading class variables from multiple processes without any protection!
-        # Reach costs
-        slack_finger_cost, slack_pos_cost, slack_near_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                               self.slack_locs, slack_xpos, tools_pos,
-                                                                               rope_points)
+        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping, grasp_locs,
+                                                                               grasp_xpos, tools_pos, rope_points)
 
-        # Homotopy costs
-        homotopy_finger_cost, homotopy_pos_cost, homotopy_near_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                                        self.homotopy_locs,
-                                                                                        homotopy_xpos, tools_pos,
-                                                                                        rope_points)
-
-        # TODO: MAB should choose these weights
-        w_goal = self.viz.p.config['w_goal']
-        w_slack = self.viz.p.config['w_slack']
-        w_homotopy = self.viz.p.config['w_homotopy']
         return (
             contact_cost,
             unstable_cost,
-            w_goal * goal_cost,
-            w_goal * maintain_grasps_cost,
-            w_slack * slack_finger_cost,
-            w_slack * slack_pos_cost,
-            w_slack * slack_near_cost,
-            w_homotopy * homotopy_finger_cost,
-            w_homotopy * homotopy_pos_cost,
-            w_homotopy * homotopy_near_cost,
+            goal_cost,
+            grasp_finger_cost,
+            grasp_pos_cost,
+            grasp_near_cost,
         )
 
     def cost_names(self):
@@ -266,32 +256,27 @@ class RegraspGoal(MPPIGoal):
             "contact",
             "unstable",
             "goal",
-            "maintain_grasps_cost",
-            "slack_finger_cost",
-            "slack_pos_cost",
-            "slack_near_cost",
-            "homotopy_finger_cost",
-            "homotopy_pos_cost",
-            "homotopy_near_cost",
+            "grasp_finger_cost",
+            "grasp_pos_cost",
+            "grasp_near_cost",
         ]
 
     def viz_result(self, result, idx: int, scale, color):
         tools_pos = as_float(result[0])
         keypoints = as_float(result[5])
         t0 = 0
-        slack_xpos = as_float(result[7])[t0]
-        homotopy_xpos = as_float(result[8])[t0]
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
-        self.viz.sphere('left_slack_xpos', slack_xpos[0], radius=0.02, color='b', frame_id='world', idx=0)
-        self.viz.sphere('right_slack_xpos', slack_xpos[1], radius=0.02, color='b', frame_id='world', idx=0)
-        self.viz.sphere('left_homotopy_xpos', homotopy_xpos[0], radius=0.02, color='g', frame_id='world', idx=0)
-        self.viz.sphere('right_homotopy_xpos', homotopy_xpos[1], radius=0.02, color='g', frame_id='world', idx=0)
+        grasp_xpos = as_float(result[8])[t0]
+        self.viz.sphere('left_grasp_xpos', grasp_xpos[0], radius=0.02, color=(0, 1, 0, 0.4), frame_id='world', idx=0)
+        self.viz.sphere('right_grasp_xpos', grasp_xpos[1], radius=0.02, color=(0, 1, 0, 0.4), frame_id='world', idx=0)
 
     def recompute_candidates(self, phy):
         from time import perf_counter
         t0 = perf_counter()
+
+        self.current_locs = get_grasp_locs(phy)
 
         # Reachability planner
         # - minimize geodesic distance to the keypoint (loc)
@@ -305,4 +290,3 @@ class RegraspGoal(MPPIGoal):
         self.homotopy_locs = self.homotopy_gen.generate(phy)
 
         print(f'Recompute candidates: {perf_counter() - t0:.4f}')
-        return self.slack_locs, self.homotopy_locs
