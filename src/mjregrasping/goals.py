@@ -1,4 +1,5 @@
 from copy import deepcopy
+from mjregrasping.cfg import ParamsConfig
 
 import numpy as np
 import rerun as rr
@@ -215,23 +216,26 @@ class RegraspGoal(MPPIGoal):
         keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
 
         # TODO: MAB should choose these weights
-        if self.viz.p.config['w_goal'] == 1:
+        arm = self.viz.p.config['selected_arm']
+        if arm == ParamsConfig.Params_Goal:
             grasp_locs = self.current_locs
-        elif self.viz.p.config['w_slack'] == 1:
-            grasp_locs = self.slack_locs
-        elif self.viz.p.config['w_homotopy'] == 1:
+        elif arm == ParamsConfig.Params_Homotopy:
             grasp_locs = self.homotopy_locs
+        elif arm == ParamsConfig.Params_Slack:
+            grasp_locs = self.slack_locs
+        else:
+            raise NotImplementedError(arm)
 
         _, _, grasp_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, grasp_locs)
 
-        return result(tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, grasp_locs,
-                      grasp_xpos)
+        current_grasp_locs = get_grasp_locs(phy)
+
+        return result(tools_pos, contact_cost, is_grasping, current_grasp_locs, is_unstable, rope_points, keypoint,
+                      finger_qs, grasp_locs, grasp_xpos)
 
     def cost(self, results):
-        (tools_pos, contact_cost, is_grasping, is_unstable, rope_points, keypoint, finger_qs, grasp_locs,
-         grasp_xpos) = as_floats(
-            results)
-
+        (tools_pos, contact_cost, is_grasping, current_grasp_locs, is_unstable, rope_points, keypoint, finger_qs,
+         grasp_locs, grasp_xpos) = as_floats(results)
         keypoint_dist = norm(keypoint - self.op_goal.goal_point, axis=-1)
 
         unstable_cost = is_unstable * hp['unstable_weight']
@@ -239,13 +243,16 @@ class RegraspGoal(MPPIGoal):
         goal_cost = keypoint_dist * hp['goal_weight']
 
         # NOTE: reading class variables from multiple processes without any protection!
-        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping, grasp_locs,
+        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+                                                                               current_grasp_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
+        arm = self.viz.p.config['selected_arm']
+        w_goal = 1 if arm == ParamsConfig.Params_Goal else 0
         return (
             contact_cost,
             unstable_cost,
-            goal_cost,
+            w_goal * goal_cost,
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,
@@ -263,20 +270,19 @@ class RegraspGoal(MPPIGoal):
 
     def viz_result(self, result, idx: int, scale, color):
         tools_pos = as_float(result[0])
-        keypoints = as_float(result[5])
+        keypoints = as_float(result[6])
         t0 = 0
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
-        grasp_xpos = as_float(result[8])[t0]
+        grasp_xpos = as_float(result[9])[t0]
         self.viz.sphere('left_grasp_xpos', grasp_xpos[0], radius=0.02, color=(0, 1, 0, 0.4), frame_id='world', idx=0)
         self.viz.sphere('right_grasp_xpos', grasp_xpos[1], radius=0.02, color=(0, 1, 0, 0.4), frame_id='world', idx=0)
 
     def recompute_candidates(self, phy):
         from time import perf_counter
         t0 = perf_counter()
-
-        self.current_locs = get_grasp_locs(phy)
+        self.update_current_grasp(phy)
 
         # Reachability planner
         # - minimize geodesic distance to the keypoint (loc)
@@ -290,3 +296,6 @@ class RegraspGoal(MPPIGoal):
         self.homotopy_locs = self.homotopy_gen.generate(phy)
 
         print(f'Recompute candidates: {perf_counter() - t0:.4f}')
+
+    def update_current_grasp(self, phy):
+        self.current_locs = get_grasp_locs(phy)

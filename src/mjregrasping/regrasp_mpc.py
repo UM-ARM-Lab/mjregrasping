@@ -66,7 +66,7 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
-            if self.get_mab_reward(phy) < 0.2 and itr % 10 == 0:
+            if self.get_mab_reward(phy) < 0.30 and itr % 10 == 0:
                 regrasp_goal.recompute_candidates(phy)
                 warmstart_count = 0
                 self.mppi.reset()
@@ -90,6 +90,7 @@ class RegraspMPC:
             did_new_grasp = do_grasp_dynamics(phy, results)
             if did_new_grasp:
                 print("New grasp!")
+                regrasp_goal.update_current_grasp(phy)
                 settle(phy, sub_time_s, self.viz, is_planning=False)
                 warmstart_count = 0
                 self.mppi.reset()

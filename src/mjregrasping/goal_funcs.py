@@ -104,20 +104,13 @@ def get_keypoint(phy, body_idx, offset):
     return keypoint
 
 
-def get_finger_cost(finger_qs, desired_is_grasping):
-    # Double the q_open so we are encouraged to open a lot more than the minimum required to release the rope
-    desired_finger_qs = np.array(
-        [hp['finger_q_closed'] if is_g_i else 2 * hp['finger_q_open'] for is_g_i in desired_is_grasping])
-    finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1))
-    return finger_cost
-
-
-def get_regrasp_costs(finger_qs, is_grasping, desired_locs, regrasp_xpos, tools_pos, rope_points):
+def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, regrasp_xpos, tools_pos, rope_points):
     """
 
     Args:
         finger_qs: Finger joint angle
         is_grasping:  Whether the gripper is grasping
+        current_grasp_locs: The current grasp locations ∈ [0-1]
         desired_locs:  Whether the gripper should grasp ∈ [0-1]
         regrasp_xpos: The 3d position in space corresponding to the regrasp_locs
         tools_pos: The current 3d position of the tool tips
@@ -130,14 +123,24 @@ def get_regrasp_costs(finger_qs, is_grasping, desired_locs, regrasp_xpos, tools_
 
     """
     desired_is_grasping = desired_locs >= 0
-    regrasp_finger_cost = get_finger_cost(finger_qs, desired_is_grasping) * hp['finger_weight']
+
     regrasp_dists = norm(regrasp_xpos - tools_pos, axis=-1)
-    needs_grasp = desired_is_grasping * (1 - is_grasping)
-    regrasp_pos_cost = np.sum(regrasp_dists * needs_grasp, -1) * hp['regrasp_weight']
+    regrasp_pos_cost = np.sum(regrasp_dists * desired_is_grasping, -1) * hp['grasp_pos_weight']
 
     dists = pairwise_squared_distances(regrasp_xpos, rope_points)
     min_dist = np.min(dists)
-    regrasp_near_cost = min_dist * hp['regrasp_near_weight']
+    regrasp_near_cost = min_dist * hp['grasp_near_weight']
+
+    wrong_loc = abs(current_grasp_locs - desired_locs) > hp['grasp_loc_diff_thresh']
+    desired_open = np.logical_or(
+        np.logical_and(np.logical_and(wrong_loc, desired_is_grasping), is_grasping),
+        np.logical_not(desired_is_grasping)
+    )
+    # Double the q_open, so we are encouraged to open a lot more than the minimum required to release the rope
+    desired_finger_qs = np.array(
+        [2 * hp['finger_q_open'] if open_i else hp['finger_q_closed'] for open_i in desired_open])
+    regrasp_finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1)) * hp['grasp_finger_weight']
+
     return regrasp_finger_cost, regrasp_pos_cost, regrasp_near_cost
 
 

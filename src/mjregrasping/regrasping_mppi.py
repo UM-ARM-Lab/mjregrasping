@@ -169,7 +169,7 @@ def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
 
 def do_grasp_dynamics(phy, results):
     tools_pos = results[0]
-    finger_qs = results[6]
+    finger_qs = results[7]
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
     eqs = get_grasp_eqs(phy.m)
