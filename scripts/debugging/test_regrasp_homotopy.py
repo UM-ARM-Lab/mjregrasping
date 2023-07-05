@@ -17,7 +17,7 @@ from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_generators import HomotopyGenerator
+from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
@@ -46,7 +46,7 @@ def main():
 
     states_dir = Path("states/untangle")
     for state_path in states_dir.glob("*.pkl"):
-        # state_path = states_dir / "1688071991.pkl"
+        # state_path = states_dir / "1688067719.pkl"
         d = load_data_and_eq(m, True, state_path)
         phy = Physics(m, d, "computer_rack")
 

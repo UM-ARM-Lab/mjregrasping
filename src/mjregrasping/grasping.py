@@ -1,7 +1,8 @@
 import mujoco
 import numpy as np
 
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_indices_to_locations
+from mjregrasping.physics import Physics
 
 
 def get_is_grasping(m):
@@ -51,3 +52,20 @@ def get_finger_qs(phy):
     leftgripper_q = phy.d.qpos[phy.m.actuator("leftgripper_vel").trnid[0]]
     rightgripper_q = phy.d.qpos[phy.m.actuator("rightgripper_vel").trnid[0]]
     return np.stack([leftgripper_q, rightgripper_q], axis=0)
+
+
+def get_loc_idx_offset_xpos(phy: Physics):
+    rope_length = get_rope_length(phy)
+    for eq in get_grasp_eqs(phy.m):
+        if eq.active:
+            idx = eq.obj2id
+            offset = eq.data[3]
+            xpos = phy.d.xpos[idx] + phy.d.xmat[idx, :, 0] * offset
+            loc = grasp_indices_to_locations(phy.o.rope.body_indices, idx) + (offset / rope_length)
+            yield loc, idx, offset, xpos
+        continue
+
+
+def get_rope_length(phy):
+    rope_length = phy.m.geom(phy.o.rope.geom_indices[0]).size[1] * len(phy.o.rope.geom_indices) * 2
+    return rope_length

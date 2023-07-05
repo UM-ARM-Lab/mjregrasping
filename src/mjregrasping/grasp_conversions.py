@@ -35,3 +35,6 @@ def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_location
     body_x_axis = body_xmat[:, :, 0]
     xpos = body_xpos + body_x_axis * offsets[:, None]
     return grasp_indices, offsets, xpos
+
+
+

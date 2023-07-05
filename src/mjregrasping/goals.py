@@ -11,7 +11,8 @@ from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offset
 from mjregrasping.grasping import get_is_grasping, get_finger_qs
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_generators import SlackGenerator, HomotopyGenerator
+from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
+from mjregrasping.slack_regrasp_generator import SlackGenerator
 from mjregrasping.viz import Viz
 
 

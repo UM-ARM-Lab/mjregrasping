@@ -4,7 +4,6 @@ import mujoco
 import numpy as np
 from numpy.linalg import norm
 
-from mjregrasping.params import hp
 from mjregrasping.viz import Viz
 
 
@@ -64,9 +63,9 @@ def eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz: Opt
         mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
         # Check if the grasping grippers are near their targets
         reached = True
-        for i in range(hp['n_g']):
+        for i, (tool_name, candidate_pos_i) in enumerate(zip(tool_names, candidate_pos)):
             if candidate_is_grasping[i]:
-                d = norm(phy_ik.d.site(tool_names[i]).xpos - candidate_pos[i])
+                d = norm(phy_ik.d.site(tool_name).xpos - candidate_pos_i)
                 if d > 0.01:
                     reached = False
         if viz:
