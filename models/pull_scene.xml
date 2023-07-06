@@ -11,8 +11,10 @@
     <include file="val_eq_constraints.xml"/>
     <worldbody>
         <body name="floor_obstacles">
-<!--            <geom name="box" type="box" pos="0.8 0.06 0.15" size="0.1 0.1 0.15" material="dark-wood"/>-->
-            <geom name="port" type="box" pos="0.8 0.17 0.2" size="0.01 0.01 0.01" rgba="0.2 0.8 0.2 1.0"/>
+            <body name="floor_obstacle1">
+                <geom name="box" type="box" pos="0.8 0.06 0.15" size="0.1 0.1 0.15" material="dark-wood"/>
+                <geom name="port" type="box" pos="0.8 0.17 0.2" size="0.01 0.01 0.01" rgba="0.2 0.8 0.2 1.0"/>
+            </body>
         </body>
     </worldbody>
     <worldbody>

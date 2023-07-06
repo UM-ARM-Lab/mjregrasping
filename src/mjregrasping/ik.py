@@ -59,6 +59,7 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
 
 
 def eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz: Optional[Viz] = None):
+    # TODO: what if we start with a large solref[0] and decrease it? to make the constraint harder over time
     for _ in range(10):
         mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
         # Check if the grasping grippers are near their targets

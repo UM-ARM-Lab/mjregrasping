@@ -24,20 +24,23 @@ class SlackGenerator(RegraspGenerator):
         phy_ik = phy.copy_all()
         gripper_to_world_eq_names = ['left_world', 'right_world']
         tool_names = ['left_tool', 'right_tool']
-        is_reachable = np.zeros([len(tool_names), len(candidates_xpos)], dtype=bool)
+        reachability = np.zeros([len(tool_names), len(candidates_xpos)], dtype=bool)
         for i, tool_name in enumerate(tool_names):
             gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_names[i])
             gripper_to_world_eq.active = 1
             for j, candidate_pos in enumerate(candidates_xpos):
                 gripper_to_world_eq.data[3:6] = candidate_pos
                 reached = eq_sim_ik([tool_name], [candidate_is_grasping[i]], [candidate_pos], phy_ik, viz=None)
-                is_reachable[i, j] = reached
+                q_before = phy.d.qpos[phy.o.val.qpos_indices]
+                q_after = phy_ik.d.qpos[phy_ik.o.val.qpos_indices]
+                reachability_cost = np.linalg.norm(q_after - q_before)
+                reachability[i, j] = reachability_cost if reached else 1000
             gripper_to_world_eq.active = 0
         # tools_pos = get_tool_points(phy)
         # is_reachable = ray_based_reachability(candidates_xpos, phy, tools_pos)
 
         geodesics_costs = np.square(candidates_locs - self.op_goal.loc)
-        combined_costs = geodesics_costs + 1000 * (1 - is_reachable)
+        combined_costs = geodesics_costs + reachability_cost
         best_idx = np.argmin(combined_costs, axis=-1)
         best_candidate_locs = candidates_locs[best_idx]
         best_candidate_locs = best_candidate_locs * candidate_is_grasping + -1 * (1 - candidate_is_grasping)
