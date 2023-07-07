@@ -1,4 +1,5 @@
 from concurrent.futures import ThreadPoolExecutor
+from mjregrasping.cfg import ParamsConfig
 from typing import Optional
 
 import numpy as np
@@ -51,7 +52,6 @@ class RegraspMPC:
 
         itr = 0
         max_iters = 5000
-        sub_time_s = hp['sub_time_s']
         warmstart_count = 0
         self.viz.viz(phy)
         while True:
@@ -66,18 +66,23 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
-            if self.get_mab_reward(phy) < 0.30 and itr % 10 == 0:
+            # TODO: how to choose the new regrasp goal?
+            arm = self.viz.p.config['selected_arm']
+            regrasp_goal.set_arm(arm)
+
+            if self.get_mab_reward(phy) < hp['mab_reward_threshold']:
+                print("Trap detected!")
                 regrasp_goal.recompute_candidates(phy)
                 warmstart_count = 0
                 self.mppi.reset()
                 self.reset_trap_detection()
 
             while warmstart_count < hp['warmstart']:
-                command = self.mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
+                command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)
                 self.mppi_viz(self.mppi, regrasp_goal, phy, command, sub_time_s)
                 warmstart_count += 1
 
-            command = self.mppi.command(phy, regrasp_goal, sub_time_s, num_samples, viz=self.viz)
+            command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)
             self.mppi_viz(self.mppi, regrasp_goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s)
@@ -87,11 +92,11 @@ class RegraspMPC:
                 self.mov.render(phy.d)
 
             results = regrasp_goal.get_results(phy)
-            did_new_grasp = do_grasp_dynamics(phy, results)
+            did_new_grasp = do_grasp_dynamics(phy, results, is_planning=False)
             if did_new_grasp:
                 print("New grasp!")
                 regrasp_goal.update_current_grasp(phy)
-                settle(phy, sub_time_s, self.viz, is_planning=False)
+                settle(phy, sub_time_s=0.1, viz=self.viz, is_planning=False, mov=self.mov)
                 warmstart_count = 0
                 self.mppi.reset()
                 self.reset_trap_detection()
@@ -139,7 +144,7 @@ class RegraspMPC:
             rospy.sleep(0.001)  # needed otherwise messages get dropped :( I hate ROS...
 
         if command is not None:
-            cmd_rollout_results, _, _ = regrasp_rollout(phy.copy_all(), goal, sub_time_s, command[None], viz=None)
+            cmd_rollout_results, _, _ = regrasp_rollout(phy.copy_all(), goal, np.expand_dims(command, 0), np.expand_dims(sub_time_s, 0), viz=None)
             goal.viz_result(cmd_rollout_results, i, color='b', scale=0.004)
 
     def close(self):

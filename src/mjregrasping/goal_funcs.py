@@ -1,10 +1,8 @@
 """ Free functions used by the goals """
-import mujoco
 import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.geometry import point_to_line_segment, pairwise_squared_distances
-from mjregrasping.ik import jacobian_ik_is_reachable
 from mjregrasping.mujoco_objects import Objects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -142,39 +140,3 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
     regrasp_finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1)) * hp['grasp_finger_weight']
 
     return regrasp_finger_cost, regrasp_pos_cost, regrasp_near_cost
-
-
-def ray_based_reachability(candidates_xpos, phy, tools_pos, max_d=0.7):
-    # by having group 1 set to 0, we exclude the rope and grippers/fingers
-    # FIXME: this reachability check is not accurate!
-    include_groups = np.array([1, 0, 0, 0, 0, 0], dtype=np.uint8)
-    is_reachable = np.zeros([len(tools_pos), len(candidates_xpos)], dtype=bool)
-    for i, tool_pos in enumerate(tools_pos):
-        for j, xpos in enumerate(candidates_xpos):
-            out_geomids = np.array([-1], dtype=np.int32)
-            candidate_to_tool = (tool_pos - xpos)
-            # print(i, j, candidate_to_tool, out_geomids)
-            if norm(candidate_to_tool) > max_d:
-                # print("not reachable because the candidate is too far away")
-                is_reachable[i, j] = False
-                continue
-            d = mujoco.mj_ray(phy.m, phy.d, xpos, candidate_to_tool, include_groups, 1, -1, out_geomids)
-            if d > max_d or out_geomids[0] == -1:
-                # print("reachable because either there was no collision, or the collision was far away")
-                is_reachable[i, j] = True
-            else:
-                # print("not reachable because there was a collision and it was close")
-                is_reachable[i, j] = False
-    return is_reachable
-
-
-def ik_based_reachability(candidates_xpos, phy, tools_pos):
-    is_reachable = np.zeros([len(tools_pos), len(candidates_xpos)], dtype=bool)
-    from time import perf_counter
-    t0 = perf_counter()
-    for i, tool_pos in enumerate(tools_pos):
-        tool_body_idx = phy.m.body('left_finger_pad').id if i == 0 else phy.m.body('right_finger_pad').id
-        for j, xpos in enumerate(candidates_xpos):
-            is_reachable[i, j] = jacobian_ik_is_reachable(phy, tool_body_idx, xpos, pos_tol=0.03)
-    print(f'dt: {perf_counter() - t0:.4f}')
-    return is_reachable

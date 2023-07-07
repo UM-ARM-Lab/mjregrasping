@@ -1,26 +1,21 @@
 from copy import copy
-from bayes_opt import BayesianOptimization, Events
-import cma
 from typing import List
 
 import networkx as nx
 import numpy as np
 import rerun as rr
-from pybio_ik import BioIK
+from bayes_opt import BayesianOptimization
 
 from mjregrasping.goal_funcs import get_rope_points
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, grasp_indices_to_locations
-from mjregrasping.grasping import get_grasp_eqs, get_rope_length
-from mjregrasping.ik import eq_sim_ik
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, grasp_indices_to_locations, \
+    make_full_locs, sln_to_locs
+from mjregrasping.grasping import get_rope_length
+from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, create_eq_and_sim_ik
 from mjregrasping.magnetic_fields import get_h_signature
 from mjregrasping.mujoco_objects import parents_points
-from mjregrasping.params import hp
+from mjregrasping.params import ALLOWABLE_IS_GRASPING
 from mjregrasping.regrasp_generator import RegraspGenerator
 from mjregrasping.viz import Viz
-
-HARD_CONSTRAINT_PENALTY = 1e3
-
-IK_OFFSET = np.array([0, 0, 0.145])
 
 
 def pairwise(x):
@@ -52,24 +47,16 @@ class HomotopyGenerator(RegraspGenerator):
         self.tool_names = ["left_tool", "right_tool"]
         self.tool_bodies = ["drive50", "drive10"]
         self.gripper_to_world_eq_names = ['left_world', 'right_world']
-        self.bio_ik = BioIK("robot_description")
 
     def generate(self, phy):
         initial_rope_points = copy(get_rope_points(phy))
         _, h = self.get_h_signature(phy, initial_rope_points)
 
-        allowable_is_grasping = np.array([
-            [0, 1],
-            [1, 0],
-            [1, 1],
-            # [0, 0],
-        ])
-
         # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
         #  Can we prove that there is always a way to change homotopy? Or prove a correct stopping condition?
         best_locs = None
         best_cost = np.inf
-        for candidate_is_grasping in allowable_is_grasping:
+        for candidate_is_grasping in ALLOWABLE_IS_GRASPING:
             bounds = {}
             for tool_name, is_grasping_i in zip(self.tool_names, candidate_is_grasping):
                 if is_grasping_i:
@@ -82,10 +69,11 @@ class HomotopyGenerator(RegraspGenerator):
 
                 # Construct phy_ik to match the candidate grasp
                 phy_ik, reached = create_eq_and_sim_ik(phy, self.tool_names, self.gripper_to_world_eq_names,
-                                                       candidate_is_grasping, candidate_idx, candidate_pos)
-                q_before = phy.d.qpos[phy.o.val.qpos_indices]
-                q_after = phy_ik.d.qpos[phy_ik.o.val.qpos_indices]
-                reachability_cost = np.linalg.norm(q_after - q_before) if reached else HARD_CONSTRAINT_PENALTY
+                                                       candidate_is_grasping, candidate_idx, candidate_pos,
+                                                       viz=None)
+                # self.viz.viz(phy_ik, is_planning=True)
+
+                reachability_cost = get_reachability_cost(phy, phy_ik, reached, candidate_locs, candidate_is_grasping)
 
                 _, candidate_h = self.get_h_signature(phy_ik, initial_rope_points)
                 homotopy_cost = HARD_CONSTRAINT_PENALTY if h_equal(h, candidate_h) else 0
@@ -94,8 +82,9 @@ class HomotopyGenerator(RegraspGenerator):
                 # BayesOpt uses maximization, so we need to negate the cost
                 return -cost
 
-            opt = BayesianOptimization(f=_cost, pbounds=bounds, verbose=2, random_state=1)
-            opt.maximize(n_iter=10, init_points=3)
+            opt = BayesianOptimization(f=_cost, pbounds=bounds, verbose=0, random_state=self.rng.randint(0, 1000),
+                                       allow_duplicate_points=True)
+            opt.maximize(n_iter=8, init_points=5)
             sln = opt.max
             cost = -sln['target']  # BayesOpt uses maximization, so we need to negate to get cost
             locs = sln_to_locs(sln['params'], candidate_is_grasping)
@@ -110,8 +99,8 @@ class HomotopyGenerator(RegraspGenerator):
                 best_cost = cost
 
         if best_cost >= HARD_CONSTRAINT_PENALTY:
-            print("No valid different homotopies found")
-            return np.array([-1, -1])
+            print("All candidates were homologous")
+            return None
         return best_locs
 
     def get_h_signature(self, phy, initial_rope_points):
@@ -300,52 +289,3 @@ def has_gripper_gripper_edge(loop):
     return None
 
 
-def create_eq_and_sim_ik(phy, tool_names, gripper_to_world_eq_names, candidate_is_grasping, candidate_idx,
-                         candidate_pos):
-    phy_ik = phy.copy_all()
-    grasp_eqs = get_grasp_eqs(phy_ik.m)
-    ik_targets = {}
-    for i in range(hp['n_g']):
-        tool_name = tool_names[i]
-        gripper_to_world_eq_name = gripper_to_world_eq_names[i]
-        eq = grasp_eqs[i]
-        # Set eq_active and qpos depending on the grasp
-        if candidate_is_grasping[i]:
-            eq.active = 1
-            eq.obj2id = candidate_idx[i]
-            ik_targets[tool_name] = candidate_pos[i] - IK_OFFSET
-            gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
-            gripper_to_world_eq.active = 1
-            gripper_to_world_eq.data[3:6] = candidate_pos[i]
-        else:
-            eq.active = 0
-    # Estimate reachability using eq constraints in mujoco
-    reached = eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz=None)
-    return phy_ik, reached
-
-
-def make_full_locs(locs_where_grasping, is_grasping):
-    candidate_locs = []
-    j = 0
-    for is_grasping_i in is_grasping:
-        if is_grasping_i:
-            candidate_locs.append(locs_where_grasping[j])
-            j += 1
-        else:
-            candidate_locs.append(-1)
-    candidate_locs = np.array(candidate_locs)
-    return candidate_locs
-
-
-def sln_to_locs(best_sln, candidate_is_grasping):
-    locs = []
-    best_sln = list(best_sln.values())
-    j = 0
-    for is_grasping_i in candidate_is_grasping:
-        if is_grasping_i:
-            locs.append(best_sln[j])
-            j += 1
-        else:
-            locs.append(-1)
-    locs = np.array(locs)
-    return locs

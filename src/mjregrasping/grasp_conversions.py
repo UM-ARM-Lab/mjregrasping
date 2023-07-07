@@ -37,4 +37,28 @@ def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_location
     return grasp_indices, offsets, xpos
 
 
+def make_full_locs(locs_where_grasping, is_grasping):
+    candidate_locs = []
+    j = 0
+    for is_grasping_i in is_grasping:
+        if is_grasping_i:
+            candidate_locs.append(locs_where_grasping[j])
+            j += 1
+        else:
+            candidate_locs.append(-1)
+    candidate_locs = np.array(candidate_locs)
+    return candidate_locs
 
+
+def sln_to_locs(best_sln, candidate_is_grasping):
+    locs = []
+    best_sln = list(best_sln.values())
+    j = 0
+    for is_grasping_i in candidate_is_grasping:
+        if is_grasping_i:
+            locs.append(best_sln[j])
+            j += 1
+        else:
+            locs.append(-1)
+    locs = np.array(locs)
+    return locs

@@ -7,27 +7,28 @@ from numpy.linalg import norm
 from mjregrasping.goals import as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_eqs
-from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.math import softmax
+from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.params import hp
 from mjregrasping.rerun_visualizer import log_line_with_std
 from mjregrasping.rollout import control_step
 
 
 class RegraspMPPI(MujocoMPPI):
-    """ The regrasping problem has a slightly different action representation and rollout function """
 
     def __init__(self, pool, nu, seed, horizon, noise_sigma, n_g, temp=1.):
-        # TODO: add an additional gripper action for releasing initially
         super().__init__(pool, nu, seed, horizon, noise_sigma, temp, None)
         self.n_g = n_g  # number of grippers
         self.rng = np.random.RandomState(seed)
         self.u_sigma_diag = np.ones(nu) * self.initial_noise_sigma
         self.u_mu = np.zeros([self.horizon * nu])
+        self.time_sigma = 0.03
+        self.time_mu = hp['sub_time_s']
 
     def reset(self):
         self.u_sigma_diag = np.ones(self.nu) * self.initial_noise_sigma
         self.u_mu = np.zeros([self.horizon * self.nu])
+        self.time_mu = hp['sub_time_s']
 
     def roll(self):
         u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
@@ -35,28 +36,31 @@ class RegraspMPPI(MujocoMPPI):
         u_mu_square[-1] = 0
         self.u_mu = u_mu_square.reshape(-1)
 
-    def command(self, phy, goal, sub_time_s, num_samples, viz=None):
+    def command(self, phy, goal, num_samples, viz=None):
         u_sigma_diag_rep = np.tile(self.u_sigma_diag, self.horizon)
         u_sigma_mat = np.diagflat(u_sigma_diag_rep)
 
         u_samples = self.noise_rng.multivariate_normal(self.u_mu, u_sigma_mat, size=num_samples)
+        time_samples = self.noise_rng.normal(self.time_mu, self.time_sigma, size=num_samples)
 
+        # Bound u
         lower = np.tile(phy.m.actuator_ctrlrange[:, 0], self.horizon)
         upper = np.tile(phy.m.actuator_ctrlrange[:, 1], self.horizon)
         u_samples = np.clip(u_samples, lower, upper)
+        # Also bound time
+        time_samples = np.clip(time_samples, hp['min_sub_time_s'], hp['max_sub_time_s'])
 
         u_noise = u_samples - self.u_mu
+        time_noise = time_samples - self.time_mu
 
         self.rollout_results, self.cost, costs_by_term = self.regrasp_parallel_rollout(phy, goal, u_samples,
+                                                                                       time_samples,
                                                                                        num_samples,
-                                                                                       sub_time_s,
-                                                                                       viz=viz)
+                                                                                       viz=None)
 
         cost_term_names = goal.cost_names() + ['smoothness', 'ever_not_grasping']
         for cost_term_name, costs_for_term in zip(cost_term_names, costs_by_term.T):
             rr.log_scalar(f'regrasp_goal/{cost_term_name}', np.mean(costs_for_term))
-
-        log_line_with_std('regrasp_cost', self.cost, color=[0, 255, 255])
 
         # normalized cost is only used for visualization, so we avoid numerical issues
         cost_range = (self.cost.max() - self.cost.min())
@@ -70,26 +74,29 @@ class RegraspMPPI(MujocoMPPI):
         rr.log_tensor('σ', self.u_sigma_diag)
 
         # compute the (weighted) average noise and add that to the reference control
-        weighted_avg_noise = np.sum(weights[..., None] * u_noise, axis=0)
+        weighted_avg_u_noise = np.sum(weights[..., None] * u_noise, axis=0)
+        weight_avg_time_noise = np.sum(weights * time_noise, axis=0)
 
-        # Covariance update for u
+        # Update mean
+        self.u_mu += weighted_avg_u_noise
+        self.time_mu += weight_avg_time_noise
+
+        # Update covariance
         u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
-        u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
-        self.u_sigma_diag = weights @ np.mean((u_samples_square - u_mu_square) ** 2, axis=1)
+        new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
+        self.u_sigma_diag = weights @ np.mean((u_samples_square - new_u_mu_square) ** 2, axis=1)
+        # NOTE: we could adapt time_sigma with this: weights @ (time_samples - self.time_mu) ** 2
 
-        self.u_mu += weighted_avg_noise
+        rr.log_scalar("time μ", self.time_mu)
 
-        command = u_mu_square[0]
-        return command
+        command = new_u_mu_square[0]
+        return command, self.time_mu
 
-    def regrasp_parallel_rollout(self, phy, goal, u_samples, num_samples, sub_time_s, viz):
+    def regrasp_parallel_rollout(self, phy, goal, u_samples, time_samples, num_samples, viz):
         u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
-
-        if not viz.p.viz_planning:
-            viz = None
 
         # We must also copy model here because EQs are going to be changing
-        args_sets = [(phy.copy_all(), goal, sub_time_s, *args_i) for args_i in zip(u_samples_square, )]
+        args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
 
         if viz:
             results = []
@@ -118,13 +125,15 @@ class RegraspMPPI(MujocoMPPI):
         return results, costs, costs_by_term
 
 
-def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
+def regrasp_rollout(phy, goal, u_sample, sub_time_s, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """
     if viz:
         viz.viz(phy, is_planning=True)
 
     results_0 = goal.get_results(phy)
-    do_grasp_dynamics(phy, results_0)
+    # Only do this at the beginning, since it's expensive and if it went in the loop, it could potentially cause
+    # rapid oscillations of grasping/not grasping which seems undesirable.
+    do_grasp_dynamics(phy, results_0, is_planning=True)
     results = [results_0]
 
     costs = []
@@ -157,7 +166,7 @@ def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
 
     is_grasping = as_float(results[2])
     no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
-    ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping']
+    ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
 
     cost = per_time_cost + smoothness_cost + ever_not_grasping_cost
 
@@ -167,7 +176,7 @@ def regrasp_rollout(phy, goal, sub_time_s, u_sample, viz=None):
     return results, cost, costs_by_term
 
 
-def do_grasp_dynamics(phy, results):
+def do_grasp_dynamics(phy, results, is_planning=False):
     tools_pos = results[0]
     finger_qs = results[7]
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop

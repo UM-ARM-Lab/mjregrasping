@@ -7,7 +7,6 @@ from pathlib import Path
 import mujoco
 import rerun as rr
 
-import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import Params

@@ -195,12 +195,18 @@ class RegraspGoal(MPPIGoal):
         self.n_g = hp['n_g']
         self.slack_gen = SlackGenerator(op_goal, viz)
         self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, viz)
+        self.arm = ParamsConfig.Params_Goal
+        self.current_locs = None
 
     def satisfied(self, phy):
         return self.op_goal.satisfied(phy)
 
     def viz_goal(self, phy):
         self.op_goal.viz_goal(phy)
+
+    def set_arm(self, arm):
+        # TODO: MAB should choose these weights
+        self.arm = arm
 
     def get_results(self, phy: Physics):
         # Create goals that makes the closest point on the rope the intended goal
@@ -215,16 +221,14 @@ class RegraspGoal(MPPIGoal):
                                                                                   phy.o.rope.body_indices)
         keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
 
-        # TODO: MAB should choose these weights
-        arm = self.viz.p.config['selected_arm']
-        if arm == ParamsConfig.Params_Goal:
+        if self.arm == ParamsConfig.Params_Goal:
             grasp_locs = self.current_locs
-        elif arm == ParamsConfig.Params_Homotopy:
+        elif self.arm == ParamsConfig.Params_Homotopy:
             grasp_locs = self.homotopy_locs
-        elif arm == ParamsConfig.Params_Slack:
+        elif self.arm == ParamsConfig.Params_Slack:
             grasp_locs = self.slack_locs
         else:
-            raise NotImplementedError(arm)
+            raise NotImplementedError(self.arm)
 
         _, _, grasp_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, grasp_locs)
 
@@ -247,8 +251,7 @@ class RegraspGoal(MPPIGoal):
                                                                                current_grasp_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
-        arm = self.viz.p.config['selected_arm']
-        w_goal = 1 if arm == ParamsConfig.Params_Goal else 0
+        w_goal = 1 if self.arm == ParamsConfig.Params_Goal else 0
         return (
             contact_cost,
             unstable_cost,
@@ -276,8 +279,8 @@ class RegraspGoal(MPPIGoal):
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
         grasp_xpos = as_float(result[9])[t0]
-        self.viz.sphere('left_grasp_xpos', grasp_xpos[0], radius=0.02, color=(0, 1, 0, 0.4), frame_id='world', idx=0)
-        self.viz.sphere('right_grasp_xpos', grasp_xpos[1], radius=0.02, color=(0, 1, 0, 0.4), frame_id='world', idx=0)
+        self.viz.sphere('left_grasp_xpos', grasp_xpos[0], radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), frame_id='world', idx=0)
+        self.viz.sphere('right_grasp_xpos', grasp_xpos[1], radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), frame_id='world', idx=0)
 
     def recompute_candidates(self, phy):
         from time import perf_counter
@@ -295,7 +298,9 @@ class RegraspGoal(MPPIGoal):
         # We can start by trying rejection sampling?
         self.homotopy_locs = self.homotopy_gen.generate(phy)
 
-        print(f'Recompute candidates: {perf_counter() - t0:.4f}')
+        print(f'Homotopy: {self.homotopy_locs}')
+        print(f'Slack: {self.slack_locs}')
+        print(f'dt: {perf_counter() - t0:.3f}')
 
     def update_current_grasp(self, phy):
         self.current_locs = get_grasp_locs(phy)

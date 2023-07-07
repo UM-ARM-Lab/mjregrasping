@@ -56,7 +56,7 @@ def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     runner = Untangle()
-    runner.run([5], obstacle_name="computer_rack")
+    runner.run([4], obstacle_name="computer_rack")
 
 
 if __name__ == "__main__":
