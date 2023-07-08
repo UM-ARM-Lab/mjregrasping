@@ -1,6 +1,6 @@
-<mujoco model="val">
+<mujoco model="conq">
     <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
-    <option viscosity="0.1" timestep="0.005"/>
+    <option viscosity="1.0" timestep="0.004"/>
     <worldbody>
         <light name="top" pos="0 0 105" mode="trackcom"/>
         <body name="conq_base">
