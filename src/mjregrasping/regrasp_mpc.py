@@ -26,13 +26,11 @@ class RegraspMPC:
         self.pool = pool
         self.viz = viz
         self.op_goal = goal
-        self.n_g = hp['n_g']
         self.mov = mov
         self.is_gasping_rng = np.random.RandomState(0)
 
         self.mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=seed, horizon=hp['regrasp_horizon'],
-                                noise_sigma=np.deg2rad(2),
-                                n_g=self.n_g, temp=hp['regrasp_temp'])
+                                noise_sigma=np.deg2rad(2), temp=hp['regrasp_temp'])
         self.state_history = Buffer(hp['state_history_size'])
         self.max_dq = None
         self.reset_trap_detection()
@@ -124,7 +122,7 @@ class RegraspMPC:
 
     def get_q_for_trap_detection(self, phy):
         return np.concatenate(
-            (hp['q_joint_weight'] * phy.d.qpos[phy.o.rope.qpos_indices], phy.d.qpos[phy.o.val.qpos_indices]))
+            (hp['q_joint_weight'] * phy.d.qpos[phy.o.rope.qpos_indices], phy.d.qpos[phy.o.robot.qpos_indices]))
 
     def mppi_viz(self, mppi, goal, phy, command, sub_time_s):
         if not self.viz.p.mppi_rollouts:
@@ -140,12 +138,12 @@ class RegraspMPC:
             c = list(cm.RdYlGn(1 - cost_normalized))
             c[-1] = 0.8
             result_i = mppi.rollout_results[:, sorted_traj_idx]
-            goal.viz_result(result_i, i, color=c, scale=0.002)
+            goal.viz_result(phy, result_i, i, color=c, scale=0.002)
             rospy.sleep(0.001)  # needed otherwise messages get dropped :( I hate ROS...
 
         if command is not None:
             cmd_rollout_results, _, _ = regrasp_rollout(phy.copy_all(), goal, np.expand_dims(command, 0), np.expand_dims(sub_time_s, 0), viz=None)
-            goal.viz_result(cmd_rollout_results, i, color='b', scale=0.004)
+            goal.viz_result(phy, cmd_rollout_results, i, color='b', scale=0.004)
 
     def close(self):
         if self.mov is not None:

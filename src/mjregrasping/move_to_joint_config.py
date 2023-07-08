@@ -28,6 +28,7 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
         offending_q_idx = np.argmax(error)
         abs_qvel = np.abs(q_prev - q_current)
         offending_qvel_idx = np.argmax(abs_qvel)
+        # NOTE: this assumes all joints are rotational...
         reached = np.rad2deg(max_joint_error) < 1
         stopped = np.rad2deg(np.max(abs_qvel)) < 0.5
         if reached and stopped:
@@ -43,12 +44,6 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
     logger.error(f"PID failed to converge. {reason}")
 
 
-def get_q_current(phy):
-    # NOTE: if I used "sensors" instead of "qpos", it might clearer because I could just omit the sensor
-    #  for the mimic'd gripper joint.
-    deduplicated_indices = np.array([0, 1,
-                                     2, 3, 4, 5, 6, 7, 8,
-                                     9,
-                                     11, 12, 13, 14, 15, 16, 17,
-                                     18])
-    return copy(phy.d.qpos[deduplicated_indices])
+def get_q_current(phy: Physics):
+    qpos_for_act = phy.m.actuator_trnid[:, 0]
+    return copy(phy.d.qpos[qpos_for_act])

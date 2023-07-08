@@ -7,8 +7,9 @@ from arc_utilities import ros_init
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.mujoco_objects import Object
+from mjregrasping.mujoco_objects import Object, Objects
 from mjregrasping.regrasp_mpc_runner import Runner
+from mjregrasping.robot_data import val
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 
 
@@ -31,8 +32,7 @@ class Pull(Runner):
         ])
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
-        rope = Object(phy.m, "rope")
-        rope_body_indices = np.array(rope.body_indices)
+        rope_body_indices = np.array(phy.o.rope.body_indices)
         activate_grasp(phy, 'left', 0.0, rope_body_indices)
         robot_q2[9] = 0.1
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
@@ -46,13 +46,16 @@ class Pull(Runner):
     def get_skeletons(self):
         return {}
 
+    def get_objects(self, m):
+        return Objects(m, "floor_obstacles", val, "rope")
+
 
 @ros_init.with_ros("pull")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     runner = Pull()
-    runner.run([2], "floor_obstacles")
+    runner.run([2])
 
 
 if __name__ == "__main__":

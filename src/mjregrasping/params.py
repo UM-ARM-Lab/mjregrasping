@@ -9,7 +9,6 @@ hp = {
     "regrasp_horizon":          15,
     "regrasp_n_samples":        50,
     "regrasp_temp":             0.1,
-    "n_g":                      2,
     "goal_weight":              1.0,
     "grasp_pos_weight":         1.0,
     "grasp_near_weight":        5.0,
@@ -55,11 +54,3 @@ class Params:
 
     def __getattr__(self, item):
         return getattr(self.config, item)
-
-
-ALLOWABLE_IS_GRASPING = np.array([
-    [0, 1],
-    [1, 0],
-    [1, 1],
-    # [0, 0],
-])

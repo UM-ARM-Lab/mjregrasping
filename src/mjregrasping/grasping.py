@@ -5,14 +5,14 @@ from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offset
 from mjregrasping.physics import Physics
 
 
-def get_is_grasping(m):
-    eqs = get_grasp_eqs(m)
-    is_grasping = np.array([m.eq_active[eq.id] for eq in eqs])
+def get_is_grasping(phy):
+    eqs = get_grasp_eqs(phy)
+    is_grasping = np.array([phy.m.eq_active[eq.id] for eq in eqs])
     return is_grasping
 
 
-def get_grasp_eqs(m):
-    return [m.eq('left'), m.eq('right')]
+def get_grasp_eqs(phy: Physics):
+    return [phy.m.eq(eq_name) for eq_name in phy.o.rd.rope_grasp_eqs]
 
 
 def activate_grasp(phy, name, loc, rope_body_indices):
@@ -48,16 +48,15 @@ def activate_grasp(phy, name, loc, rope_body_indices):
         grasp_eq.data[6:10] = g_b_quat
 
 
-def get_finger_qs(phy):
-    leftgripper_q = phy.d.qpos[phy.m.actuator("leftgripper_vel").trnid[0]]
-    rightgripper_q = phy.d.qpos[phy.m.actuator("rightgripper_vel").trnid[0]]
-    return np.stack([leftgripper_q, rightgripper_q], axis=0)
+def get_finger_qs(phy: Physics):
+    qs = [phy.d.qpos[phy.m.actuator(actuator_name).trnid[0]] for actuator_name in phy.o.rd.gripper_actuator_names]
+    return np.stack(qs, axis=0)
 
 
 def get_grasp_locs(phy: Physics):
     rope_length = get_rope_length(phy)
     locs = []
-    for eq in get_grasp_eqs(phy.m):
+    for eq in get_grasp_eqs(phy):
         if eq.active:
             idx = int(eq.obj2id)
             offset = eq.data[3]
@@ -70,7 +69,7 @@ def get_grasp_locs(phy: Physics):
 
 def get_loc_idx_offset_xpos(phy: Physics):
     rope_length = get_rope_length(phy)
-    for eq in get_grasp_eqs(phy.m):
+    for eq in get_grasp_eqs(phy):
         if eq.active:
             idx = eq.obj2id
             offset = eq.data[3]

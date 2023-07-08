@@ -17,8 +17,8 @@ def get_contact_cost(phy: Physics):
     for contact in phy.d.contact:
         geom_name1 = phy.m.geom(contact.geom1).name
         geom_name2 = phy.m.geom(contact.geom2).name
-        if (geom_name1 in all_obstacle_geoms and geom_name2 in phy.o.val_collision_geom_names) or \
-                (geom_name2 in all_obstacle_geoms and geom_name1 in phy.o.val_collision_geom_names) or \
+        if (geom_name1 in all_obstacle_geoms and geom_name2 in phy.o.robot_collision_geom_names) or \
+                (geom_name2 in all_obstacle_geoms and geom_name1 in phy.o.robot_collision_geom_names) or \
                 val_self_collision(geom_name1, geom_name2, phy.o):
             contact_cost += 1
     max_expected_contacts = 6.0
@@ -29,7 +29,7 @@ def get_contact_cost(phy: Physics):
 
 
 def val_self_collision(geom_name1, geom_name2, objects: Objects):
-    return geom_name1 in objects.val_self_collision_geom_names and geom_name2 in objects.val_self_collision_geom_names
+    return geom_name1 in objects.robot_self_collision_geom_names and geom_name2 in objects.robot_self_collision_geom_names
 
 
 def get_action_cost(joint_positions):
@@ -48,9 +48,8 @@ def get_results_common(phy: Physics):
 
 
 def get_tool_points(phy):
-    left_tool_pos = phy.d.site('left_tool').xpos
-    right_tool_pos = phy.d.site('right_tool').xpos
-    return np.stack([left_tool_pos, right_tool_pos], 0)
+    xpos = [phy.d.site(site_name).xpos for site_name in phy.o.rd.tool_sites]
+    return np.stack(xpos, 0)
 
 
 def get_rope_points(phy):

@@ -8,6 +8,7 @@ from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_contact_cost
 from mjregrasping.grasping import get_grasp_eqs
 from mjregrasping.params import hp
+from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
 
 
@@ -62,13 +63,13 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     return ctrl, position_error
 
 
-def eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz: Optional[Viz] = None):
+def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Optional[Viz] = None):
     # TODO: what if we start with a large solref[0] and decrease it? to make the constraint harder over time
     for _ in range(10):
         mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
         # Check if the grasping grippers are near their targets
         reached = True
-        for i, (tool_name, candidate_pos_i) in enumerate(zip(tool_names, candidate_pos)):
+        for i, (tool_name, candidate_pos_i) in enumerate(zip(phy_ik.o.rd.tool_sites, candidate_pos)):
             if candidate_is_grasping[i]:
                 d = norm(phy_ik.d.site(tool_name).xpos - candidate_pos_i)
                 if d > 0.01:
@@ -81,8 +82,8 @@ def eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz: Opt
 
 
 def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
-    q_before = phy_before.d.qpos[phy_before.o.val.qpos_indices]
-    q_after = phy_after.d.qpos[phy_after.o.val.qpos_indices]
+    q_before = phy_before.d.qpos[phy_before.o.robot.qpos_indices]
+    q_after = phy_after.d.qpos[phy_after.o.robot.qpos_indices]
     contact_cost_before = get_contact_cost(phy_before)
     contact_cost_after = get_contact_cost(phy_after)
     new_contact_cost = contact_cost_after - contact_cost_before
@@ -137,14 +138,14 @@ def ik_based_reachability(candidates_xpos, phy, tools_pos):
     return is_reachable
 
 
-def create_eq_and_sim_ik(phy, tool_names, gripper_to_world_eq_names, candidate_is_grasping, candidate_idx,
+def create_eq_and_sim_ik(phy: Physics, candidate_is_grasping, candidate_idx,
                          candidate_pos, viz):
     phy_ik = phy.copy_all()
-    grasp_eqs = get_grasp_eqs(phy_ik.m)
+    grasp_eqs = get_grasp_eqs(phy)
     ik_targets = {}
-    for i in range(hp['n_g']):
-        tool_name = tool_names[i]
-        gripper_to_world_eq_name = gripper_to_world_eq_names[i]
+    for i in range(phy.o.rd.n_g):
+        tool_name = phy.o.rd.tool_sites[i]
+        gripper_to_world_eq_name = phy.o.rd.world_gripper_eqs[i]
         eq = grasp_eqs[i]
         # Set eq_active and qpos depending on the grasp
         if candidate_is_grasping[i]:
@@ -157,5 +158,5 @@ def create_eq_and_sim_ik(phy, tool_names, gripper_to_world_eq_names, candidate_i
         else:
             eq.active = 0
     # Estimate reachability using eq constraints in mujoco
-    reached = eq_sim_ik(tool_names, candidate_is_grasping, candidate_pos, phy_ik, viz=viz)
+    reached = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik, viz=viz)
     return phy_ik, reached

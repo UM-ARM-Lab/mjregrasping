@@ -8,22 +8,31 @@ from mjregrasping.goals import as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_eqs
 from mjregrasping.math import softmax
-from mjregrasping.mujoco_mppi import MujocoMPPI
 from mjregrasping.params import hp
-from mjregrasping.rerun_visualizer import log_line_with_std
 from mjregrasping.rollout import control_step
 
 
-class RegraspMPPI(MujocoMPPI):
+class RegraspMPPI:
 
-    def __init__(self, pool, nu, seed, horizon, noise_sigma, n_g, temp=1.):
-        super().__init__(pool, nu, seed, horizon, noise_sigma, temp, None)
-        self.n_g = n_g  # number of grippers
-        self.rng = np.random.RandomState(seed)
+    def __init__(self, pool, nu, seed, horizon, noise_sigma, temp):
+        self.pool = pool
+        self.horizon = horizon
+        self.nu = nu
+
+        self.initial_noise_sigma = noise_sigma
+        self.seed = seed
+        self.temp = temp
+
+        self.noise_rng = np.random.RandomState(seed)
         self.u_sigma_diag = np.ones(nu) * self.initial_noise_sigma
         self.u_mu = np.zeros([self.horizon * nu])
         self.time_sigma = 0.03
         self.time_mu = hp['sub_time_s']
+
+        # sampled results from last command
+        self.rollout_results = None
+        self.cost = None
+        self.cost_normalized = None
 
     def reset(self):
         self.u_sigma_diag = np.ones(self.nu) * self.initial_noise_sigma
@@ -181,7 +190,7 @@ def do_grasp_dynamics(phy, results, is_planning=False):
     finger_qs = results[7]
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
-    eqs = get_grasp_eqs(phy.m)
+    eqs = get_grasp_eqs(phy)
     for tool_pos, finger_q, eq in zip(tools_pos, finger_qs, eqs):
         is_grasping = bool(eq.active)
         if is_grasping:

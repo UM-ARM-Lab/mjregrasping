@@ -16,7 +16,7 @@ def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
     np.seterr(all='raise')
 
-    model_xml_prefix = 'computer_rack'
+    model_xml_prefix = 'hose_obstacles'
     model_xml_filename = f"models/{model_xml_prefix}.xml"
     skeleton_filename = f"models/{model_xml_prefix}_skeleton.hjson"
 

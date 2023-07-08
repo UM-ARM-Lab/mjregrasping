@@ -35,11 +35,12 @@ class Runner:
         self.root = Path("results") / self.__class__.__name__
         self.root.mkdir(exist_ok=True, parents=True)
 
-    def run(self, seeds, obstacle_name):
+    def run(self, seeds):
         for seed in seeds:
             m = mujoco.MjModel.from_xml_path(self.xml_path)
             d = mujoco.MjData(m)
-            phy = Physics(m, d, obstacle_name)
+            objects = self.get_objects(m)
+            phy = Physics(m, d, objects)
 
             self.setup_scene(phy, self.viz)
 
@@ -60,7 +61,7 @@ class Runner:
                 mpc.run(phy)
                 mpc.close()
 
-    def make_goal(self):
+    def make_goal(self, phy):
         raise NotImplementedError()
         # goal = ObjectPointGoal(dfield=None,
         #                        viz=self.viz,
@@ -73,4 +74,10 @@ class Runner:
         pass
 
     def get_skeletons(self):
+        raise NotImplementedError()
+
+    def get_robot_name(self):
+        raise NotImplementedError()
+
+    def get_objects(self, m):
         raise NotImplementedError()

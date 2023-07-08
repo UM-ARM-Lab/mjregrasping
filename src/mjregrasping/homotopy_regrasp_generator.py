@@ -13,8 +13,8 @@ from mjregrasping.grasping import get_rope_length
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, create_eq_and_sim_ik
 from mjregrasping.magnetic_fields import get_h_signature
 from mjregrasping.mujoco_objects import parents_points
-from mjregrasping.params import ALLOWABLE_IS_GRASPING
-from mjregrasping.regrasp_generator import RegraspGenerator
+from mjregrasping.physics import Physics
+from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
 from mjregrasping.viz import Viz
 
 
@@ -44,11 +44,8 @@ class HomotopyGenerator(RegraspGenerator):
     def __init__(self, op_goal, skeletons, viz: Viz):
         super().__init__(op_goal, viz)
         self.skeletons = skeletons
-        self.tool_names = ["left_tool", "right_tool"]
-        self.tool_bodies = ["drive50", "drive10"]
-        self.gripper_to_world_eq_names = ['left_world', 'right_world']
 
-    def generate(self, phy):
+    def generate(self, phy: Physics):
         initial_rope_points = copy(get_rope_points(phy))
         _, h = self.get_h_signature(phy, initial_rope_points)
 
@@ -56,9 +53,9 @@ class HomotopyGenerator(RegraspGenerator):
         #  Can we prove that there is always a way to change homotopy? Or prove a correct stopping condition?
         best_locs = None
         best_cost = np.inf
-        for candidate_is_grasping in ALLOWABLE_IS_GRASPING:
+        for candidate_is_grasping in get_allowable_is_grasping(phy.o.rd.n_g):
             bounds = {}
-            for tool_name, is_grasping_i in zip(self.tool_names, candidate_is_grasping):
+            for tool_name, is_grasping_i in zip(phy.o.rd.tool_sites, candidate_is_grasping):
                 if is_grasping_i:
                     bounds[tool_name] = (0, 1)
 
@@ -68,8 +65,7 @@ class HomotopyGenerator(RegraspGenerator):
                 candidate_idx, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
 
                 # Construct phy_ik to match the candidate grasp
-                phy_ik, reached = create_eq_and_sim_ik(phy, self.tool_names, self.gripper_to_world_eq_names,
-                                                       candidate_is_grasping, candidate_idx, candidate_pos,
+                phy_ik, reached = create_eq_and_sim_ik(phy, candidate_is_grasping, candidate_idx, candidate_pos,
                                                        viz=None)
                 # self.viz.viz(phy_ik, is_planning=True)
 
@@ -123,7 +119,7 @@ class HomotopyGenerator(RegraspGenerator):
         #  2. base of the robot
         #  3. grasping grippers
         graph = nx.DiGraph()
-        base_xpos = phy.d.body('val_base').xpos
+        base_xpos = phy.d.body(phy.o.rd.base_link).xpos
         graph.add_node('b', loc=-1, xpos=base_xpos, point_idx=-1)  # base of the robot. -1 is a dummy value
         rope_length = get_rope_length(phy)
         attach_i = 0
@@ -139,10 +135,9 @@ class HomotopyGenerator(RegraspGenerator):
                 if "attach" in eq.name:
                     graph.add_node(f'a{attach_i}', loc=loc, xpos=xpos, point_idx=point_idx)
                     attach_i += 1
-                elif eq.name == 'left':  # FIXME: hardcoded gripper names
-                    graph.add_node(f'g0', loc=loc, xpos=xpos, point_idx=point_idx)
-                elif eq.name == 'right':
-                    graph.add_node(f'g1', loc=loc, xpos=xpos, point_idx=point_idx)
+                if eq.name in phy.o.rd.rope_grasp_eqs:
+                    eq_name_idx = phy.o.rd.rope_grasp_eqs.index(eq.name)
+                    graph.add_node(f'g{eq_name_idx}', loc=loc, xpos=xpos, point_idx=point_idx)
 
         while True:
             # Edges in the graph are added based on the following rules. All edges are bidirectional.
@@ -164,7 +159,7 @@ class HomotopyGenerator(RegraspGenerator):
             # which we get from the EQ constraints. The order of the bodies depends on the order of the edge,
             # i.e "g0->a" vs "a->g0". Finally, an edge like "b->a" is simply the robot base position and the "a" position.
             # order still matters.
-            arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in self.tool_bodies]
+            arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in phy.o.rd.tool_bodies]
             for i in graph.nodes:
                 for j in graph.nodes:
                     if i == j:
@@ -287,5 +282,3 @@ def has_gripper_gripper_edge(loop):
         if 'g' in e1 and 'g' in e2:
             return e1, e2
     return None
-
-

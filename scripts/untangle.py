@@ -7,8 +7,9 @@ from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.mujoco_objects import Object
+from mjregrasping.mujoco_objects import Object, Objects
 from mjregrasping.regrasp_mpc_runner import Runner
+from mjregrasping.robot_data import val
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 
 
@@ -34,8 +35,7 @@ class Untangle(Runner):
             0.3,  # right gripper
         ])
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-        rope = Object(phy.m, "rope")
-        rope_body_indices = np.array(rope.body_indices)
+        rope_body_indices = np.array(phy.o.rope.body_indices)
         activate_grasp(phy, 'right', 0.95, rope_body_indices)
         robot_q2[-1] = 0.05  # close right gripper
         pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
@@ -50,13 +50,16 @@ class Untangle(Runner):
     def get_skeletons(self):
         return load_skeletons("models/computer_rack_skeleton.hjson")
 
+    def get_objects(self, m):
+        return Objects(m, "computer_rack", val, "rope")
+
 
 @ros_init.with_ros("untangle")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     runner = Untangle()
-    runner.run([4], obstacle_name="computer_rack")
+    runner.run([4])
 
 
 if __name__ == "__main__":

@@ -1,7 +1,10 @@
 from copy import copy
+from typing import List, Optional
 
 import mujoco
 import numpy as np
+
+from mjregrasping.robot_data import RobotData
 
 
 def is_child(model, body, parent_body_idx):
@@ -32,10 +35,10 @@ class Children:
             elif joint.type == mujoco.mjtJoint.mjJNT_BALL:
                 dof = 4  # orientation represented as quaternion
             elif joint.type == mujoco.mjtJoint.mjJNT_FREE:
-                dof = 6
+                dof = 7
             start = joint.qposadr[0]
             end = start + dof
-            if is_child(model, jnt_body, parent_body_idx):
+            if is_child(model, jnt_body, parent_body_idx) or parent_body_idx == jnt_body.id:
                 self.qpos_indices.extend(list(range(start, end)))
 
         for body_idx in range(model.nbody):
@@ -54,41 +57,30 @@ class Children:
 
 class Object(Children):
 
-    def __init__(self, model, parent_body_name):
-        self.parent_body_idx = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, parent_body_name)
-        if self.parent_body_idx == -1:
-            raise ValueError(f"body {parent_body_name} not found")
-        Children.__init__(self, model, self.parent_body_idx)
+    def __init__(self, m, parent_body_name):
+        # Use this as opposed to model.body() because that doesn't
+        self.parent_body_idx = m.body(parent_body_name).id
+        Children.__init__(self, m, self.parent_body_idx)
 
 
 class Objects:
 
-    def __init__(self, model, obstacle_name='computer_rack'):
-        self.val = Object(model, "val_base")
-        self.rope = Object(model, "rope")
+    def __init__(self, model, obstacle_name, rd: RobotData, rope_name):
+        self.obstacle_name = obstacle_name
+        self.rd = rd
+        self.rope_name = rope_name
+        self.robot = Object(model, rd.base_link)
+        self.rope = Object(model, rope_name)
         self.obstacle = Object(model, obstacle_name)
 
         # allow collision between the environment and the finger pads
-        self.val_collision_geom_names = copy(self.val.geom_names)
-        self.val_collision_geom_names.remove('left_finger_pad')
-        self.val_collision_geom_names.remove('left_finger_pad2')
-        self.val_collision_geom_names.remove('right_finger_pad')
-        self.val_collision_geom_names.remove('right_finger_pad2')
+        self.robot_collision_geom_names = copy(self.robot.geom_names)
+        for geom_name in rd.allowed_robot_collision_geoms_names:
+            self.robot_collision_geom_names.remove(geom_name)
 
-        self.val_self_collision_geom_names = copy(self.val.geom_names)
-        self.val_gripper_act_names = [
-            'leftgripper_vel',
-            'rightgripper_vel',
-        ]
-        self.gripper_ctrl_indices = np.concatenate([model.actuator(n).actadr for n in self.val_gripper_act_names])
-        self.val_self_collision_geom_names.remove('left_finger_pad')
-        self.val_self_collision_geom_names.remove('left_finger_pad2')
-        self.val_self_collision_geom_names.remove('right_finger_pad')
-        self.val_self_collision_geom_names.remove('right_finger_pad2')
-        self.val_self_collision_geom_names.remove('leftgripper')
-        self.val_self_collision_geom_names.remove('leftgripper2')
-        self.val_self_collision_geom_names.remove('rightgripper')
-        self.val_self_collision_geom_names.remove('rightgripper2')
+        self.robot_self_collision_geom_names = copy(self.robot.geom_names)
+        for geom_name in rd.ignored_robot_self_collision_geoms_names:
+            self.robot_self_collision_geom_names.remove(geom_name)
 
 
 def parents_points(m: mujoco.MjModel, d: mujoco.MjData, body_name: str):

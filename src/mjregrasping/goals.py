@@ -58,14 +58,14 @@ class MPPIGoal:
         #  override this method not "cost()"
         raise NotImplementedError()
 
-    def satisfied(self, phy):
+    def satisfied(self, phy: Physics):
         raise NotImplementedError()
 
     def viz_sphere(self, position, radius):
         self.viz.sphere(ns='goal', position=position, radius=radius, frame_id='world', color=[1, 0, 1, 0.5], idx=0)
         self.viz.tf(translation=position, quat_xyzw=[0, 0, 0, 1], parent='world', child='goal')
 
-    def viz_result(self, result, idx: int, scale, color):
+    def viz_result(self, phy: Physics, result, idx: int, scale, color):
         raise NotImplementedError()
 
     def viz_ee_lines(self, tools_pos, idx: int, scale: float, color):
@@ -75,7 +75,7 @@ class MPPIGoal:
     def viz_rope_lines(self, rope_pos, idx: int, scale: float, color):
         self.viz.lines(rope_pos, ns='rope', idx=idx, scale=scale, color=color)
 
-    def get_results(self, phy):
+    def get_results(self, phy: Physics):
         """
         Returns: the result is any object or tuple of objects, and will be passed to cost()
         The reason for this architecture is that returning the entire physics state is expensive, since it requires
@@ -84,7 +84,7 @@ class MPPIGoal:
         """
         raise NotImplementedError()
 
-    def viz_goal(self, phy):
+    def viz_goal(self, phy: Physics):
         raise NotImplementedError()
 
 
@@ -96,11 +96,11 @@ class ObjectPointGoal(MPPIGoal):
         self.loc = loc
         self.goal_radius = goal_radius
 
-    def get_results(self, phy):
+    def get_results(self, phy: Physics):
         tools_pos, joint_positions, contact_cost, is_unstable = get_results_common()
         body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy.o.rope.body_indices)
         rope_points = get_rope_points(phy)
-        is_grasping = get_is_grasping(phy.m)
+        is_grasping = get_is_grasping(phy)
 
         keypoint = get_keypoint(phy, body_idx, offset)
 
@@ -108,15 +108,14 @@ class ObjectPointGoal(MPPIGoal):
                       is_unstable)
 
     def cost(self, results):
-        rope_points, keypoint, joint_positions, left_tool_pos, right_tool_pos, is_grasping, contact_cost, is_unstable = as_floats(
+        rope_points, keypoint, joint_positions, tools_pos, is_grasping, contact_cost, is_unstable = as_floats(
             results)
 
         pred_contact_cost = contact_cost[:, 1:]
         pred_rope_points = rope_points[:, 1:]
         keypoint_dist = self.keypoint_dist_to_goal(keypoint)
         pred_keypoint_dist = keypoint_dist[:, 1:]
-        gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
-        pred_gripper_points = gripper_points[:, 1:]
+        pred_gripper_points = tools_pos[:, 1:]
         pred_joint_positions = joint_positions[:, 1:]
 
         pred_is_grasping = is_grasping[:, 1:]  # skip t=0
@@ -138,6 +137,7 @@ class ObjectPointGoal(MPPIGoal):
         # Add a cost that non-grasping grippers should try to return to a "home" position.
         # Home is assumed to be 0, so penalize the distance from 0.
         # FIXME: doesn't generalize, hard-coded for Val
+        raise NotImplementedError('TODO: generalize this')
         arm_gripper_matrix = np.zeros([18, 2])
         left_joint_indices = np.arange(2, 10)
         right_joint_indices = np.arange(10, 17)
@@ -161,27 +161,22 @@ class ObjectPointGoal(MPPIGoal):
 
         return cost  # [b, horizon]
 
-    def satisfied(self, phy):
+    def satisfied(self, phy: Physics):
         body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy.o.rope.body_indices)
         keypoint = get_keypoint(phy, body_idx, offset)
         error = self.keypoint_dist_to_goal(keypoint).squeeze()
         return error < self.goal_radius
 
-    def gripper_dists_to_goal(self, left_tool_pos, right_tool_pos):
-        gripper_points = np.stack([left_tool_pos, right_tool_pos], axis=-2)
-        gripper_distances = norm((gripper_points - self.goal_point[None, None, None]), axis=-1)
-        return gripper_distances
-
     def keypoint_dist_to_goal(self, keypoint):
         return norm((keypoint - self.goal_point), axis=-1)
 
-    def viz_result(self, result, idx: int, scale, color):
+    def viz_result(self, phy: Physics, result, idx: int, scale, color):
         tools_pos = as_float(result[2])
         keypoints = as_float(result[0])
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
-    def viz_goal(self, phy):
+    def viz_goal(self, phy: Physics):
         self.viz_sphere(self.goal_point, self.goal_radius)
 
 
@@ -192,16 +187,15 @@ class RegraspGoal(MPPIGoal):
         self.op_goal = op_goal
         self.skeletons = skeletons
         self.grasp_goal_radius = grasp_goal_radius
-        self.n_g = hp['n_g']
         self.slack_gen = SlackGenerator(op_goal, viz)
         self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, viz)
         self.arm = ParamsConfig.Params_Goal
         self.current_locs = None
 
-    def satisfied(self, phy):
+    def satisfied(self, phy: Physics):
         return self.op_goal.satisfied(phy)
 
-    def viz_goal(self, phy):
+    def viz_goal(self, phy: Physics):
         self.op_goal.viz_goal(phy)
 
     def set_arm(self, arm):
@@ -214,7 +208,7 @@ class RegraspGoal(MPPIGoal):
         # The only case where we want to make a gripper result/cost is when we are not currently grasping
         # but when gripper_action is 1, meaning change the grasp state.
         tools_pos, _, contact_cost, is_unstable = get_results_common(phy)
-        is_grasping = get_is_grasping(phy.m)
+        is_grasping = get_is_grasping(phy)
         rope_points = get_rope_points(phy)
         finger_qs = get_finger_qs(phy)
         op_goal_body_idx, op_goal_offset = grasp_locations_to_indices_and_offsets(self.op_goal.loc,
@@ -271,7 +265,7 @@ class RegraspGoal(MPPIGoal):
             "grasp_near_cost",
         ]
 
-    def viz_result(self, result, idx: int, scale, color):
+    def viz_result(self, phy: Physics, result, idx: int, scale, color):
         tools_pos = as_float(result[0])
         keypoints = as_float(result[6])
         t0 = 0
@@ -279,10 +273,10 @@ class RegraspGoal(MPPIGoal):
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
         grasp_xpos = as_float(result[9])[t0]
-        self.viz.sphere('left_grasp_xpos', grasp_xpos[0], radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), frame_id='world', idx=0)
-        self.viz.sphere('right_grasp_xpos', grasp_xpos[1], radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), frame_id='world', idx=0)
+        for name, xpos in zip(phy.o.rd.rope_grasp_eqs, grasp_xpos):
+            self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), frame_id='world', idx=0)
 
-    def recompute_candidates(self, phy):
+    def recompute_candidates(self, phy: Physics):
         from time import perf_counter
         t0 = perf_counter()
         self.update_current_grasp(phy)
@@ -302,5 +296,5 @@ class RegraspGoal(MPPIGoal):
         print(f'Slack: {self.slack_locs}')
         print(f'dt: {perf_counter() - t0:.3f}')
 
-    def update_current_grasp(self, phy):
+    def update_current_grasp(self, phy: Physics):
         self.current_locs = get_grasp_locs(phy)
