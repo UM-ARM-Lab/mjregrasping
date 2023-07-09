@@ -1,8 +1,9 @@
 from copy import copy
-from typing import List
+from enum import Enum
 
 import networkx as nx
 import numpy as np
+import pysdf_tools
 import rerun as rr
 from bayes_opt import BayesianOptimization
 
@@ -11,8 +12,8 @@ from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offset
     make_full_locs, sln_to_locs
 from mjregrasping.grasping import get_rope_length
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, create_eq_and_sim_ik
-from mjregrasping.magnetic_fields import get_h_signature
 from mjregrasping.mujoco_objects import parents_points
+from mjregrasping.path_comparer import TrueHomotopyComparer, FirstOrderComparer, PathComparer
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
 from mjregrasping.viz import Viz
@@ -30,24 +31,28 @@ def from_to(i, j):
         return range(i, j, -1)
 
 
-def h_equal(h1: List, h2: List):
-    if np.shape(h1) != np.shape(h2):
-        return False
-    try:
-        return np.all(h1 == h2)
-    except ValueError:
-        return np.allclose(np.sort(h1, axis=0), np.sort(h2, axis=0))
+class HomotopyType(Enum):
+    TRUE = 0
+    FIRST_ORDER = 1
 
 
 class HomotopyGenerator(RegraspGenerator):
 
-    def __init__(self, op_goal, skeletons, viz: Viz):
+    def __init__(self, op_goal, skeletons, sdf: pysdf_tools.SignedDistanceField, viz: Viz):
         super().__init__(op_goal, viz)
         self.skeletons = skeletons
+        self.sdf = sdf
 
-    def generate(self, phy: Physics):
+    def generate(self, phy: Physics, homotopy_type=HomotopyType.TRUE):
+        if homotopy_type == HomotopyType.TRUE:
+            comparer = TrueHomotopyComparer(self.skeletons)
+        elif homotopy_type == HomotopyType.FIRST_ORDER:
+            comparer = FirstOrderComparer(self.sdf)
+        else:
+            raise ValueError(f"Unknown {homotopy_type=}")
+
         initial_rope_points = copy(get_rope_points(phy))
-        _, h = self.get_h_signature(phy, initial_rope_points)
+        _, h = self.get_h_signature(phy, initial_rope_points, comparer)
 
         # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
         #  Can we prove that there is always a way to change homotopy? Or prove a correct stopping condition?
@@ -71,8 +76,8 @@ class HomotopyGenerator(RegraspGenerator):
 
                 reachability_cost = get_reachability_cost(phy, phy_ik, reached, candidate_locs, candidate_is_grasping)
 
-                _, candidate_h = self.get_h_signature(phy_ik, initial_rope_points)
-                homotopy_cost = HARD_CONSTRAINT_PENALTY if h_equal(h, candidate_h) else 0
+                _, candidate_h = self.get_h_signature(phy_ik, initial_rope_points, comparer)
+                homotopy_cost = HARD_CONSTRAINT_PENALTY if comparer.check_equal(h, candidate_h) else 0
 
                 cost = reachability_cost + homotopy_cost
                 # BayesOpt uses maximization, so we need to negate the cost
@@ -99,7 +104,7 @@ class HomotopyGenerator(RegraspGenerator):
             return None
         return best_locs
 
-    def get_h_signature(self, phy, initial_rope_points):
+    def get_h_signature(self, phy: Physics, initial_rope_points, comparer: PathComparer):
         """
         The H-signature is a vector the uniquely defines the homotopy class of the current state. The state involves
         both the gripper and arm positions, the rope configuration, and the obstacles. The h_equal() function can be
@@ -108,6 +113,7 @@ class HomotopyGenerator(RegraspGenerator):
             phy: The full physics state
             initial_rope_points: The rope points. Passed separately because the IK solver modifies the rope state
                  in a stupid way that we don't want.
+            comparer: The comparer to use to compute the h-signature
 
         Returns:
             The h-signature of the current state and the loops and tool positions that were used to compute it.
@@ -233,7 +239,7 @@ class HomotopyGenerator(RegraspGenerator):
                 # nodes and re-run the algorithm
                 edge = has_gripper_gripper_edge(cycle)
                 if edge is not None:
-                    h = get_h_signature(loop, self.skeletons)
+                    h = comparer.get_signature(loop)
                     if np.count_nonzero(h) == 0:
                         # arbitrarily choose the "larger" node in the edge as the one we remove.
                         graph.remove_node(max(*edge))
@@ -242,7 +248,7 @@ class HomotopyGenerator(RegraspGenerator):
             if removed_node:
                 continue
 
-            h = np.array([get_h_signature(loop, self.skeletons) for loop in loops])
+            h = np.array([comparer.get_signature(loop) for loop in loops])
 
             return loops, h
 

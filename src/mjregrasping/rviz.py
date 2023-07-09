@@ -1,5 +1,6 @@
 import xml.etree.ElementTree as ET
 from copy import deepcopy
+from pathlib import Path
 from typing import Optional
 
 import mujoco
@@ -33,7 +34,7 @@ def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
 
 
 class MjRViz:
-    def __init__(self, xml_path: str, tfw: Optional[TF2Wrapper] = None):
+    def __init__(self, xml_path: Path, tfw: Optional[TF2Wrapper] = None):
         self.tfw = tfw
         self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
 
@@ -436,7 +437,7 @@ def plot_ring_rviz(pub, ring_position, ring_z_axis, radius, idx=0):
 
 class MujocoXmlMeshParser:
 
-    def __init__(self, xml_path: str):
+    def __init__(self, xml_path: Path):
         self.xml_path = xml_path
         self.xml_tree = ET.parse(self.xml_path)
         self.xml_root = self.xml_tree.getroot()

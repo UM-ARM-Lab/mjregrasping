@@ -1,10 +1,8 @@
 import mujoco
 import numpy as np
 
-import rospy
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import Object
 from mjregrasping.physics import Physics
-from visualization_msgs.msg import MarkerArray
 
 
 def point_to_idx(points, origin_point, res):
@@ -41,8 +39,8 @@ def set_cc_sphere_pos(phy, xyz):
 
 class VoxelGrid:
 
-    def __init__(self, phy: Physics, res, extends_2d, objects):
-        self.objects = objects
+    def __init__(self, phy: Physics, res, extends_2d, obstacle: Object):
+        self.obstacle = obstacle
         self.res = res
         self.extents_2d = extends_2d
         self.extents_flat = self.extents_2d.reshape(-1)
@@ -53,6 +51,7 @@ class VoxelGrid:
         self.origin_point = np.array([xmin, ymin, zmin]) + self.res / 2  # center  of the voxel [0,0,0]
 
         self.vg = np.zeros(self.shape, dtype=np.float32)
+        self.points = []
         for x_i, y_i, z_i in list(np.ndindex(*self.shape)):
             xyz = idx_to_point_from_origin_point(np.array([x_i, y_i, z_i]), self.res, self.origin_point)
             set_cc_sphere_pos(phy, xyz)
@@ -61,10 +60,11 @@ class VoxelGrid:
             for c in phy.d.contact:
                 geom1_name = phy.m.geom(c.geom1).name
                 geom2_name = phy.m.geom(c.geom2).name
-                obs = geom1_name in self.objects.obstacle.geom_names or geom2_name in self.objects.obstacle.geom_names
+                is_obs = geom1_name in self.obstacle.geom_names or geom2_name in self.obstacle.geom_names
                 cc = geom1_name == 'cc_sphere' or geom2_name == 'cc_sphere'
-                if c.dist < 0 and cc and obs:
+                if c.dist < 0 and cc and is_obs:
                     self.vg[x_i, y_i, z_i] = 1
+                    self.points.append(xyz)
                     # print(f"Contact at {xyz} between {geom1_name} and {geom2_name}, {xyz}")
                     # marker = Marker()
                     # marker.id = idx
@@ -89,3 +89,4 @@ class VoxelGrid:
 
                     break
         set_cc_sphere_pos(phy, np.array([10, 0, 0]))
+        self.points = np.array(self.points)

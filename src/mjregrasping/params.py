@@ -1,4 +1,3 @@
-import numpy as np
 from mjregrasping.cfg import ParamsConfig
 
 from dynamic_reconfigure.encoding import Config

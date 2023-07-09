@@ -72,7 +72,7 @@ def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Option
         for i, (tool_name, candidate_pos_i) in enumerate(zip(phy_ik.o.rd.tool_sites, candidate_pos)):
             if candidate_is_grasping[i]:
                 d = norm(phy_ik.d.site(tool_name).xpos - candidate_pos_i)
-                if d > 0.01:
+                if d > phy_ik.o.rd.ik_tol:
                     reached = False
         if viz:
             viz.viz(phy_ik, is_planning=True)
@@ -141,11 +141,11 @@ def ik_based_reachability(candidates_xpos, phy, tools_pos):
 def create_eq_and_sim_ik(phy: Physics, candidate_is_grasping, candidate_idx,
                          candidate_pos, viz):
     phy_ik = phy.copy_all()
-    grasp_eqs = get_grasp_eqs(phy)
+    grasp_eqs = get_grasp_eqs(phy_ik)
     ik_targets = {}
-    for i in range(phy.o.rd.n_g):
-        tool_name = phy.o.rd.tool_sites[i]
-        gripper_to_world_eq_name = phy.o.rd.world_gripper_eqs[i]
+    for i in range(phy_ik.o.rd.n_g):
+        tool_name = phy_ik.o.rd.tool_sites[i]
+        gripper_to_world_eq_name = phy_ik.o.rd.world_gripper_eqs[i]
         eq = grasp_eqs[i]
         # Set eq_active and qpos depending on the grasp
         if candidate_is_grasping[i]:

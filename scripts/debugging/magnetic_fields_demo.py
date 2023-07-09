@@ -4,7 +4,7 @@ import hjson
 import numpy as np
 import rerun as rr
 
-from mjregrasping.magnetic_fields import get_h_signature, discretize_path, make_ring_skeleton, load_skeletons
+from mjregrasping.magnetic_fields import get_true_h_signature, discretize_path, make_ring_skeleton, load_skeletons
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.viz_magnetic_fields import animate_field
 
@@ -36,7 +36,7 @@ def h_signature_demo():
         from time import perf_counter
         t0 = perf_counter()
         path = np.array([[0, y, z], [1., y, z], [1., y, z + 0.2], [0, y, z + 0.2], [0, y, z]])
-        h = get_h_signature(path, skeletons)
+        h = get_true_h_signature(path, skeletons)
         all_hs.append(h)
         print(f'{y=:.2f} {h=} computing H-signature: {perf_counter() - t0:.4f}s')
         rr.log_line_strip('path', path, ext={'hs': str(h)})

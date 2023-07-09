@@ -1,4 +1,6 @@
 <mujoco model="computer_rack">
+    <include file="materials.xml"/>
+    <include file="cc_sphere.xml"/>
     <worldbody>
         <body name="computer_rack" pos="1.1 0 0">
             <geom name="wall" type="box" pos="-0.2 0.7 0.975" size="0.01 0.25 1" rgba="0.1 0.1 0.1 1"/>

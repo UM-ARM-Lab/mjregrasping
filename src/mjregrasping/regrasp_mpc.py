@@ -30,7 +30,7 @@ class RegraspMPC:
         self.is_gasping_rng = np.random.RandomState(0)
 
         self.mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=seed, horizon=hp['regrasp_horizon'],
-                                noise_sigma=np.deg2rad(2), temp=hp['regrasp_temp'])
+                                noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]), temp=hp['regrasp_temp'])
         self.state_history = Buffer(hp['state_history_size'])
         self.max_dq = None
         self.reset_trap_detection()

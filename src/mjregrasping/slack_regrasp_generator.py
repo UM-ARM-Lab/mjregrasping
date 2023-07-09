@@ -1,5 +1,6 @@
 import numpy as np
 from bayes_opt import BayesianOptimization
+from bayes_opt.target_space import NotUniqueError
 
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, make_full_locs, sln_to_locs
 from mjregrasping.ik import get_reachability_cost, create_eq_and_sim_ik, HARD_CONSTRAINT_PENALTY
@@ -40,9 +41,11 @@ class SlackGenerator(RegraspGenerator):
                 # BayesOpt uses maximization, so we need to negate the cost
                 return -cost
 
-            opt = BayesianOptimization(f=_cost, pbounds=bounds, verbose=0, random_state=self.rng.randint(0, 1000),
-                                       allow_duplicate_points=True)
-            opt.maximize(n_iter=8, init_points=5)
+            opt = BayesianOptimization(f=_cost, pbounds=bounds, verbose=0, random_state=self.rng.randint(0, 1000))
+            try:
+                opt.maximize(n_iter=8, init_points=5)
+            except NotUniqueError:
+                pass
             sln = opt.max
             cost = -sln['target']  # BayesOpt uses maximization, so we need to negate to get cost
             locs = sln_to_locs(sln['params'], candidate_is_grasping)

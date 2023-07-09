@@ -4,7 +4,7 @@ import logging
 import numpy as np
 
 from mjregrasping.goals import CombinedThreadingGoal
-from mjregrasping.regrasp_mpc_runner import Runner
+from mjregrasping.run_evaluation import Runner
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
 

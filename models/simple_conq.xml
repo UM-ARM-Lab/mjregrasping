@@ -16,12 +16,11 @@
                 <body name="hand" pos="0.6 0 0.4" quat="1 0 0 0">
                     <inertial pos="0 0 0" quat="1 0 0 0" mass="3"/>
                     <geom name="hand" type="box" size="0.02 0.03 0.04" rgba="0.9 0.7 0.2 1"/>
-                    <site name="hand_tool" pos="0.025 0 0.0"/>
-                    <site name="hand_sensor_site" pos="0 0 0"/>
+                    <site name="hand_tool" pos="0.03 0 -0.03"/>
                     <joint name="hand_z" type="slide" axis="0 0 1" pos="0 0 0" damping="10"/>
-                    <body name="finger" pos="0.03 0 0" quat="1 0 0 0">
+                    <body name="finger" pos="0.05 0 0" quat="1 0 0 0">
                         <inertial pos="0 0 0" quat="1 0 0 0" mass="0.2"/>
-                        <geom name="finger" type="box" size="0.005 0.03 0.04" rgba="0.1 0.1 0.1 1"/>
+                        <geom name="finger" type="box" pos="0 0 0.01" size="0.005 0.03 0.03" rgba="0.1 0.1 0.1 1"/>
                         <joint name="finger" type="hinge" axis="0 -1 0" pos="0 0 0.04" damping="1"/>
                     </body>
                 </body>
@@ -34,9 +33,4 @@
         <intvelocity name="hand_z_vel" joint="hand_z" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.35 0.5" kp="200" forcelimited="true" forcerange="-50 50"/>
         <intvelocity name="finger_vel" joint="finger" ctrllimited="true" ctrlrange="-1.5707 1.5707" actrange="0.0 1.5707" kp="10" forcelimited="true" forcerange="-1 1"/>
     </actuator>
-    <sensor>
-        <torque name="hand_x_torque" site="hand_sensor_site"/>
-        <torque name="hand_y_torque" site="hand_sensor_site"/>
-        <torque name="hand_z_torque" site="hand_sensor_site"/>
-    </sensor>
 </mujoco>

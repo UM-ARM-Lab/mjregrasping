@@ -2,30 +2,36 @@ import time
 from pathlib import Path
 
 import mujoco.viewer
-import numpy as np
 
+import rospy
+from arc_utilities import ros_init
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.mjsaver import save_data_and_eq
+from mjregrasping.mujoco_objects import Objects
 from mjregrasping.physics import Physics
+from mjregrasping.scenarios import conq_hose, setup_conq_hose_scene
+from mjregrasping.viz import make_viz
+from std_msgs.msg import String
 
 
+@ros_init.with_ros("viewer")
 def main():
-    task = "pull"  # "untangle"
-    obstacle_name = 'floor'
-    m = mujoco.MjModel.from_xml_path(f'models/{task}_scene.xml')
+    scenario = conq_hose
+    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     d = mujoco.MjData(m)
-    phy = Physics(m, d, obstacle_name)
+    phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+    viz = make_viz(scenario)
 
-    q = np.array([
-        -0.5, 0.4,  # torso
-        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
-        0.1,  # left gripper
-        1.2, -0.2, 0, -0.90, 0, -0.6, 0,  # right arm
-        0.3,  # right gripper
-    ])
-    d.qpos[:18] = q
-    d.act[:18] = q
+    setup_conq_hose_scene(phy, viz)
+
+    latest_cmd = ""
+
+    def cmd_callback(msg):
+        nonlocal latest_cmd
+        latest_cmd = msg.data
+
+    cmd_sub = rospy.Subscriber("viewer_cmd", String, queue_size=10, callback=cmd_callback)
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
         while viewer.is_running():
@@ -40,13 +46,21 @@ def main():
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
 
-    # Useful lines of code to run
-    activate_grasp(phy, 'right', 1.0, phy.o.rope.body_indices)
-    activate_grasp(phy, 'left', 0.0, phy.o.rope.body_indices)
-    phy.m.eq("right").active = 0
-    phy.m.eq("left").active = 0
-    now = int(time.time())
-    save_data_and_eq(phy, Path(f"states/{task}/{now}.pkl"))
+            if latest_cmd == "save":
+                now = int(time.time())
+                path = Path(f"states/conq_hose/{now}.pkl")
+                print(f"Saving to {path}")
+                save_data_and_eq(phy, path)
+                latest_cmd = ""
+            elif "grasp" in latest_cmd:
+                _, eq_name, loc = latest_cmd.split(" ")
+                loc = float(loc)
+                latest_cmd = ""
+                activate_grasp(phy, eq_name, loc, phy.o.rope.body_indices)
+            elif "release" in latest_cmd:
+                _, eq_name = latest_cmd.split(" ")
+                phy.m.eq(eq_name).active = 0
+                latest_cmd = ""
 
 
 if __name__ == '__main__':

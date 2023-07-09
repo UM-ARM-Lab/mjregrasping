@@ -1,3 +1,4 @@
+import rerun as rr
 from matplotlib.colors import to_rgba
 
 import rospy
@@ -7,7 +8,13 @@ from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz, plot_ring_rviz
 from visualization_msgs.msg import MarkerArray
-import rerun as rr
+
+
+def make_viz(scenario):
+    tfw = TF2Wrapper()
+    mjviz = MjRViz(scenario.xml_path, tfw)
+    p = Params()
+    return Viz(rviz=mjviz, mjrr=MjReRun(scenario.xml_path), tfw=tfw, p=p)
 
 
 class Viz:

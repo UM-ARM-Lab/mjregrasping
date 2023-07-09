@@ -89,7 +89,7 @@ def make_ring_mat(ring_position, ring_z_axis):
     return ring_mat
 
 
-def get_h_signature(path, skeletons: Dict):
+def get_true_h_signature(path, skeletons: Dict):
     # NOTE: this function seems to slow down a lot when called from multiple parallel processes?
     path_discretized = discretize_path(path)
     path_deltas = np.diff(path_discretized, axis=0)

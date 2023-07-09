@@ -42,7 +42,8 @@ class RegraspMPPI:
     def roll(self):
         u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
         u_mu_square[:-1] = u_mu_square[1:]
-        u_mu_square[-1] = 0
+        # u_mu_square[-1] = u_mu_square[-2]  # repeat last action
+        u_mu_square[-1] = 0  # just using 0 is another reasonable choice
         self.u_mu = u_mu_square.reshape(-1)
 
     def command(self, phy, goal, num_samples, viz=None):
@@ -88,12 +89,12 @@ class RegraspMPPI:
 
         # Update mean
         self.u_mu += weighted_avg_u_noise
+        new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
         self.time_mu += weight_avg_time_noise
 
         # Update covariance
-        u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
-        new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
-        self.u_sigma_diag = weights @ np.mean((u_samples_square - new_u_mu_square) ** 2, axis=1)
+        # u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
+        # self.u_sigma_diag = weights @ np.mean((u_samples_square - new_u_mu_square) ** 2, axis=1)
         # NOTE: we could adapt time_sigma with this: weights @ (time_samples - self.time_mu) ** 2
 
         rr.log_scalar("time μ", self.time_mu)
