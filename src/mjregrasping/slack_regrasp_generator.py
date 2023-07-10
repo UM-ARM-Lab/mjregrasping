@@ -27,11 +27,10 @@ class SlackGenerator(RegraspGenerator):
             def _cost(**locs):
                 locs_where_grasping = list(locs.values())  # Only contains locs for the grasping grippers
                 candidate_locs = make_full_locs(locs_where_grasping, candidate_is_grasping)
-                candidate_idx, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
+                _, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
 
                 # Construct phy_ik to match the candidate grasp
-                phy_ik, reached = create_eq_and_sim_ik(phy, candidate_is_grasping, candidate_idx, candidate_pos,
-                                                       viz=None)
+                phy_ik, reached = create_eq_and_sim_ik(phy, candidate_is_grasping, candidate_pos, viz=None)
                 # self.viz.viz(phy_ik, is_planning=True)
 
                 reachability_cost = get_reachability_cost(phy, phy_ik, reached, candidate_locs, candidate_is_grasping)
@@ -57,4 +56,10 @@ class SlackGenerator(RegraspGenerator):
         if best_cost >= HARD_CONSTRAINT_PENALTY:
             print("No candidates were reachable")
             return None
-        return best_locs
+
+        _, _, pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, best_locs)
+        pull_dir = self.op_goal.goal_point - pos
+        pull_dir /= np.linalg.norm(pull_dir)
+        subgoal = pos + pull_dir * 1.0
+
+        return best_locs, subgoal

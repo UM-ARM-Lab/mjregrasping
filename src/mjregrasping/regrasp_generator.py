@@ -2,12 +2,13 @@ import itertools
 
 import numpy as np
 
+from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.viz import Viz
 
 
 class RegraspGenerator:
 
-    def __init__(self, op_goal, viz: Viz):
+    def __init__(self, op_goal: ObjectPointGoal, viz: Viz):
         self.op_goal = op_goal
         self.viz = viz
         self.rng = np.random.RandomState(0)

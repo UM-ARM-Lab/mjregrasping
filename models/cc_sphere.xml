@@ -2,7 +2,7 @@
     <worldbody>
         <body pos="0 0 0" name="cc_sphere">
             <!-- To get the most precise results, the size here should be half of the resolution of the voxelgrid -->
-            <geom type="sphere" name="cc_sphere" size="0.01" rgba="1 1 1 0.1"/>
+            <geom type="sphere" name="cc_sphere" size="0.005" rgba="1 1 1 0.1"/>
             <joint type="free" name="cc_sphere" damping="0.1"/>
         </body>
     </worldbody>

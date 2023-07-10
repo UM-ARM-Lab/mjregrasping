@@ -8,7 +8,7 @@ from matplotlib import cm
 
 import rospy
 from mjregrasping.buffer import Buffer
-from mjregrasping.goals import RegraspGoal
+from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, regrasp_rollout

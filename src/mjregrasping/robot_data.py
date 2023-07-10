@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List
 
+import numpy as np
+
 
 @dataclass
 class RobotData:
@@ -40,7 +42,7 @@ val = RobotData(
         'left_world', 'right_world'
     ],
     tool_bodies=["drive50", "drive10"],
-    ik_tol=0.01
+    ik_tol=0.01,
 )
 
 conq = RobotData(
@@ -53,5 +55,5 @@ conq = RobotData(
     world_gripper_eqs=['hand_world'],
     tool_bodies=["hand"],
     gripper_actuator_names=['finger_vel'],
-    ik_tol=0.02
+    ik_tol=0.02,
 )

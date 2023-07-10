@@ -19,4 +19,18 @@
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="false" solref="0.03 1"/>
     </equality>
+    <!-- Disable contect between legs and rope, since in the real world Conq would usually step over it -->
+    <contact>
+        <exclude body1="conq_body" body2="B_first"/>
+        <exclude body1="conq_body" body2="B_1"/>
+        <exclude body1="conq_body" body2="B_2"/>
+        <exclude body1="conq_body" body2="B_3"/>
+        <exclude body1="conq_body" body2="B_4"/>
+        <exclude body1="conq_body" body2="B_5"/>
+        <exclude body1="conq_body" body2="B_6"/>
+        <exclude body1="conq_body" body2="B_7"/>
+        <exclude body1="conq_body" body2="B_8"/>
+        <exclude body1="conq_body" body2="B_9"/>
+        <exclude body1="conq_body" body2="B_last"/>
+    </contact>
 </mujoco>

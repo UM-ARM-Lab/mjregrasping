@@ -19,7 +19,7 @@ class Scenario:
     name: str
     xml_path: Path
     skeletons_path: Optional[Path]
-    vg_path: Path
+    sdf_path: Path
     obstacle_name: str
     robot_data: RobotData
     rope_name: str
@@ -29,7 +29,7 @@ conq_hose = Scenario(
     name="ConqHose",
     xml_path=Path("models/conq_hose_scene.xml"),
     skeletons_path=Path("models/hose_obstacles_skeleton.hjson"),
-    vg_path=Path("voxelgrids/computer_rack_vg.pkl"),
+    sdf_path=Path("sdfs/hose_obstacles.sdf"),
     obstacle_name="hose_obstacles",
     robot_data=conq,
     rope_name="rope",
@@ -39,7 +39,7 @@ val_pull = Scenario(
     name="Pull",
     xml_path=Path("models/pull_scene.xml"),
     skeletons_path=None,
-    vg_path=Path("voxelgrids/pull_vg.pkl"),
+    sdf_path=Path("sdfs/pull.sdf"),
     obstacle_name="floor_obstacles",
     robot_data=val,
     rope_name="rope",
@@ -49,7 +49,7 @@ val_untangle = Scenario(
     name="Untangle",
     xml_path=Path("models/untangle_scene.xml"),
     skeletons_path=Path("models/computer_rack_skeleton.hjson"),
-    vg_path=Path("voxelgrids/computer_rack_vg.pkl"),
+    sdf_path=Path("sdfs/computer_rack.sdf"),
     obstacle_name="computer_rack",
     robot_data=val,
     rope_name="rope",

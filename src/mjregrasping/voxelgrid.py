@@ -1,5 +1,6 @@
 import mujoco
 import numpy as np
+import pysdf_tools
 
 from mjregrasping.mujoco_objects import Object
 from mjregrasping.physics import Physics
@@ -37,56 +38,38 @@ def set_cc_sphere_pos(phy, xyz):
     phy.d.qpos[qposadr: qposadr + 3] = xyz
 
 
-class VoxelGrid:
+def make_vg(phy: Physics, res, extends_2d, origin_point, obstacle: Object):
+    phy = phy.copy_data()  # make a copy, so we don't mess up the state for the caller
+    obstacle = obstacle
+    res = res
+    extents_2d = extends_2d
+    extents_flat = extents_2d.reshape(-1)
+    shape = extent_to_env_shape(extents_flat, res)
 
-    def __init__(self, phy: Physics, res, extends_2d, obstacle: Object):
-        self.obstacle = obstacle
-        self.res = res
-        self.extents_2d = extends_2d
-        self.extents_flat = self.extents_2d.reshape(-1)
-        self.shape = extent_to_env_shape(self.extents_flat, self.res)
-        xmin = self.extents_2d[0, 0]
-        ymin = self.extents_2d[1, 0]
-        zmin = self.extents_2d[2, 0]
-        self.origin_point = np.array([xmin, ymin, zmin]) + self.res / 2  # center  of the voxel [0,0,0]
+    origin_transform = pysdf_tools.Isometry3d([
+        [1.0, 0.0, 0.0, origin_point[0]],
+        [0.0, 1.0, 0.0, origin_point[1]],
+        [0.0, 0.0, 1.0, origin_point[2]],
+        [0.0, 0.0, 0.0, 1.0]
+    ])
 
-        self.vg = np.zeros(self.shape, dtype=np.float32)
-        self.points = []
-        for x_i, y_i, z_i in list(np.ndindex(*self.shape)):
-            xyz = idx_to_point_from_origin_point(np.array([x_i, y_i, z_i]), self.res, self.origin_point)
-            set_cc_sphere_pos(phy, xyz)
+    oob_value = pysdf_tools.COLLISION_CELL(-10000)
+    occupied_value = pysdf_tools.COLLISION_CELL(1)
+    grid = pysdf_tools.CollisionMapGrid(origin_transform, 'world', res, *shape, oob_value)
+    points = []
+    for x_i, y_i, z_i in list(np.ndindex(*shape)):
+        xyz = idx_to_point_from_origin_point(np.array([x_i, y_i, z_i]), res, origin_point)
+        set_cc_sphere_pos(phy, xyz)
 
-            mujoco.mj_step1(phy.m, phy.d)  # call step to update collisions
-            for c in phy.d.contact:
-                geom1_name = phy.m.geom(c.geom1).name
-                geom2_name = phy.m.geom(c.geom2).name
-                is_obs = geom1_name in self.obstacle.geom_names or geom2_name in self.obstacle.geom_names
-                cc = geom1_name == 'cc_sphere' or geom2_name == 'cc_sphere'
-                if c.dist < 0 and cc and is_obs:
-                    self.vg[x_i, y_i, z_i] = 1
-                    self.points.append(xyz)
-                    # print(f"Contact at {xyz} between {geom1_name} and {geom2_name}, {xyz}")
-                    # marker = Marker()
-                    # marker.id = idx
-                    # idx += 1
-                    # marker.header.frame_id = "world"
-                    # marker.ns = 'vg'
-                    # marker.type = marker.SPHERE
-                    # marker.action = marker.ADD
-                    # marker.scale.x = res / 2
-                    # marker.scale.y = res / 2
-                    # marker.scale.z = res / 2
-                    # marker.color.a = 0.5
-                    # marker.color.r = 1.0
-                    # marker.pose.orientation.w = 1.0
-                    # marker.pose.position.x = xyz[0]
-                    # marker.pose.position.y = xyz[1]
-                    # marker.pose.position.z = xyz[2]
-                    # markers = MarkerArray()
-                    # markers.markers.append(marker)
-                    # pub.publish(markers)
-                    # rospy.sleep(0.005)
+        mujoco.mj_step1(phy.m, phy.d)  # call step to update collisions
+        for c in phy.d.contact:
+            geom1_name = phy.m.geom(c.geom1).name
+            geom2_name = phy.m.geom(c.geom2).name
+            is_obs = geom1_name in obstacle.geom_names or geom2_name in obstacle.geom_names
+            cc = geom1_name == 'cc_sphere' or geom2_name == 'cc_sphere'
+            if c.dist < 0 and cc and is_obs:
+                grid.SetValue(x_i, y_i, z_i, occupied_value)
+                points.append(xyz)
+                break
 
-                    break
-        set_cc_sphere_pos(phy, np.array([10, 0, 0]))
-        self.points = np.array(self.points)
+    return grid, points

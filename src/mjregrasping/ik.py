@@ -138,25 +138,17 @@ def ik_based_reachability(candidates_xpos, phy, tools_pos):
     return is_reachable
 
 
-def create_eq_and_sim_ik(phy: Physics, candidate_is_grasping, candidate_idx,
-                         candidate_pos, viz):
+def create_eq_and_sim_ik(phy: Physics, candidate_is_grasping, candidate_pos, viz):
     phy_ik = phy.copy_all()
-    grasp_eqs = get_grasp_eqs(phy_ik)
-    ik_targets = {}
-    for i in range(phy_ik.o.rd.n_g):
-        tool_name = phy_ik.o.rd.tool_sites[i]
-        gripper_to_world_eq_name = phy_ik.o.rd.world_gripper_eqs[i]
-        eq = grasp_eqs[i]
-        # Set eq_active and qpos depending on the grasp
+    # first deactivate any constraints between the grippers and the rope
+    for eq_name in phy_ik.o.rd.rope_grasp_eqs:
+        eq = phy_ik.m.eq(eq_name)
+        eq.active = 0
+    for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
         if candidate_is_grasping[i]:
-            eq.active = 1
-            eq.obj2id = candidate_idx[i]
-            ik_targets[tool_name] = candidate_pos[i] - IK_OFFSET
             gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
             gripper_to_world_eq.active = 1
             gripper_to_world_eq.data[3:6] = candidate_pos[i]
-        else:
-            eq.active = 0
     # Estimate reachability using eq constraints in mujoco
     reached = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik, viz=viz)
     return phy_ik, reached
