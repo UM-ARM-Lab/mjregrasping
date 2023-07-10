@@ -56,7 +56,7 @@ def main():
                 _, eq_name, loc = latest_cmd.split(" ")
                 loc = float(loc)
                 latest_cmd = ""
-                activate_grasp(phy, eq_name, loc, phy.o.rope.body_indices)
+                activate_grasp(phy, eq_name, loc)
             elif "release" in latest_cmd:
                 _, eq_name = latest_cmd.split(" ")
                 phy.m.eq(eq_name).active = 0

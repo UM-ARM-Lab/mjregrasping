@@ -1,15 +1,10 @@
-import logging
-
 import mujoco
 import numpy as np
 
 from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.physics import Physics
 
-MAX_VEL_TILL_ERROR_RAD = np.deg2rad(3)
 DEFAULT_SUB_TIME_S = 0.1
-
-logger = logging.getLogger(f'rosout.{__name__}')
 
 
 def no_results(*args, **kwargs):
@@ -42,7 +37,7 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float):
     if qvel_target is not None:
         np.copyto(d.ctrl, qvel_target)
     else:
-        logger.warning("control is None!!!")
+        print("control is None!!!")
     n_sub_time = int(sub_time_s / m.opt.timestep)
 
     slow_when_eqs_bad(phy)

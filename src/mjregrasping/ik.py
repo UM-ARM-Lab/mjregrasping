@@ -9,6 +9,7 @@ from mjregrasping.goal_funcs import get_contact_cost
 from mjregrasping.grasping import get_grasp_eqs
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.rollout import control_step
 from mjregrasping.viz import Viz
 
 
@@ -64,9 +65,20 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
 
 
 def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Optional[Viz] = None):
-    # TODO: what if we start with a large solref[0] and decrease it? to make the constraint harder over time
-    for _ in range(10):
-        mujoco.mj_step(phy_ik.m, phy_ik.d, nstep=25)
+    # Next activate the eqs between the grippers and the world to drag them to candidate_pos
+    for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
+        if candidate_is_grasping[i]:
+            gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
+            gripper_to_world_eq.active = 1
+            gripper_to_world_eq.data[3:6] = candidate_pos[i]
+            gripper_to_world_eq.solref[0] = 1.0  # start with a really soft constraint
+
+    for _ in range(hp['sim_ik_nstep']):
+        for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
+            if candidate_is_grasping[i]:
+                gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
+                gripper_to_world_eq.solref[0] *= hp['sim_ik_solref_decay']
+        control_step(phy_ik, np.zeros(phy_ik.m.nu), sub_time_s=hp['sim_ik_sub_time_s'])
         # Check if the grasping grippers are near their targets
         reached = True
         for i, (tool_name, candidate_pos_i) in enumerate(zip(phy_ik.o.rd.tool_sites, candidate_pos)):
@@ -88,14 +100,15 @@ def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
     contact_cost_after = get_contact_cost(phy_after)
     new_contact_cost = contact_cost_after - contact_cost_before
 
-    reachability_cost = np.linalg.norm(q_after - q_before)
-    # Penalize the distance between locations if grasping
+    dq_cost = np.linalg.norm(q_after - q_before)
+
+    # Penalize the distance between locations if grasping with multiple grippers
     dists = pairwise_squared_distances(locs[:, None], locs[:, None])
     is_grasping_mat = np.tile(is_grasping, (len(is_grasping), 1))
     is_pair_grasping = is_grasping_mat * is_grasping_mat.T
     valid_grasp_dists = np.triu(dists * is_pair_grasping, k=1)
     nearby_locs_cost = np.sum(valid_grasp_dists) * hp['nearby_locs_weight']
-    return new_contact_cost + reachability_cost + nearby_locs_cost if reached else HARD_CONSTRAINT_PENALTY
+    return new_contact_cost + dq_cost + nearby_locs_cost if reached else HARD_CONSTRAINT_PENALTY
 
 
 HARD_CONSTRAINT_PENALTY = 1e3
@@ -136,19 +149,3 @@ def ik_based_reachability(candidates_xpos, phy, tools_pos):
             is_reachable[i, j] = jacobian_ik_is_reachable(phy, tool_body_idx, xpos, pos_tol=0.03)
     print(f'dt: {perf_counter() - t0:.4f}')
     return is_reachable
-
-
-def create_eq_and_sim_ik(phy: Physics, candidate_is_grasping, candidate_pos, viz):
-    phy_ik = phy.copy_all()
-    # first deactivate any constraints between the grippers and the rope
-    for eq_name in phy_ik.o.rd.rope_grasp_eqs:
-        eq = phy_ik.m.eq(eq_name)
-        eq.active = 0
-    for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
-        if candidate_is_grasping[i]:
-            gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
-            gripper_to_world_eq.active = 1
-            gripper_to_world_eq.data[3:6] = candidate_pos[i]
-    # Estimate reachability using eq constraints in mujoco
-    reached = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik, viz=viz)
-    return phy_ik, reached

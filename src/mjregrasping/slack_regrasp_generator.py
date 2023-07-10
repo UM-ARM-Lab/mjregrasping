@@ -3,7 +3,7 @@ from bayes_opt import BayesianOptimization
 from bayes_opt.target_space import NotUniqueError
 
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, make_full_locs, sln_to_locs
-from mjregrasping.ik import get_reachability_cost, create_eq_and_sim_ik, HARD_CONSTRAINT_PENALTY
+from mjregrasping.ik import get_reachability_cost, HARD_CONSTRAINT_PENALTY, eq_sim_ik
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
@@ -30,7 +30,8 @@ class SlackGenerator(RegraspGenerator):
                 _, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
 
                 # Construct phy_ik to match the candidate grasp
-                phy_ik, reached = create_eq_and_sim_ik(phy, candidate_is_grasping, candidate_pos, viz=None)
+                phy_ik = phy.copy_all()
+                reached = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik, viz=None)
                 # self.viz.viz(phy_ik, is_planning=True)
 
                 reachability_cost = get_reachability_cost(phy, phy_ik, reached, candidate_locs, candidate_is_grasping)
@@ -55,7 +56,7 @@ class SlackGenerator(RegraspGenerator):
 
         if best_cost >= HARD_CONSTRAINT_PENALTY:
             print("No candidates were reachable")
-            return None
+            return None, None
 
         _, _, pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, best_locs)
         pull_dir = self.op_goal.goal_point - pos

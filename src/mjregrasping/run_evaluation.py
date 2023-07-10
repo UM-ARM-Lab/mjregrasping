@@ -25,7 +25,7 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
     root.mkdir(exist_ok=True, parents=True)
 
     for seed in seeds:
-        m = mujoco.MjModel.from_xml_path(scenario.xml_path)
+        m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
         d = mujoco.MjData(m)
         objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)

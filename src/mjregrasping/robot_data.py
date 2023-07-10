@@ -15,6 +15,7 @@ class RobotData:
     n_g: int
     rope_grasp_eqs: List[str]
     world_gripper_eqs: List[str]
+    world_rope_eqs: List[str]
     tool_bodies: List[str]
     ik_tol: float
 
@@ -41,6 +42,9 @@ val = RobotData(
     world_gripper_eqs=[
         'left_world', 'right_world'
     ],
+    world_rope_eqs=[
+        'rope_left_world', 'rope_right_world'
+    ],
     tool_bodies=["drive50", "drive10"],
     ik_tol=0.01,
 )
@@ -53,6 +57,7 @@ conq = RobotData(
     n_g=1,
     rope_grasp_eqs=['hand'],
     world_gripper_eqs=['hand_world'],
+    world_rope_eqs=['rope_hand_world'],
     tool_bodies=["hand"],
     gripper_actuator_names=['finger_vel'],
     ik_tol=0.02,

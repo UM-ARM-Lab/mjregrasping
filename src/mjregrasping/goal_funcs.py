@@ -128,14 +128,19 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
     min_dist = np.min(dists)
     regrasp_near_cost = min_dist * hp['grasp_near_weight']
 
-    wrong_loc = abs(current_grasp_locs - desired_locs) > hp['grasp_loc_diff_thresh']
-    desired_open = np.logical_or(
-        np.logical_and(np.logical_and(wrong_loc, desired_is_grasping), is_grasping),
-        np.logical_not(desired_is_grasping)
-    )
+    desired_open = check_should_be_open(current_grasp_locs, is_grasping, desired_locs, desired_is_grasping)
     # Double the q_open, so we are encouraged to open a lot more than the minimum required to release the rope
     desired_finger_qs = np.array(
         [2 * hp['finger_q_open'] if open_i else hp['finger_q_closed'] for open_i in desired_open])
     regrasp_finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1)) * hp['grasp_finger_weight']
 
     return regrasp_finger_cost, regrasp_pos_cost, regrasp_near_cost
+
+
+def check_should_be_open(current_grasp_locs, current_is_grasping, desired_locs, desired_is_grasping):
+    wrong_loc = abs(current_grasp_locs - desired_locs) > hp['grasp_loc_diff_thresh']
+    desired_open = np.logical_or(
+        np.logical_and(np.logical_and(wrong_loc, desired_is_grasping), current_is_grasping),
+        np.logical_not(desired_is_grasping)
+    )
+    return desired_open

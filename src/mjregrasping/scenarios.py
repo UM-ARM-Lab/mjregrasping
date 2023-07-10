@@ -74,7 +74,7 @@ def setup_untangle_scene(phy, viz):
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
     rope_body_indices = np.array(phy.o.rope.body_indices)
-    activate_grasp(phy, 'right', 0.95, rope_body_indices)
+    activate_grasp(phy, 'right', 0.95)
     robot_q2[-1] = 0.05  # close right gripper
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
@@ -99,7 +99,7 @@ def setup_pull_scene(phy, viz):
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
     rope_body_indices = np.array(phy.o.rope.body_indices)
-    activate_grasp(phy, 'left', 0.0, rope_body_indices)
+    activate_grasp(phy, 'left', 0.0)
     robot_q2[9] = 0.1
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
@@ -134,6 +134,6 @@ def setup_conq_hose_scene(phy, viz):
 
 
 def make_conq_hose_goal(viz):
-    goal_point = np.array([0.78, 0.04, 1.25])
-    goal = ObjectPointGoal(goal_point, goal_radius=0.05, loc=1, viz=viz)
+    goal_point = np.array([1.5, -0.75, 0.04])
+    goal = ObjectPointGoal(goal_point, goal_radius=0.15, loc=1, viz=viz)
     return goal

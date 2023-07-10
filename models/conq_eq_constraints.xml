@@ -2,5 +2,6 @@
     <equality>
         <connect body1="hand" body2="B_first" name="hand" anchor="0.03 0 -0.03" active="false" solref="0.04 1"/>
         <connect body1="hand" body2="world" name="hand_world" anchor="0.025 0 -0.035" active="false" solref="0.02 1"/>
+        <connect body1="world" body2="B_first" name="rope_hand_world" anchor="0 0 0" active="false" solref="0.04 1"/>
     </equality>
 </mujoco>

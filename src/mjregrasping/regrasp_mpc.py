@@ -66,7 +66,7 @@ class RegraspMPC:
 
             # TODO: how to choose the new regrasp goal?
             arm = self.viz.p.config['selected_arm']
-            regrasp_goal.set_arm(arm)
+            regrasp_goal.update_arm(phy, arm)
 
             if self.get_mab_reward(phy) < hp['mab_reward_threshold']:
                 print("Trap detected!")
@@ -93,7 +93,6 @@ class RegraspMPC:
             did_new_grasp = do_grasp_dynamics(phy, results, is_planning=False)
             if did_new_grasp:
                 print("New grasp!")
-                regrasp_goal.update_current_grasp(phy)
                 settle(phy, sub_time_s=0.1, viz=self.viz, is_planning=False, mov=self.mov)
                 warmstart_count = 0
                 self.mppi.reset()

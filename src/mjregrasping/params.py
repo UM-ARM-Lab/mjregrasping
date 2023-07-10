@@ -1,3 +1,4 @@
+# noinspection PyUnresolvedReferences
 from mjregrasping.cfg import ParamsConfig
 
 from dynamic_reconfigure.encoding import Config
@@ -12,7 +13,7 @@ hp = {
     "grasp_pos_weight":         1.0,
     "grasp_near_weight":        5.0,
     "grasp_finger_weight":      1.0,
-    "grasp_loc_diff_thresh":    0.05,
+    "grasp_loc_diff_thresh":    0.07,  # A percentage of rope length
     "smoothness_weight":        0.1,
     "nearby_locs_weight":       10,
     "unstable_weight":          100,
@@ -35,6 +36,9 @@ hp = {
     "min_sub_time_s":           0.05,
     "max_sub_time_s":           0.30,
     "geodesic_weight":          5.0,
+    "sim_ik_nstep":             20,
+    "sim_ik_sub_time_s":        0.25,
+    "sim_ik_solref_decay":      0.8,
 }
 
 

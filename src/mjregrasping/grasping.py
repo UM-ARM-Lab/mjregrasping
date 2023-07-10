@@ -15,8 +15,8 @@ def get_grasp_eqs(phy: Physics):
     return [phy.m.eq(eq_name) for eq_name in phy.o.rd.rope_grasp_eqs]
 
 
-def activate_grasp(phy, name, loc, rope_body_indices):
-    grasp_index, offset = grasp_locations_to_indices_and_offsets(loc, rope_body_indices)
+def activate_grasp(phy: Physics, name, loc):
+    grasp_index, offset = grasp_locations_to_indices_and_offsets(loc, phy.o.rope.body_indices)
     # Round the offset here so that the eqs are not too sensitive to small changes in the offset.
     # I was noticing that I got different cost when comparing `regrasp` and `untangle` and it turns out it was caused
     # by the offset being slightly different, since in one case the loc is sampled from code and in the other

@@ -1,5 +1,8 @@
+import numpy as np
 from numpy.linalg import norm
 
+# noinspection PyUnresolvedReferences
+from mjregrasping.cfg import ParamsConfig
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_regrasp_costs
 from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
@@ -30,8 +33,12 @@ class RegraspGoal(MPPIGoal):
     def viz_goal(self, phy: Physics):
         self.op_goal.viz_goal(phy)
 
-    def set_arm(self, arm):
+    def update_arm(self, phy, arm):
         # TODO: MAB should choose these weights
+        if arm != self.arm:
+            self.current_locs = get_grasp_locs(phy)
+        if self.current_locs is None:
+            self.current_locs, _ = self.slack_gen.generate(phy)
         self.arm = arm
 
     def get_results(self, phy: Physics):
@@ -47,6 +54,8 @@ class RegraspGoal(MPPIGoal):
                                                                                   phy.o.rope.body_indices)
         keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
 
+        current_locs = get_grasp_locs(phy)
+
         if self.arm == ParamsConfig.Params_Goal:
             grasp_locs = self.current_locs
         elif self.arm == ParamsConfig.Params_Homotopy:
@@ -58,13 +67,11 @@ class RegraspGoal(MPPIGoal):
 
         _, _, grasp_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, grasp_locs)
 
-        current_grasp_locs = get_grasp_locs(phy)
-
-        return result(tools_pos, contact_cost, is_grasping, current_grasp_locs, is_unstable, rope_points, keypoint,
+        return result(tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint,
                       finger_qs, grasp_locs, grasp_xpos)
 
     def cost(self, results):
-        (tools_pos, contact_cost, is_grasping, current_grasp_locs, is_unstable, rope_points, keypoint, finger_qs,
+        (tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint, finger_qs,
          grasp_locs, grasp_xpos) = as_floats(results)
         keypoint_dist = norm(keypoint - self.op_goal.goal_point, axis=-1)
 
@@ -74,7 +81,7 @@ class RegraspGoal(MPPIGoal):
 
         # NOTE: reading class variables from multiple processes without any protection!
         grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                               current_grasp_locs, grasp_locs,
+                                                                               current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
         w_goal = 1 if self.arm == ParamsConfig.Params_Goal else 0
@@ -111,22 +118,11 @@ class RegraspGoal(MPPIGoal):
     def recompute_candidates(self, phy: Physics):
         from time import perf_counter
         t0 = perf_counter()
-        self.update_current_grasp(phy)
 
-        # Reachability planner
-        # - minimize geodesic distance to the keypoint (loc)
-        # - subject to reachability constraint, which might be hard but should probably involve collision-free IK?
-        self.slack_locs = self.slack_gen.generate(phy)
-
-        # Homotopy planner
-        # Find a new grasp configuration that results in a new homotopy class,
-        # and satisfies reachability constraints
-        # We can start by trying rejection sampling?
-        self.homotopy_locs = self.homotopy_gen.generate(phy)
+        self.slack_locs, self.slack_subgoals = self.slack_gen.generate(phy)
+        self.homotopy_locs, self.homotopy_subgoals = self.homotopy_gen.generate(phy)
+        # self.first_order_locs = self.first_order_gen.generate(phy)
 
         print(f'Homotopy: {self.homotopy_locs}')
         print(f'Slack: {self.slack_locs}')
         print(f'dt: {perf_counter() - t0:.3f}')
-
-    def update_current_grasp(self, phy: Physics):
-        self.current_locs = get_grasp_locs(phy)

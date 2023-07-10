@@ -3,13 +3,14 @@ from copy import copy
 import numpy as np
 import pysdf_tools
 import rerun as rr
-from pymjregrasping_cpp import get_first_order_homotopy_points
 from bayes_opt import BayesianOptimization
 
-from arc_utilities.path_utils import path_length, densify
-from mjregrasping.goal_funcs import get_rope_points, get_contact_cost
+from arc_utilities.path_utils import densify
+from mjregrasping.goal_funcs import get_rope_points, check_should_be_open
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, sln_to_locs
-from mjregrasping.ik import create_eq_and_sim_ik, get_reachability_cost, HARD_CONSTRAINT_PENALTY
+from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
+from mjregrasping.ik import get_reachability_cost, HARD_CONSTRAINT_PENALTY, eq_sim_ik
+from mjregrasping.params import hp
 from mjregrasping.path_comparer import FirstOrderComparer
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
@@ -57,29 +58,27 @@ class FirstOrderGenerator(RegraspGenerator):
                         candidate_subgoals.append(None)
                 candidate_locs = np.array(candidate_locs)
                 candidate_subgoals = np.array(candidate_subgoals)
+                # # DEBUGGING:
+                # candidate_locs = np.array([0.5])
+                # candidate_subgoals = np.array([[1.1, 0.9, 0.30]])
 
                 # kwargs keys are based on the bounds dict
-                _, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
+                candidate_idx, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy, candidate_locs)
+
+                for tool_name, xpos, subgoal in zip(phy.o.rd.tool_sites, candidate_pos, candidate_subgoals):
+                    self.viz.sphere(f'first_order/{tool_name}_xpos', xpos, hp['grasp_goal_radius'], 'world', 'w', 0)
+                    self.viz.sphere(f'first_order/{tool_name}_subgoal', subgoal, hp['grasp_goal_radius'], 'world', 'c',
+                                    0)
 
                 # Construct phy_ik to match the candidate grasp
-                phy_regrasp, reached_regrasp = create_eq_and_sim_ik(phy, candidate_is_grasping, candidate_pos,
-                                                                    viz=None)
-                # self.viz.viz(phy_regrasp, is_planning=True)
+                phy_regrasp, reached_regrasp = self.sim_regrasp(phy, candidate_locs, candidate_is_grasping,
+                                                                candidate_pos)
                 # FIXME: doesn't generalize to multiple grippers
-                phy_subgoal, reached_subgoal = create_eq_and_sim_ik(phy_regrasp, candidate_is_grasping,
-                                                                    candidate_subgoals, viz=None)
-                # self.viz.viz(phy_subgoal, is_planning=True)
-
-                # The real challenge is what "next" rope state (b1 in Dale's terminology) to use.
-                # The ideal thing would be to run the MPC controller to reach the subgoal, but that would be too slow
-                # Straight line is probably a terrible approximation.
-                path2 = [
-                    path1[0],
-                    candidate_subgoals[0],  # FIXME: doesn't generalize to multiple grippers
-                    path1[-1]
-                ]
+                phy_subgoal, reached_subgoal = self.sim_subgoals(phy_regrasp, candidate_locs, candidate_is_grasping,
+                                                                 candidate_subgoals)
 
                 path1_dense = np.array(densify(path1, 4 * self.sdf.GetResolution()))
+                path2 = copy(get_rope_points(phy_subgoal))
                 path2_dense = np.array(densify(path2, 4 * self.sdf.GetResolution()))
 
                 reachability_cost = sum([
@@ -91,7 +90,6 @@ class FirstOrderGenerator(RegraspGenerator):
                 path1_in_collision = any([self.sdf.GetValueByCoordinates(*p)[0] < 0 for p in path1_dense])
                 if path1_in_collision:
                     raise ValueError("Path 1 is in collision, this should never happen!")
-                path2_in_collision = any([self.sdf.GetValueByCoordinates(*p)[0] < 0 for p in path2_dense])
 
                 self.viz.lines(path1_dense, 'first_order/path1', 0, 0.005, 'r')
                 self.viz.lines(path2_dense, 'first_order/path2', 0, 0.005, 'orange')
@@ -103,17 +101,11 @@ class FirstOrderGenerator(RegraspGenerator):
                 #         self.viz.lines([p1, p2], 'first_order/indices_path', 0, 0.005, 'white')
 
                 homotopy_cost = HARD_CONSTRAINT_PENALTY if comparer.check_equal(path1_dense, path2_dense) else 0
-                path2_collision_cost = HARD_CONSTRAINT_PENALTY if path2_in_collision else 0
-                stretch_cost = max((path_length(path2) - path_length(path1)) ** 2, 0)  # don't penalize if path2 is shorter
-                contact_cost = get_contact_cost(phy_regrasp) + get_contact_cost(phy_subgoal)
 
-                cost = reachability_cost + homotopy_cost + path2_collision_cost + contact_cost + stretch_cost
+                cost = reachability_cost + homotopy_cost
 
                 rr.log_scalar("first_order_costs/reachability", reachability_cost)
-                rr.log_scalar("first_order_costs/contact", contact_cost)
                 rr.log_scalar("first_order_costs/homotopy", homotopy_cost)
-                rr.log_scalar("first_order_costs/path2_collision", path2_collision_cost)
-                rr.log_scalar("first_order_costs/stretch", stretch_cost)
                 rr.log_scalar("first_order_costs/total_cost", cost)
                 return -cost
 
@@ -137,10 +129,60 @@ class FirstOrderGenerator(RegraspGenerator):
                 best_subgoals = subgoals
 
         if best_cost >= HARD_CONSTRAINT_PENALTY:
-            print("All candidates were homologous")
-            return None
+            print("All candidates were first-order-homologous")
+            return None, None
 
         return best_locs, best_subgoals
+
+    def sim_regrasp(self, phy: Physics, candidate_locs, candidate_is_grasping, candidate_pos):
+        phy_ik = phy.copy_all()
+
+        # First deactivate any grippers that need to change location or are simply not
+        # supposed to be grasping given candidate_locs
+        desired_open = check_should_be_open(current_grasp_locs=get_grasp_locs(phy),
+                                            current_is_grasping=get_is_grasping(phy),
+                                            desired_locs=candidate_locs,
+                                            desired_is_grasping=candidate_is_grasping)
+        for eq_name, desired_open_i in zip(phy_ik.o.rd.rope_grasp_eqs, desired_open):
+            eq = phy_ik.m.eq(eq_name)
+            if desired_open_i:
+                eq.active = 0
+
+        # Disable collisions for the rope, except for the floor
+        for rope_geom_name in phy_ik.o.rope.geom_names:
+            rope_geom = phy_ik.m.geom(rope_geom_name)
+            rope_geom.contype = 2
+            rope_geom.conaffinity = 2
+        floor_geom = phy_ik.m.geom('floor')
+        floor_geom.contype = 2
+        floor_geom.conaffinity = 2
+
+        # Estimate reachability using eq constraints in mujoco
+        reached = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik, viz=self.viz)
+
+        return phy_ik, reached
+
+    def sim_subgoals(self, phy: Physics, candidate_locs, candidate_is_grasping, candidate_pos):
+        phy_ik = phy.copy_all()
+
+        # Activate any grippers that need to be grasping
+        for eq_name, is_grasping_i, loc_i in zip(phy_ik.o.rd.rope_grasp_eqs, candidate_is_grasping, candidate_locs):
+            eq = phy_ik.m.eq(eq_name)
+            if is_grasping_i:
+                activate_grasp(phy_ik, eq_name, loc_i)
+
+        # Disable collisions for the rope, except for the floor
+        for rope_geom_name in phy_ik.o.rope.geom_names:
+            rope_geom = phy_ik.m.geom(rope_geom_name)
+            rope_geom.contype = 2
+            rope_geom.conaffinity = 2
+        floor_geom = phy_ik.m.geom('floor')
+        floor_geom.contype = 2
+        floor_geom.conaffinity = 2
+
+        reached = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik, viz=self.viz)
+
+        return phy_ik, reached
 
 
 def sln_to_subgoals(params, candidate_is_grasping, tool_names):
