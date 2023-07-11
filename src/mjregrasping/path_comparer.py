@@ -21,6 +21,9 @@ class PathComparer(ABC):
         raise NotImplementedError()
 
 
+NO_HOMOTOPY = -999
+
+
 class TrueHomotopyComparer(PathComparer):
 
     def __init__(self, skeletons):
@@ -140,7 +143,7 @@ class TrueHomotopyComparer(PathComparer):
                     valid_cycles.append(cycle)
 
             if len(valid_cycles) == 0:
-                return None, -999  # No valid cycles, so we give it a bogus h value
+                return NO_HOMOTOPY  # No valid cycles, so we give it a bogus h value
 
             loops = []
             for valid_cycle in valid_cycles:
@@ -154,7 +157,7 @@ class TrueHomotopyComparer(PathComparer):
                 loops.append(loop)
 
             for l in loops:
-                rr.log_line_strip('candidate_loop', l)
+                rr.log_line_strip('candidate_loop', l, stroke_width=0.03)
 
             removed_node = False
             for loop, cycle in zip(loops, valid_cycles):
@@ -196,8 +199,8 @@ class FirstOrderComparer(PathComparer):
         # indices_path is a list of pairs of ints which describes how to smoothly map from h1 to h2.
         # If the list is empty, then there is no smooth path, meaning they are _NOT_ equal.
         # Therefore, return TRUE if the list is NOT EMPTY.
-        indices_path = get_first_order_homotopy_points(self.sdf, h1, h2)
-        return len(indices_path ) > 0
+        indices_path = get_first_order_homotopy_points(self.sdf, h1, h2, sdf_threshold=-self.sdf.GetResolution() + 1e-6)
+        return len(indices_path) > 0
 
 
 def passes_through(graph, i, j):
@@ -247,5 +250,3 @@ def from_to(i, j):
         return range(i + 1, j + 1)
     else:
         return range(i, j, -1)
-
-

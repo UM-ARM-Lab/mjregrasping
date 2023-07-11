@@ -92,7 +92,7 @@ class Viz:
             colors = []
             for x_i in range(0, sdf.GetNumXCells(), 1):
                 for y_i in range(0, sdf.GetNumYCells(), 1):
-                    for z_i in [30]:  # range(0, sdf.GetNumZCells(), 10):
+                    for z_i in [54]:  # range(0, sdf.GetNumZCells(), 10):
                         p = origin + np.array([x_i, y_i, z_i]) * sdf.GetResolution()
                         points.append(p)
                         sdf_value = sdf.GetValueByIndex(x_i, y_i, z_i)[0]

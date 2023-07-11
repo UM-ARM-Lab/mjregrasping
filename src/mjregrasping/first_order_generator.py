@@ -55,7 +55,7 @@ class FirstOrderGenerator(RegraspGenerator):
                                                             kwargs[tool_name + '_subgoal_z']]))
                     else:
                         candidate_locs.append(-1)
-                        candidate_subgoals.append(None)
+                        candidate_subgoals.append(np.zeros(3))
                 candidate_locs = np.array(candidate_locs)
                 candidate_subgoals = np.array(candidate_subgoals)
                 # # DEBUGGING:
@@ -87,7 +87,7 @@ class FirstOrderGenerator(RegraspGenerator):
                                           candidate_is_grasping)
                 ])
 
-                path1_in_collision = any([self.sdf.GetValueByCoordinates(*p)[0] < 0 for p in path1_dense])
+                path1_in_collision = any([self.sdf.GetValueByCoordinates(*p)[0] < -self.sdf.GetResolution() for p in path1_dense])
                 if path1_in_collision:
                     raise ValueError("Path 1 is in collision, this should never happen!")
 

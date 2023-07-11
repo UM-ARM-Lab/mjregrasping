@@ -3,6 +3,8 @@ from numpy.linalg import norm
 
 # noinspection PyUnresolvedReferences
 from mjregrasping.cfg import ParamsConfig
+
+from mjregrasping.first_order_generator import FirstOrderGenerator
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_regrasp_costs
 from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
@@ -17,13 +19,14 @@ from mjregrasping.viz import Viz
 
 class RegraspGoal(MPPIGoal):
 
-    def __init__(self, op_goal, skeletons, grasp_goal_radius, viz: Viz):
+    def __init__(self, op_goal, skeletons, sdf, grasp_goal_radius, viz: Viz):
         super().__init__(viz)
         self.op_goal = op_goal
         self.skeletons = skeletons
         self.grasp_goal_radius = grasp_goal_radius
         self.slack_gen = SlackGenerator(op_goal, viz)
         self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, viz)
+        self.first_order_gen = FirstOrderGenerator(op_goal, sdf, viz)
         self.arm = ParamsConfig.Params_Goal
         self.current_locs = None
 
@@ -119,9 +122,9 @@ class RegraspGoal(MPPIGoal):
         from time import perf_counter
         t0 = perf_counter()
 
-        self.slack_locs, self.slack_subgoals = self.slack_gen.generate(phy)
+        self.first_order_locs, self.first_order_subgoals = self.first_order_gen.generate(phy)
         self.homotopy_locs, self.homotopy_subgoals = self.homotopy_gen.generate(phy)
-        # self.first_order_locs = self.first_order_gen.generate(phy)
+        self.slack_locs, self.slack_subgoals = self.slack_gen.generate(phy)
 
         print(f'Homotopy: {self.homotopy_locs}')
         print(f'Slack: {self.slack_locs}')

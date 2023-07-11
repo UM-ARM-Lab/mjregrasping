@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Callable
 
 import mujoco
+import pysdf_tools
 import rerun as rr
 
 from mjregrasping.movie import MjMovieMaker
@@ -30,6 +31,11 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
         objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)
 
+        sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
+        viz.sdf(sdf, '', 0)
+        mujoco.mj_forward(phy.m, phy.d)
+        viz.viz(phy)
+
         setup_scene(phy, viz)
 
         mov = MjMovieMaker(m)
@@ -45,6 +51,6 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
             viz.p.w_regrasp_point = 0.0
             viz.p.update()
 
-            mpc = RegraspMPC(pool, phy.m.nu, skeletons, goal, seed, viz, mov)
+            mpc = RegraspMPC(pool, phy.m.nu, skeletons, sdf, goal, seed, viz, mov)
             mpc.run(phy)
             mpc.close()

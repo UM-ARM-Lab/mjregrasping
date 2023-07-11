@@ -76,16 +76,17 @@ def main():
     res = np.array([res])
     extent = np.array([[xmin, xmax], [ymin, ymax], [zmin, zmax]])
 
-    obstacle = Object(phy.m, 'hose_obstacles')
+    obstacle = Object(phy.m, 'computer_rack')
+
+    position = np.mean(extent, axis=1)
+    half_size = (extent[:, 1] - extent[:, 0]) / 2
+    rr.log_obb('extent', half_size=half_size, position=position)
 
     t0 = perf_counter()
     vg, points = make_vg(phy, res, extent, origin_point, obstacle)
     print(f'Computing VoxelGrid: {perf_counter() - t0:.3f}')
 
     rr.log_points('point_cloud', points)
-    position = np.mean(extent, axis=1)
-    half_size = (extent[:, 1] - extent[:, 0]) / 2
-    rr.log_obb('extent', half_size=half_size, position=position)
 
     print(f"Saving to {outfilename}")
     oob_value = pysdf_tools.COLLISION_CELL(-10000)

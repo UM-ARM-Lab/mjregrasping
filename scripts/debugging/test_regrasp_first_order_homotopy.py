@@ -12,10 +12,10 @@ from PIL import Image
 
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
+from mjregrasping.first_order_generator import FirstOrderGenerator
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
 from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
@@ -25,17 +25,17 @@ from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle
+from mjregrasping.scenarios import conq_hose
 from mjregrasping.viz import Viz
 
 
-@ros_init.with_ros("test_regrasp_homotopy")
+@ros_init.with_ros("test_regrasp_first_order_homotopy")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
-    rr.init('test_regrasp_homotopy')
+    rr.init('test_regrasp_first_order_homotopy')
     rr.connect()
 
-    scenario = val_untangle
+    scenario = conq_hose
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     tfw = TF2Wrapper()
@@ -51,11 +51,12 @@ def main():
     goal = ObjectPointGoal(np.array([1.0, 0.0, 2.0]), 0.05, 1, viz)
     skeletons = load_skeletons(scenario.skeletons_path)
     sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
+    # viz.sdf(sdf, frame_id='world', idx=0)  # Very slow!
 
-    h = HomotopyGenerator(goal, skeletons, viz)
+    h = FirstOrderGenerator(goal, sdf, viz)
     r = MjRenderer(m)
 
-    states_dir = Path("states/untangle")
+    states_dir = Path("states/conq_hose")
     for state_path in states_dir.glob("*.pkl"):
         d = load_data_and_eq(m, True, state_path)
         phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
