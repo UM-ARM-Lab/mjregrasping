@@ -1,6 +1,7 @@
 import numpy as np
 
 from mjregrasping.physics import Physics
+from mjregrasping.rope_length import get_rope_length
 
 
 def grasp_location_to_indices(grasp_locations, rope_body_indices):
@@ -15,21 +16,20 @@ def grasp_indices_to_locations(rope_body_indices, grasp_index):
     return grasp_locations
 
 
-def grasp_offset(grasp_index, grasp_location, rope_body_indices):
-    grasp_locations_rounded = grasp_indices_to_locations(rope_body_indices, grasp_index)
-    offset = grasp_location - grasp_locations_rounded
+def grasp_offset(grasp_index, grasp_location, phy: Physics):
+    grasp_locations_rounded = grasp_indices_to_locations(phy.o.rope.body_indices, grasp_index)
+    offset = (grasp_location - grasp_locations_rounded) * get_rope_length(phy)
     return offset
 
 
-def grasp_locations_to_indices_and_offsets(grasp_locations, rope_body_indices):
-    grasp_indices = grasp_location_to_indices(grasp_locations, rope_body_indices)
-    offsets = grasp_offset(grasp_indices, grasp_locations, rope_body_indices)
+def grasp_locations_to_indices_and_offsets(grasp_locations, phy: Physics):
+    grasp_indices = grasp_location_to_indices(grasp_locations, phy.o.rope.body_indices)
+    offsets = grasp_offset(grasp_indices, grasp_locations, phy)
     return grasp_indices, offsets
 
 
 def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_locations):
-    grasp_indices = grasp_location_to_indices(grasp_locations, phy.o.rope.body_indices)
-    offsets = grasp_offset(grasp_indices, grasp_locations, phy.o.rope.body_indices)
+    grasp_indices, offsets = grasp_locations_to_indices_and_offsets(grasp_locations, phy)
     body_xpos = phy.d.xpos[grasp_indices]
     body_xmat = phy.d.xmat[grasp_indices].reshape(-1, 3, 3)
     body_x_axis = body_xmat[:, :, 0]

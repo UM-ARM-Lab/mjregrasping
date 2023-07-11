@@ -93,7 +93,7 @@ class ObjectPointGoal(MPPIGoal):
 
     def get_results(self, phy: Physics):
         tools_pos, joint_positions, contact_cost, is_unstable = get_results_common()
-        body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy.o.rope.body_indices)
+        body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy)
         rope_points = get_rope_points(phy)
         is_grasping = get_is_grasping(phy)
 
@@ -157,7 +157,7 @@ class ObjectPointGoal(MPPIGoal):
         return cost  # [b, horizon]
 
     def satisfied(self, phy: Physics):
-        body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy.o.rope.body_indices)
+        body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy)
         keypoint = get_keypoint(phy, body_idx, offset)
         error = self.keypoint_dist_to_goal(keypoint).squeeze()
         return error < self.goal_radius

@@ -9,21 +9,21 @@ from mjregrasping.grasping import activate_grasp
 from mjregrasping.mjsaver import save_data_and_eq
 from mjregrasping.mujoco_objects import Objects
 from mjregrasping.physics import Physics
-from mjregrasping.scenarios import conq_hose, setup_conq_hose_scene
+from mjregrasping.scenarios import conq_hose, setup_conq_hose, cable_harness, setup_cable_harness
 from mjregrasping.viz import make_viz
 from std_msgs.msg import String
 
 
 @ros_init.with_ros("viewer")
 def main():
-    scenario = conq_hose
+    scenario = cable_harness
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     d = mujoco.MjData(m)
     phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     viz = make_viz(scenario)
 
-    setup_conq_hose_scene(phy, viz)
+    setup_cable_harness(phy, viz)
 
     latest_cmd = ""
 
@@ -32,6 +32,8 @@ def main():
         latest_cmd = msg.data
 
     cmd_sub = rospy.Subscriber("viewer_cmd", String, queue_size=10, callback=cmd_callback)
+    root = Path(f"states/{scenario.name}")
+    root.mkdir(exist_ok=True, parents=True)
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
         while viewer.is_running():
@@ -48,7 +50,7 @@ def main():
 
             if latest_cmd == "save":
                 now = int(time.time())
-                path = Path(f"states/conq_hose/{now}.pkl")
+                path = root / f"{now}.pkl"
                 print(f"Saving to {path}")
                 save_data_and_eq(phy, path)
                 latest_cmd = ""

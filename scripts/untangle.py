@@ -4,7 +4,7 @@ import numpy as np
 from arc_utilities import ros_init
 from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.run_evaluation import run_evaluation
-from mjregrasping.scenarios import val_untangle, make_untangle_goal, setup_untangle_scene
+from mjregrasping.scenarios import val_untangle, make_untangle_goal, setup_untangle
 
 
 @ros_init.with_ros("untangle")
@@ -15,7 +15,7 @@ def main():
         scenario=val_untangle,
         make_goal=make_untangle_goal,
         skeletons=load_skeletons(val_untangle.skeletons_path),
-        setup_scene=setup_untangle_scene,
+        setup_scene=setup_untangle,
         seeds=[1],
     )
 

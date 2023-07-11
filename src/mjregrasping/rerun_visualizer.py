@@ -30,7 +30,7 @@ class MjReRun:
         self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
         init()
 
-    def viz(self, phy: Physics, is_planning=False):
+    def viz(self, phy: Physics, is_planning=False, detailed=False):
         entity_prefix = 'planning/' if is_planning else ''
         rr.set_time_seconds('sim_time', phy.d.time)
 
@@ -46,7 +46,7 @@ class MjReRun:
 
         rr.log_scalar(f'contact/num_contacts', len(phy.d.contact))
 
-        self.viz_bodies(phy.m, phy.d, entity_prefix)
+        self.viz_bodies(phy.m, phy.d, entity_prefix, detailed)
         self.viz_sites(phy, entity_prefix)
         self.viz_contacts(phy, entity_prefix)
 
@@ -56,7 +56,7 @@ class MjReRun:
             pos = phy.d.site_xpos[site_id]
             rr.log_point(entity_path=f'sites/{name}', position=pos)
 
-    def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData, entity_prefix):
+    def viz_bodies(self, m: mujoco.MjModel, d: mujoco.MjData, entity_prefix, detailed=False):
         """
         Rerun, or possibly my code, seems to have some serious problems with efficiency when logging meshes,
         so this method is very hacked at the moment.
@@ -69,24 +69,27 @@ class MjReRun:
             entity_name = f"{entity_prefix}{parent_name}/{child_name}"
 
             if geom_type == mjtGeom.mjGEOM_BOX:
-                # log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
-                log_bbox_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
+                if detailed:
+                    log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
+                else:
+                    log_bbox_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_CYLINDER:
-                pass
-                # log_cylinder(entity_name, m.geom(geom_id), d.geom(geom_id))
+                if detailed:
+                    log_cylinder(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_CAPSULE:
                 log_capsule(entity_name, m.geom(geom_id), d.geom(geom_id))
-                pass
             elif geom_type == mjtGeom.mjGEOM_SPHERE:
                 log_sphere(entity_name, m.geom(geom_id), d.geom(geom_id))
             elif geom_type == mjtGeom.mjGEOM_MESH:
-                # mesh_file_contents = self.get_mesh_file_contents(geom, m)
-                mesh_file_contents = None
-                # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
-                # has NO POS OR QUAT, but instead that info goes in the <body> tag
-                parent_bodyid = m.body(geom_bodyid).parentid
-                if m.body(parent_bodyid).name != 'val_base':
-                    log_skeleton(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), d.body(parent_bodyid))
+                if detailed:
+                    mesh_file_contents = self.get_mesh_file_contents(geom, m)
+                    log_mesh_body(entity_name, d.body(geom_bodyid), mesh_file_contents)
+                else:
+                    # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
+                    # has NO POS OR QUAT, but instead that info goes in the <body> tag
+                    parent_bodyid = m.body(geom_bodyid).parentid
+                    if m.body(parent_bodyid).name != 'val_base':
+                        log_skeleton(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), d.body(parent_bodyid))
             else:
                 logger.debug(f"Unsupported geom type {geom_type}")
                 continue
@@ -172,7 +175,7 @@ def log_capsule(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     end = data.xpos + model.size[1] * xmat[:, 2]
     rr.log_line_strip(entity_path=entity_path + '/line',
                       positions=np.stack([start, end]),
-                      stroke_width=model.size[0],
+                      stroke_width=model.size[0] * 2,
                       color=tuple(model.rgba))
     rr.log_point(entity_path=entity_path + '/start',
                  position=start,
@@ -221,8 +224,7 @@ def log_skeleton(body_name, model, data, parent_data):
                       positions=[data.xpos, parent_data.xpos])
 
 
-def log_mesh_body(body_name, model, data, mesh_file_contents):
-    entity_path = make_entity_path(body_name, model.name)
+def log_mesh_body(entity_path, data, mesh_file_contents):
     transform = get_transform(data)
     rr.log_mesh_file(entity_path=entity_path,
                      mesh_format=rr.MeshFormat.GLB,

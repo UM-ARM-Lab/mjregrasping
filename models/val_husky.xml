@@ -25,11 +25,10 @@
         <mesh name="FINGER_PAD" file="FINGER_PAD.stl"/>
     </asset>
     <worldbody>
-        <light name="top" pos="0 0 105" mode="trackcom"/>
         <body pos="0 0 0.145" name="val_base">
             <inertial pos="0 0 0" quat="0.707107 0 0 0.707107" mass="50" diaginertia="8.333 8.333 8.333"/>
             <body pos="0 0 0.3" quat="0 0 0 1" name="battery">
-                <geom type="box" name="battery" size="0.16 0.15 0.1" rgba="0.8 0.8 0.2 1"/>
+                <geom type="box" name="battery" size="0.16 0.15 0.1" rgba="0.3 0.3 0.1 1"/>
             </body>
             <body pos="0.3641 0.00470858 0.315" quat="0 -0.707141 0.707073 0" name="drive56">
                 <inertial pos="1.36e-06  0.00343   0.0203" quat="1 0 0 0" mass="0.392"

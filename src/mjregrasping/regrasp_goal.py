@@ -53,8 +53,7 @@ class RegraspGoal(MPPIGoal):
         is_grasping = get_is_grasping(phy)
         rope_points = get_rope_points(phy)
         finger_qs = get_finger_qs(phy)
-        op_goal_body_idx, op_goal_offset = grasp_locations_to_indices_and_offsets(self.op_goal.loc,
-                                                                                  phy.o.rope.body_indices)
+        op_goal_body_idx, op_goal_offset = grasp_locations_to_indices_and_offsets(self.op_goal.loc, phy)
         keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
 
         current_locs = get_grasp_locs(phy)

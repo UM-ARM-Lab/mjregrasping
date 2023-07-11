@@ -55,8 +55,18 @@ val_untangle = Scenario(
     rope_name="rope",
 )
 
+cable_harness = Scenario(
+    name="CableHarness",
+    xml_path=Path("models/cable_harness_scene.xml"),
+    skeletons_path=Path("models/cable_harness_skeleton.hjson"),
+    sdf_path=Path("sdfs/cable_harness.sdf"),
+    obstacle_name="cable_harness_obstacles",
+    robot_data=val,
+    rope_name="rope",
+)
 
-def setup_untangle_scene(phy, viz):
+
+def setup_untangle(phy, viz):
     robot_q1 = np.array([
         -0.7, 0.1,  # torso
         -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
@@ -86,7 +96,7 @@ def make_untangle_goal(viz):
     return goal
 
 
-def setup_pull_scene(phy, viz):
+def setup_pull(phy, viz):
     # set the rope pose
     phy.d.qpos[20:23] = np.array([1.0, 0.2, 0])
     phy.d.qpos[23:27] = quaternion_from_euler(0, 0, 0)
@@ -111,10 +121,7 @@ def make_pull_goal(viz):
     return goal
 
 
-def setup_conq_hose_scene(phy, viz):
-    # TODO: set up the scene so that the rope (hose) is at the attach point on the vacuum,
-    #  put the hand near the end of the rope, activate the grasp constraint
-    #  maybe set up the joint angles for the rope so that it is in a reasonable position.
+def setup_conq_hose(phy, viz):
     rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
     rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
     rope_ball_q_indices = phy.o.rope.qpos_indices[7:].reshape((-1, 4))
@@ -137,3 +144,17 @@ def make_conq_hose_goal(viz):
     goal_point = np.array([1.5, -0.75, 0.04])
     goal = ObjectPointGoal(goal_point, goal_radius=0.15, loc=1, viz=viz)
     return goal
+
+
+def setup_cable_harness(phy, viz):
+    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
+    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
+    phy.d.qpos[rope_xyz_q_indices] = np.array([1.2, -1.0, 1.0])
+    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0, np.pi / 2)
+
+    mujoco.mj_forward(phy.m, phy.d)
+    viz.viz(phy)
+
+    activate_grasp(phy, 'attach1', 0.0)
+    activate_grasp(phy, 'attach2', 1.0)
+    settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)

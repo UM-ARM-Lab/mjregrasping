@@ -3,6 +3,7 @@ import numpy as np
 
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_indices_to_locations
 from mjregrasping.physics import Physics
+from mjregrasping.rope_length import get_rope_length
 
 
 def get_is_grasping(phy):
@@ -16,7 +17,7 @@ def get_grasp_eqs(phy: Physics):
 
 
 def activate_grasp(phy: Physics, name, loc):
-    grasp_index, offset = grasp_locations_to_indices_and_offsets(loc, phy.o.rope.body_indices)
+    grasp_index, offset = grasp_locations_to_indices_and_offsets(loc, phy)
     # Round the offset here so that the eqs are not too sensitive to small changes in the offset.
     # I was noticing that I got different cost when comparing `regrasp` and `untangle` and it turns out it was caused
     # by the offset being slightly different, since in one case the loc is sampled from code and in the other
@@ -78,8 +79,3 @@ def get_loc_idx_offset_xpos(phy: Physics):
             loc = grasp_indices_to_locations(phy.o.rope.body_indices, idx) + (offset / rope_length)
             yield loc, idx, offset, xpos
         continue
-
-
-def get_rope_length(phy):
-    rope_length = phy.m.geom(phy.o.rope.geom_indices[0]).size[1] * len(phy.o.rope.geom_indices) * 2
-    return rope_length

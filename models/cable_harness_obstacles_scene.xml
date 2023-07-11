@@ -1,0 +1,6 @@
+<mujoco model="cable_harness_scene">
+    <include file="materials.xml"/>
+    <include file="cc_sphere.xml"/>
+    <include file="floor.xml"/>
+    <include file="cable_harness_obstacles.xml"/>
+</mujoco>

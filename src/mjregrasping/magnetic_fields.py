@@ -97,10 +97,9 @@ def get_true_h_signature(path, skeletons: Dict):
     for skeleton in skeletons.values():
         bs = skeleton_field_dir(skeleton, path_discretized[:-1])
         h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
-        h = h.round(0)  # round to nearest integer since the output should really either be 0 or 1
+        h = int(h.round(0))  # round to nearest integer since the output should really either be 0 or 1
         hs.append(h)
-    hs = np.array(hs)
-    return hs
+    return tuple(hs)
 
 
 def discretize_path(path, n=1000):

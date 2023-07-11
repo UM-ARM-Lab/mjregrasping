@@ -1,5 +1,4 @@
 <mujoco model="hose_obstacles">
-<!--    <include file="materials.xml"/>-->
     <worldbody>
         <body name="hose_obstacles" pos="0 0 0">
             <body name="vacuum" pos="2.0 1.5 0.0">

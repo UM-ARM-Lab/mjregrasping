@@ -4,10 +4,11 @@ import networkx as nx
 import numpy as np
 import pysdf_tools
 import rerun as rr
+from multiset import Multiset
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
-from mjregrasping.grasping import get_rope_length
+from mjregrasping.rope_length import get_rope_length
 from mjregrasping.magnetic_fields import get_true_h_signature
 from mjregrasping.mujoco_objects import parents_points
 
@@ -21,7 +22,7 @@ class PathComparer(ABC):
         raise NotImplementedError()
 
 
-NO_HOMOTOPY = -999
+NO_HOMOTOPY = Multiset([-999])
 
 
 class TrueHomotopyComparer(PathComparer):
@@ -29,7 +30,7 @@ class TrueHomotopyComparer(PathComparer):
     def __init__(self, skeletons):
         self.skeletons = skeletons
 
-    def get_signature(self, phy, initial_rope_points):
+    def get_signature(self, phy, initial_rope_points, log_loops=False):
         """
         The H-signature is a vector the uniquely defines the homotopy class of the current state. The state involves
         both the gripper and arm positions, the rope configuration, and the obstacles. The h_equal() function can be
@@ -156,8 +157,9 @@ class TrueHomotopyComparer(PathComparer):
                 loop = np.stack(loop)
                 loops.append(loop)
 
-            for l in loops:
-                rr.log_line_strip('candidate_loop', l, stroke_width=0.03)
+            if log_loops:
+                for l in loops:
+                    rr.log_line_strip('candidate_loop', l, stroke_width=0.03)
 
             removed_node = False
             for loop, cycle in zip(loops, valid_cycles):
@@ -174,17 +176,12 @@ class TrueHomotopyComparer(PathComparer):
             if removed_node:
                 continue
 
-            h = np.array([get_true_h_signature(loop, self.skeletons) for loop in loops])
+            h = Multiset([get_true_h_signature(loop, self.skeletons) for loop in loops])
 
             return h
 
     def check_equal(self, h1, h2):
-        if np.shape(h1) != np.shape(h2):
-            return False
-        try:
-            return np.all(h1 == h2)
-        except ValueError:
-            return np.allclose(np.sort(h1, axis=0), np.sort(h2, axis=0))
+        return h1 == h2
 
 
 class FirstOrderComparer(PathComparer):

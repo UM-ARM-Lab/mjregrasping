@@ -16,12 +16,12 @@ from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import Objects
 from mjregrasping.params import Params
-from mjregrasping.path_comparer import TrueHomotopyComparer
+from mjregrasping.path_comparer import TrueHomotopyComparer, NO_HOMOTOPY
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle
+from mjregrasping.scenarios import val_untangle, cable_harness
 from mjregrasping.viz import Viz
 
 
@@ -31,7 +31,8 @@ def main():
     rr.init('make_homotopy_results')
     rr.connect()
 
-    scenario = val_untangle
+    # scenario = val_untangle
+    scenario = cable_harness
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     tfw = TF2Wrapper()
@@ -42,16 +43,15 @@ def main():
     objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
     phy = Physics(m, mujoco.MjData(m), objects)
     mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
 
     r = MjRenderer(m)
 
     skeletons = load_skeletons(scenario.skeletons_path)
-    log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True, stroke_width=0.03)
+    log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True, stroke_width=0.02)
 
     comparer = TrueHomotopyComparer(skeletons)
 
-    states_dir = Path("states/homotopy_results")
+    states_dir = Path(f"states/{scenario.name}")
     states_paths = list(states_dir.glob("*.pkl"))
     n_states = len(states_paths)
     # Divide n_states into rows and cols in way that looks nice
@@ -64,20 +64,19 @@ def main():
     for i, state_path in enumerate(states_paths):
         d = load_data_and_eq(m, True, state_path)
         phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-        viz.viz(phy)
 
         img = r.render(d)
         img_path = (state_path.parent / state_path.stem).with_suffix(".png")
         Image.fromarray(img).save(img_path)
 
+        # Visualize the robot in rerun
+        viz.rviz.viz(phy, is_planning=False)
+        viz.mjrr.viz(phy, is_planning=False, detailed=True)
+
         initial_rope_points = copy(get_rope_points(phy))
         h = comparer.get_signature(phy, initial_rope_points)
-        if isinstance(h, int):  # == NO_HOMOTOPY
+        if h == NO_HOMOTOPY:
             h = '∅'
-        else:
-            h = np.abs(h.astype(int))
-
-        # TODO: visualization
 
         row = i // ncols
         col = i % ncols

@@ -55,7 +55,8 @@ def slow_when_eqs_bad(phy):
 
 
 def limit_actuator_windup(phy):
-    qpos_for_act = phy.d.qpos[phy.m.actuator_trnid[:, 0]]
+    qpos_for_act_indices = phy.o.robot.qpos_indices[0] + phy.m.actuator_trnid[:, 0]
+    qpos_for_act = phy.d.qpos[qpos_for_act_indices]
     phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -0.01, 0.01)
 
 

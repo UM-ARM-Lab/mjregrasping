@@ -22,5 +22,6 @@
         <body name="mycamera">
             <camera mode="fixed" name="mycamera" xyaxes="-0.3 1 0 -0.5 0 0.5" pos="2.7 0.8 2.0"/>
         </body>
+        <light name="top" pos="0 0 105" mode="trackcom"/>
     </worldbody>
 </mujoco>
