@@ -8,13 +8,14 @@ from dynamic_reconfigure.server import Server
 hp = {
     "regrasp_horizon":          15,
     "regrasp_n_samples":        50,
-    "regrasp_temp":             0.1,
+    "regrasp_temp":             0.15,
     "goal_weight":              1.0,
     "grasp_pos_weight":         1.0,
     "grasp_near_weight":        5.0,
-    "grasp_finger_weight":      1.0,
+    "grasp_finger_weight":      0.5,
     "grasp_loc_diff_thresh":    0.07,  # A percentage of rope length
-    "smoothness_weight":        0.1,
+    "smoothness_weight":        0.02,
+    "home_weight":              1.0,
     "nearby_locs_weight":       10,
     "unstable_weight":          100,
     "ever_not_grasping_weight": 5.0,

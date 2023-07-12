@@ -87,18 +87,20 @@ class RegraspMPPI:
         weighted_avg_u_noise = np.sum(weights[..., None] * u_noise, axis=0)
         weight_avg_time_noise = np.sum(weights * time_noise, axis=0)
 
-        # Update mean
-        self.u_mu += weighted_avg_u_noise
-        new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
-        self.time_mu += weight_avg_time_noise
+        u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
 
         # Update covariance
-        # u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
-        # self.u_sigma_diag = weights @ np.mean((u_samples_square - new_u_mu_square) ** 2, axis=1)
+        u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
+        self.u_sigma_diag = weights @ np.mean((u_samples_square - u_mu_square) ** 2, axis=1)
         # NOTE: we could adapt time_sigma with this: weights @ (time_samples - self.time_mu) ** 2
+
+        # Update mean
+        self.u_mu += weighted_avg_u_noise
+        self.time_mu += weight_avg_time_noise
 
         rr.log_scalar("time μ", self.time_mu)
 
+        new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
         command = new_u_mu_square[0]
         return command, self.time_mu
 
@@ -212,7 +214,7 @@ def do_grasp_dynamics(phy, results, is_planning=False):
             best_offset = offset[best_idx]
             best_offset_body = np.array([best_offset, 0, 0])
             # if we're close enough and gripper angle is small enough, activate the grasp constraint
-            if best_d < hp["grasp_goal_radius"] and finger_q < hp['finger_q_closed']:
+            if best_d < hp["grasp_goal_radius"] and abs(finger_q - hp['finger_q_closed']) < np.deg2rad(5):
                 eq.obj2id = best_body_idx
                 eq.active = 1
                 eq.data[3:6] = best_offset_body

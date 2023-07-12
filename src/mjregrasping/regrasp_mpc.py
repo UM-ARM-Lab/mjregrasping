@@ -46,7 +46,9 @@ class RegraspMPC:
         num_samples = hp['regrasp_n_samples']
 
         regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, self.sdf, hp['grasp_goal_radius'], self.viz)
-        regrasp_goal.recompute_candidates(phy)
+        regrasp_goal.viz_goal(phy)
+        # regrasp_goal.recompute_candidates(phy)
+        self.viz.p.config['selected_arm'] = ParamsConfig.Params_Goal
 
         self.mppi.reset()
         self.reset_trap_detection()
@@ -67,16 +69,16 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
-            # TODO: how to choose the new regrasp goal?
-            arm = self.viz.p.config['selected_arm']
-            regrasp_goal.update_arm(phy, arm)
-
             if self.get_mab_reward(phy) < hp['mab_reward_threshold']:
                 print("Trap detected!")
                 regrasp_goal.recompute_candidates(phy)
                 warmstart_count = 0
                 self.mppi.reset()
                 self.reset_trap_detection()
+
+            # TODO: how to choose the new regrasp goal?
+            arm = self.viz.p.config['selected_arm']
+            regrasp_goal.update_arm(phy, arm)
 
             while warmstart_count < hp['warmstart']:
                 command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)

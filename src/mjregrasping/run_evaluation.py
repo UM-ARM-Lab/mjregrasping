@@ -32,7 +32,7 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
         phy = Physics(m, d, objects)
 
         sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
-        viz.sdf(sdf, '', 0)
+        # viz.sdf(sdf, '', 0)
         mujoco.mj_forward(phy.m, phy.d)
         viz.viz(phy)
 

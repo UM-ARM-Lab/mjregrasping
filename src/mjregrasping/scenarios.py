@@ -91,8 +91,8 @@ def setup_untangle(phy, viz):
 
 def make_untangle_goal(viz):
     loc = 1
-    goal_point = np.array([1.5, -1.5, 0.05])
-    goal = ObjectPointGoal(goal_point, 0.05, loc, viz)
+    goal_point = np.array([0.8, 0.04, 1.25])
+    goal = ObjectPointGoal(goal_point, 0.06, loc, viz)
     return goal
 
 

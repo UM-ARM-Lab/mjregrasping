@@ -25,7 +25,7 @@ from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle
+from mjregrasping.scenarios import val_untangle, conq_hose, make_untangle_goal
 from mjregrasping.viz import Viz
 
 
@@ -48,15 +48,16 @@ def main():
     mujoco.mj_forward(phy.m, phy.d)
     viz.viz(phy)
 
-    goal = ObjectPointGoal(np.array([1.0, 0.0, 2.0]), 0.05, 1, viz)
     skeletons = load_skeletons(scenario.skeletons_path)
-    sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
+    # sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
 
+    goal = make_untangle_goal(viz)
     h = HomotopyGenerator(goal, skeletons, viz)
     r = MjRenderer(m)
 
     states_dir = Path("states/untangle")
     for state_path in states_dir.glob("*.pkl"):
+        state_path = states_dir / 'debugging.pkl'
         d = load_data_and_eq(m, True, state_path)
         phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
         viz.viz(phy)
@@ -72,13 +73,13 @@ def main():
         from time import perf_counter
         t0 = perf_counter()
         result = h.generate(phy)
+        locs, subgoals = result
         print(f'H generate(): {perf_counter() - t0:.3f}s')
 
-        if result is None:
+        if locs is None or subgoals is None:
             print("Homotopy not useful!")
             continue
 
-        locs, subgoals = result
 
         _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
         path1 = copy(get_rope_points(phy))

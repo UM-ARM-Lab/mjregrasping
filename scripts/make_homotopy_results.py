@@ -4,6 +4,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import mujoco
+import networkx as nx
 import numpy as np
 import rerun as rr
 from PIL import Image
@@ -21,7 +22,7 @@ from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle, cable_harness
+from mjregrasping.scenarios import cable_harness
 from mjregrasping.viz import Viz
 
 
@@ -58,37 +59,59 @@ def main():
     nrows = int(np.ceil(np.sqrt(n_states)))
     ncols = int(np.ceil(n_states / nrows))
 
-    plt.style.use('paper')
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 10, nrows * 6))
-
+    results = []
     for i, state_path in enumerate(states_paths):
         d = load_data_and_eq(m, True, state_path)
         phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
-        img = r.render(d)
-        img_path = (state_path.parent / state_path.stem).with_suffix(".png")
-        Image.fromarray(img).save(img_path)
+        img = np.copy(r.render(d))
 
         # Visualize the robot in rerun
         viz.rviz.viz(phy, is_planning=False)
         viz.mjrr.viz(phy, is_planning=False, detailed=True)
 
         initial_rope_points = copy(get_rope_points(phy))
+        graph = comparer.create_graph_nodes(phy)
+        arm_points = comparer.get_arm_points(phy)
+        comparer.add_edges(graph, initial_rope_points, arm_points)
         h = comparer.get_signature(phy, initial_rope_points, log_loops=True)
+
+        # TODO: add the nx graphs, and a easier to interpret image of the loops & skeletons
+        nx_fig, nx_ax = plt.subplots()
+        loc_labels = {k: f'{k}\nloc={v:.1f}' for k, v in nx.get_node_attributes(graph, 'loc').items()}
+        nx.draw(graph, labels=loc_labels, node_size=5000, ax=nx_ax)
+        nx_fig.show()
+        nx_fig.savefig(states_dir / f"{state_path.stem}_nx.pdf", dpi=300, format="pdf")
+        nx_fig.savefig(states_dir / f"{state_path.stem}_nx.png", dpi=300)
+
+        img_path = states_dir / f"{state_path.stem}_mj.png"
+        Image.fromarray(img).save(img_path)
+
+        results.append({
+            'h': h,
+            'mj_img': img,
+            'nx_img': nx_fig,
+        })
+
+    plt.style.use('paper')
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 10, nrows * 6))
+    results = sorted(results, key=lambda r: r['h'])
+    for i, result in enumerate(results):
+        h = result['h']
         if h == NO_HOMOTOPY:
             h = '∅'
+        else:
+            h = sorted(h)
+        mj_img = result['mj_img']
 
         row = i // ncols
         col = i % ncols
         ax = axes[row, col]
 
-        # TODO: add the nx graphs, and a easier to interpret image of the loops & skeletons
-
-        ax.imshow(img)
+        ax.imshow(mj_img)
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_title(f"$\mathcal{{H}}=${h}")
-        # state_path.unlink()
 
     # Remove any extra unused axes
     for i in range(n_states, nrows * ncols):

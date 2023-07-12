@@ -1,10 +1,9 @@
 import numpy as np
-from numpy.linalg import norm
-
 # noinspection PyUnresolvedReferences
 from mjregrasping.cfg import ParamsConfig
+from numpy.linalg import norm
 
-from mjregrasping.first_order_generator import FirstOrderGenerator
+# from mjregrasping.first_order_generator import FirstOrderGenerator
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_regrasp_costs
 from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
@@ -26,7 +25,7 @@ class RegraspGoal(MPPIGoal):
         self.grasp_goal_radius = grasp_goal_radius
         self.slack_gen = SlackGenerator(op_goal, viz)
         self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, viz)
-        self.first_order_gen = FirstOrderGenerator(op_goal, sdf, viz)
+        # self.first_order_gen = FirstOrderGenerator(op_goal, sdf, viz)
         self.arm = ParamsConfig.Params_Goal
         self.current_locs = None
 
@@ -86,6 +85,9 @@ class RegraspGoal(MPPIGoal):
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
+        # penalize distance of q's from 0
+        home_cost = np.sum(np.abs(finger_qs)) * hp['home_weight']
+
         w_goal = 1 if self.arm == ParamsConfig.Params_Goal else 0
         return (
             contact_cost,
@@ -94,6 +96,7 @@ class RegraspGoal(MPPIGoal):
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,
+            home_cost,
         )
 
     def cost_names(self):
@@ -101,9 +104,10 @@ class RegraspGoal(MPPIGoal):
             "contact",
             "unstable",
             "goal",
-            "grasp_finger_cost",
-            "grasp_pos_cost",
-            "grasp_near_cost",
+            "grasp_finger",
+            "grasp_pos",
+            "grasp_near",
+            "home"
         ]
 
     def viz_result(self, phy: Physics, result, idx: int, scale, color):
@@ -115,13 +119,14 @@ class RegraspGoal(MPPIGoal):
 
         grasp_xpos = as_float(result[9])[t0]
         for name, xpos in zip(phy.o.rd.rope_grasp_eqs, grasp_xpos):
-            self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), frame_id='world', idx=0)
+            self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4),
+                            frame_id='world', idx=0)
 
     def recompute_candidates(self, phy: Physics):
         from time import perf_counter
         t0 = perf_counter()
 
-        self.first_order_locs, self.first_order_subgoals = self.first_order_gen.generate(phy)
+        # self.first_order_locs, self.first_order_subgoals = self.first_order_gen.generate(phy)
         self.homotopy_locs, self.homotopy_subgoals = self.homotopy_gen.generate(phy)
         self.slack_locs, self.slack_subgoals = self.slack_gen.generate(phy)
 
