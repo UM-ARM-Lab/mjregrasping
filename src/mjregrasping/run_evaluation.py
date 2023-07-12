@@ -47,10 +47,6 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
         goal = make_goal(viz)
 
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-            viz.p.w_goal = 1.0
-            viz.p.w_regrasp_point = 0.0
-            viz.p.update()
-
             mpc = RegraspMPC(pool, phy.m.nu, skeletons, sdf, goal, seed, viz, mov)
             mpc.run(phy)
             mpc.close()

@@ -12,6 +12,7 @@ from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, regrasp_rollout
+from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
 from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
@@ -30,10 +31,8 @@ class RegraspMPC:
         self.mov = mov
         self.is_gasping_rng = np.random.RandomState(0)
 
-        noise_sigma = np.array([0.02, 0.02, 0.01, np.deg2rad(1)])  # Conq
-        noise_sigma = np.deg2rad(2)  # Val
         self.mppi = RegraspMPPI(pool=self.pool, nu=self.mppi_nu, seed=seed, horizon=hp['regrasp_horizon'],
-                                noise_sigma=noise_sigma, temp=hp['regrasp_temp'])
+                                noise_sigma=val.noise_sigma, temp=hp['regrasp_temp'])
         self.state_history = Buffer(hp['state_history_size'])
         self.max_dq = None
         self.reset_trap_detection()

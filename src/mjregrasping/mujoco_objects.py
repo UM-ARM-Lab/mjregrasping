@@ -21,6 +21,7 @@ class Children:
     def __init__(self, model, parent_body_idx):
         self.body_names = []
         self.geom_names = []
+        self.joint_names = []
         self.body_indices = []
         self.geom_indices = []
         self.qpos_indices = []
@@ -40,6 +41,7 @@ class Children:
             end = start + dof
             if is_child(model, jnt_body, parent_body_idx) or parent_body_idx == jnt_body.id:
                 self.qpos_indices.extend(list(range(start, end)))
+                self.joint_names.append(joint.name)
 
         for body_idx in range(model.nbody):
             body = model.body(body_idx)
