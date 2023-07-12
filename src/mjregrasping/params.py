@@ -39,6 +39,7 @@ hp = {
     "sim_ik_nstep":             20,
     "sim_ik_sub_time_s":        0.25,
     "sim_ik_solref_decay":      0.8,
+    "attach_loop_size":         0.02,
 }
 
 

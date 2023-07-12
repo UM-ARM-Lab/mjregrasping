@@ -21,6 +21,12 @@
         <connect body1="attach1" body2="B_first" name="attach1" anchor="0 -0.03 0" active="false" solref="0.03 1"/>
     </equality>
     <equality>
-        <connect body1="attach2" body2="B_last" name="attach2" anchor="0 0.03 0" active="false" solref="0.03 1"/>
+        <connect body1="attach2" body2="B_first" name="attach2" anchor="0 0.03 0" active="false" solref="0.03 1"/>
+    </equality>
+    <equality>
+        <!-- NOTE: body2 can and will be changed at runtime -->
+        <connect body1="loop1" body2="B_first" name="attach_loop1" anchor="0 0 0.06" active="false" solref="0.03 1"/>
+        <connect body1="loop2" body2="B_first" name="attach_loop2" anchor="0 0 0.06" active="false" solref="0.03 1"/>
+        <connect body1="loop3" body2="B_first" name="attach_loop3" anchor="0 0 0.06" active="false" solref="0.03 1"/>
     </equality>
 </mujoco>

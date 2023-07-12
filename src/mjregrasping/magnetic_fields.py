@@ -7,6 +7,20 @@ from numpy.linalg import norm
 from mjregrasping.geometry import squared_norm
 
 
+def get_true_h_signature(path, skeletons: Dict):
+    # NOTE: this function seems to slow down a lot when called from multiple parallel processes?
+    path_discretized = discretize_path(path)
+    path_deltas = np.diff(path_discretized, axis=0)
+    hs = []
+    for skeleton in skeletons.values():
+        bs = skeleton_field_dir(skeleton, path_discretized[:-1])
+        # Integrate the field along the path
+        h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
+        h = int(h.round(0))  # round to nearest integer since the output should really either be 0 or 1
+        hs.append(h)
+    return tuple(hs)
+
+
 def skeleton_field_dir(skeleton, r):
     """
     Computes the field direction at the input points, where the conductor is the skeleton of an obstacle.
@@ -41,10 +55,8 @@ def skeleton_field_dir(skeleton, r):
     p_next_lens = norm(p_next, axis=-1, keepdims=True) + 1e-6
     p_prev_lens = norm(p_prev, axis=-1, keepdims=True) + 1e-6
 
-    # If the length of d is zero, that means the point is co-linear with that segment of the skeleton,
-    # and therefore no magnetic field is generated.
+    # Epsilon is added to the denominator to avoid dividing by zero, which would happen for points _on_ the skeleton.
     ε = 1e-6
-
     d_scale = np.where(squared_d_lens > ε, 1 / (squared_d_lens + ε), 0)
 
     bs = d_scale * (np.cross(d, p_next) / p_next_lens - np.cross(d, p_prev) / p_prev_lens)
@@ -87,19 +99,6 @@ def make_ring_mat(ring_position, ring_z_axis):
     ring_mat[:3, 2] = ring_z_axis
     ring_mat[:3, 3] = ring_position
     return ring_mat
-
-
-def get_true_h_signature(path, skeletons: Dict):
-    # NOTE: this function seems to slow down a lot when called from multiple parallel processes?
-    path_discretized = discretize_path(path)
-    path_deltas = np.diff(path_discretized, axis=0)
-    hs = []
-    for skeleton in skeletons.values():
-        bs = skeleton_field_dir(skeleton, path_discretized[:-1])
-        h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
-        h = int(h.round(0))  # round to nearest integer since the output should really either be 0 or 1
-        hs.append(h)
-    return tuple(hs)
 
 
 def discretize_path(path, n=1000):

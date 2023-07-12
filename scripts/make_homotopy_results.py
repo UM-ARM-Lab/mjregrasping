@@ -59,7 +59,7 @@ def main():
     ncols = int(np.ceil(n_states / nrows))
 
     plt.style.use('paper')
-    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 9, nrows * 6))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 10, nrows * 6))
 
     for i, state_path in enumerate(states_paths):
         d = load_data_and_eq(m, True, state_path)
@@ -74,7 +74,7 @@ def main():
         viz.mjrr.viz(phy, is_planning=False, detailed=True)
 
         initial_rope_points = copy(get_rope_points(phy))
-        h = comparer.get_signature(phy, initial_rope_points)
+        h = comparer.get_signature(phy, initial_rope_points, log_loops=True)
         if h == NO_HOMOTOPY:
             h = '∅'
 
@@ -82,10 +82,13 @@ def main():
         col = i % ncols
         ax = axes[row, col]
 
+        # TODO: add the nx graphs, and a easier to interpret image of the loops & skeletons
+
         ax.imshow(img)
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_title(f"$\mathcal{{H}}=${h}")
+        # state_path.unlink()
 
     # Remove any extra unused axes
     for i in range(n_states, nrows * ncols):

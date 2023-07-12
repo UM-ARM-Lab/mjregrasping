@@ -275,5 +275,6 @@ def log_line_with_std(entity_path, x, *args, **kwargs):
 
 
 def log_skeletons(skeletons: Dict[str, np.ndarray], **kwargs):
+    rr.log_cleared(f'skeleton', recursive=True)
     for name, skeleton in skeletons.items():
         rr.log_line_strip(f'skeleton/{name}', skeleton, **kwargs)

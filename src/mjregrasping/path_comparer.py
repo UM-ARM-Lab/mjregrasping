@@ -1,4 +1,5 @@
 from abc import ABC
+from copy import deepcopy
 
 import networkx as nx
 import numpy as np
@@ -7,7 +8,9 @@ import rerun as rr
 from multiset import Multiset
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
-from mjregrasping.grasp_conversions import grasp_indices_to_locations
+from mjregrasping.grasp_conversions import grasp_indices_to_locations, grasp_locations_to_indices_and_offsets
+from mjregrasping.params import hp
+from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rope_length import get_rope_length
 from mjregrasping.magnetic_fields import get_true_h_signature
 from mjregrasping.mujoco_objects import parents_points
@@ -124,13 +127,34 @@ class TrueHomotopyComparer(PathComparer):
                         edge_rope_points = initial_rope_points[from_to(i_point_idx, j_point_idx)]
                         graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
 
-            # import matplotlib.pyplot as plt
-            # loc_labels = nx.get_node_attributes(graph, 'loc')
-            # pos_labels = nx.get_node_attributes(graph, 'xpos')
-            # combined_labels = {k: f"{k}: {loc_labels[k]:.2f} {pos_labels[k]}" for k in graph.nodes}
-            # nx.draw(graph, labels=combined_labels, node_size=1000)
-            # plt.margins(x=0.4)
-            # plt.show()
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots()
+            loc_labels = {k: f'{k}\nloc={v:.1f}' for k, v in nx.get_node_attributes(graph, 'loc').items()}
+            nx.draw(graph, labels=loc_labels, node_size=5000, ax=ax)
+            ax.margins(0.2)
+            fig.show()
+
+            skeletons = deepcopy(self.skeletons)
+            # # Add small loops (squares) around each fixed point to the skeleton
+            # for node in graph.nodes:
+            #     if 'a' in node:
+            #         a_loc = nx.get_node_attributes(graph, 'loc')[node]
+            #         a_pos = nx.get_node_attributes(graph, 'xpos')[node]
+            #         # Get the orientation of the rope at the loc where it's attached
+            #         a_idx, offsets = grasp_locations_to_indices_and_offsets(a_loc, phy)
+            #         a_xpos = phy.d.xpos[a_idx]
+            #         a_xmat = phy.d.xmat[a_idx].reshape(3, 3)
+            #         a_y_axis = a_xmat[:, 1]
+            #         a_z_axis = a_xmat[:, 2]
+            #
+            #         skeletons[f'{node}_loop'] = np.array([
+            #             a_pos + hp['attach_loop_size'] * a_y_axis - hp['attach_loop_size'] * a_z_axis,
+            #             a_pos + hp['attach_loop_size'] * a_y_axis + hp['attach_loop_size'] * a_z_axis,
+            #             a_pos - hp['attach_loop_size'] * a_y_axis + hp['attach_loop_size'] * a_z_axis,
+            #             a_pos - hp['attach_loop_size'] * a_y_axis - hp['attach_loop_size'] * a_z_axis,
+            #             a_pos + hp['attach_loop_size'] * a_y_axis - hp['attach_loop_size'] * a_z_axis,
+            #         ])
+            log_skeletons(skeletons, stroke_width=0.01, color=[0, 1.0, 0, 1.0])
 
             valid_cycles = []
             for cycle in nx.simple_cycles(graph, length_bound=3):
@@ -158,8 +182,9 @@ class TrueHomotopyComparer(PathComparer):
                 loops.append(loop)
 
             if log_loops:
-                for l in loops:
-                    rr.log_line_strip('candidate_loop', l, stroke_width=0.03)
+                rr.log_cleared(f'candidate_loop', recursive=True)
+                for i, l in enumerate(loops):
+                    rr.log_line_strip(f'candidate_loop/{i}', l, stroke_width=0.02)
 
             removed_node = False
             for loop, cycle in zip(loops, valid_cycles):
@@ -167,7 +192,7 @@ class TrueHomotopyComparer(PathComparer):
                 # nodes and re-run the algorithm
                 edge = has_gripper_gripper_edge(cycle)
                 if edge is not None:
-                    h = get_true_h_signature(loop, self.skeletons)
+                    h = get_true_h_signature(loop, skeletons)
                     if np.count_nonzero(h) == 0:
                         # arbitrarily choose the "larger" node in the edge as the one we remove.
                         graph.remove_node(max(*edge))
@@ -176,9 +201,9 @@ class TrueHomotopyComparer(PathComparer):
             if removed_node:
                 continue
 
-            h = Multiset([get_true_h_signature(loop, self.skeletons) for loop in loops])
+            h = Multiset([get_true_h_signature(loop, skeletons) for loop in loops])
 
-            return h
+            return sorted(h)
 
     def check_equal(self, h1, h2):
         return h1 == h2
