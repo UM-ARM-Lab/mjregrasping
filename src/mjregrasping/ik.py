@@ -6,9 +6,8 @@ from numpy.linalg import norm
 
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_contact_cost
-from mjregrasping.grasping import get_grasp_eqs
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_total_contact_force
 from mjregrasping.rollout import control_step
 from mjregrasping.viz import Viz
 
@@ -73,12 +72,15 @@ def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Option
             gripper_to_world_eq.data[3:6] = candidate_pos[i]
             gripper_to_world_eq.solref[0] = 1.0  # start with a really soft constraint
 
-    for _ in range(hp['sim_ik_nstep']):
+    accumulated_contact_force = 0
+    for t in range(hp['sim_ik_nstep']):
         for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
             if candidate_is_grasping[i]:
                 gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
-                gripper_to_world_eq.solref[0] *= hp['sim_ik_solref_decay']
+                gripper_to_world_eq.solref[0] *= hp['sim_ik_solref_decay'] + hp['sim_ik_min_solref']
         control_step(phy_ik, np.zeros(phy_ik.m.nu), sub_time_s=hp['sim_ik_sub_time_s'])
+        contact_force = get_total_contact_force(phy_ik)
+        accumulated_contact_force += contact_force
         # Check if the grasping grippers are near their targets
         reached = True
         for i, (tool_name, candidate_pos_i) in enumerate(zip(phy_ik.o.rd.tool_sites, candidate_pos)):
@@ -89,8 +91,8 @@ def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Option
         if viz:
             viz.viz(phy_ik, is_planning=True)
         if reached:
-            return True
-    return False
+            return True, accumulated_contact_force
+    return False, accumulated_contact_force
 
 
 def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):

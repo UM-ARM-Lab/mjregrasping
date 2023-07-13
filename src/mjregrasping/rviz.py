@@ -259,8 +259,18 @@ class MjRViz:
                 eq_marker.color = ColorRGBA(*to_rgba("y"))
                 eq_marker.color.a = 0.4
                 eq_marker.ns = f"eq_{eq.name}"
-                eq_marker.points.append(Point(*phy.d.xpos[eq.obj1id][0]))
-                eq_marker.points.append(Point(*phy.d.xpos[eq.obj2id][0]))
+                # body_xpos = phy.d.xpos[eq.obj1_id]
+                # body_x_axis = body_xmat[:, :, 0]
+                # xpos = body_xpos + body_x_axis * offsets[:, None]
+
+                body1_offset_in_body = phy.m.eq_data[eq_constraint_idx, 0:3]
+                body1_xmat = phy.d.xmat[eq.obj1id].reshape(-1, 3, 3)
+                body1_offset_in_world = (body1_xmat @ body1_offset_in_body)[0]
+                body1_pos = phy.d.xpos[eq.obj1id][0] + body1_offset_in_world
+                body2_pos = phy.d.xpos[eq.obj2id][0] + phy.m.eq_data[eq_constraint_idx, 3:6]
+
+                eq_marker.points.append(Point(*body1_pos))
+                eq_marker.points.append(Point(*body2_pos))
                 eqs_markers.markers.append(eq_marker)
 
         self.eq_constraints_pub.publish(clear_all_marker)

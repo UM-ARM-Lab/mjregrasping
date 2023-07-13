@@ -17,7 +17,7 @@ from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import Objects
 from mjregrasping.params import Params
-from mjregrasping.path_comparer import TrueHomotopyComparer, NO_HOMOTOPY
+from mjregrasping.homotopy_checker import HomotopyChecker, NO_HOMOTOPY
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
@@ -50,7 +50,7 @@ def main():
     skeletons = load_skeletons(scenario.skeletons_path)
     log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True, stroke_width=0.02)
 
-    comparer = TrueHomotopyComparer(skeletons)
+    comparer = HomotopyChecker(skeletons)
 
     states_dir = Path(f"states/{scenario.name}")
     states_paths = list(states_dir.glob("*.pkl"))

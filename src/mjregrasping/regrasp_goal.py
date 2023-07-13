@@ -4,6 +4,7 @@ from mjregrasping.cfg import ParamsConfig
 from numpy.linalg import norm
 
 # from mjregrasping.first_order_generator import FirstOrderGenerator
+# from mjregrasping.slack_regrasp_generator import SlackGenerator
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_regrasp_costs
 from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
@@ -12,7 +13,6 @@ from mjregrasping.grasping import get_is_grasping, get_finger_qs, get_grasp_locs
 from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.slack_regrasp_generator import SlackGenerator
 from mjregrasping.viz import Viz
 
 
@@ -23,8 +23,8 @@ class RegraspGoal(MPPIGoal):
         self.op_goal = op_goal
         self.skeletons = skeletons
         self.grasp_goal_radius = grasp_goal_radius
-        self.slack_gen = SlackGenerator(op_goal, viz)
-        self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, viz)
+        self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, sdf)
+        # self.slack_gen = SlackGenerator(op_goal, viz)
         # self.first_order_gen = FirstOrderGenerator(op_goal, sdf, viz)
         self.arm = ParamsConfig.Params_Goal
         self.current_locs = None
@@ -40,7 +40,7 @@ class RegraspGoal(MPPIGoal):
         if arm != self.arm:
             self.current_locs = get_grasp_locs(phy)
         if self.current_locs is None:
-            self.current_locs, _ = self.slack_gen.generate(phy)
+            self.current_locs = get_grasp_locs(phy)
         self.arm = arm
 
     def get_results(self, phy: Physics):
@@ -61,8 +61,6 @@ class RegraspGoal(MPPIGoal):
             grasp_locs = self.current_locs
         elif self.arm == ParamsConfig.Params_Homotopy:
             grasp_locs = self.homotopy_locs
-        elif self.arm == ParamsConfig.Params_Slack:
-            grasp_locs = self.slack_locs
         else:
             raise NotImplementedError(self.arm)
 
@@ -127,9 +125,8 @@ class RegraspGoal(MPPIGoal):
         t0 = perf_counter()
 
         # self.first_order_locs, self.first_order_subgoals = self.first_order_gen.generate(phy)
-        self.homotopy_locs, self.homotopy_subgoals = self.homotopy_gen.generate(phy)
-        self.slack_locs, self.slack_subgoals = self.slack_gen.generate(phy)
+        # self.slack_locs, self.slack_subgoals = self.slack_gen.generate(phy)
+        self.homotopy_locs, self.homotopy_subgoals = self.homotopy_gen.generate(phy, viz=self.viz)
 
         print(f'Homotopy: {self.homotopy_locs}')
-        print(f'Slack: {self.slack_locs}')
         print(f'dt: {perf_counter() - t0:.3f}')

@@ -29,6 +29,8 @@ hp = {
     "contact_exponent":         0.5,
     "max_contact_cost":         1,
     "contact_cost":             3.0,
+    "contact_force_weight":     0.0001,
+    "eq_err_weight":            1000.0,
     "frac_max_dq":              0.5,
     "q_joint_weight":           0.5,
     "mab_reward_threshold":     0.3,
@@ -40,6 +42,7 @@ hp = {
     "sim_ik_nstep":             20,
     "sim_ik_sub_time_s":        0.25,
     "sim_ik_solref_decay":      0.8,
+    "sim_ik_min_solref":        0.02,
     "attach_loop_size":         0.02,
 }
 

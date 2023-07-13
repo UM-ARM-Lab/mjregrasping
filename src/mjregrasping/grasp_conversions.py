@@ -30,11 +30,16 @@ def grasp_locations_to_indices_and_offsets(grasp_locations, phy: Physics):
 
 def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_locations):
     grasp_indices, offsets = grasp_locations_to_indices_and_offsets(grasp_locations, phy)
-    body_xpos = phy.d.xpos[grasp_indices]
-    body_xmat = phy.d.xmat[grasp_indices].reshape(-1, 3, 3)
+    xpos = body_plus_offset(phy, grasp_indices, offsets)
+    return grasp_indices, offsets, xpos
+
+
+def body_plus_offset(phy, body_indices, offsets):
+    body_xpos = phy.d.xpos[body_indices]
+    body_xmat = phy.d.xmat[body_indices].reshape(-1, 3, 3)
     body_x_axis = body_xmat[:, :, 0]
     xpos = body_xpos + body_x_axis * offsets[:, None]
-    return grasp_indices, offsets, xpos
+    return xpos
 
 
 def make_full_locs(locs_where_grasping, is_grasping):
@@ -50,15 +55,3 @@ def make_full_locs(locs_where_grasping, is_grasping):
     return candidate_locs
 
 
-def sln_to_locs(best_sln, candidate_is_grasping):
-    locs = []
-    best_sln = list(best_sln.values())
-    j = 0
-    for is_grasping_i in candidate_is_grasping:
-        if is_grasping_i:
-            locs.append(best_sln[j])
-            j += 1
-        else:
-            locs.append(-1)
-    locs = np.array(locs)
-    return locs

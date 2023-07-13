@@ -10,7 +10,7 @@ from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
 from trimesh.creation import box, cylinder
 
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_total_contact_force
 from mjregrasping.rviz import get_parent_child_names, MujocoXmlMeshParser
 
 logger = logging.getLogger(f'rosout.{__name__}')
@@ -125,6 +125,9 @@ class MjReRun:
                       positions=positions,
                       colors=colors,
                       radii=radii)
+
+        total_contact_force = get_total_contact_force(phy)
+        rr.log_scalar('total_contact_force', total_contact_force)
 
     def viz_eqs(self, phy: Physics, entity_prefix):
         rr.log_cleared('eqs', recursive=True)

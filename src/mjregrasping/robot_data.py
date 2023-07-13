@@ -19,6 +19,7 @@ class RobotData:
     tool_bodies: List[str]
     ik_tol: float
     noise_sigma: np.ndarray
+    workspace_bbox: np.ndarray
 
 
 val = RobotData(
@@ -48,7 +49,12 @@ val = RobotData(
     ],
     tool_bodies=["drive50", "drive10"],
     ik_tol=0.01,
-    noise_sigma=np.deg2rad(2)
+    noise_sigma=np.deg2rad(2),
+    workspace_bbox=np.array([
+        [0.7, 1.2],
+        [-0.6, 0.6],
+        [0.5, 1.5]
+    ])
 )
 
 conq = RobotData(
@@ -64,4 +70,9 @@ conq = RobotData(
     gripper_actuator_names=['finger_vel'],
     ik_tol=0.02,
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
+    workspace_bbox=np.array([
+        [0, 1.5],
+        [-1.0, 1.0],
+        [0.0, 0.5],
+    ])
 )

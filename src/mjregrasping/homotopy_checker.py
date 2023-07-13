@@ -1,4 +1,3 @@
-from abc import ABC
 from copy import deepcopy
 
 import networkx as nx
@@ -8,30 +7,20 @@ import rerun as rr
 from multiset import Multiset
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
-from mjregrasping.grasp_conversions import grasp_indices_to_locations, grasp_locations_to_indices_and_offsets
-from mjregrasping.params import hp
-from mjregrasping.rerun_visualizer import log_skeletons
-from mjregrasping.rope_length import get_rope_length
+from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.grasp_conversions import grasp_indices_to_locations
 from mjregrasping.magnetic_fields import get_true_h_signature
 from mjregrasping.mujoco_objects import parents_points
-
-
-class PathComparer(ABC):
-
-    def get_signature(self, phy, path):
-        raise NotImplementedError()
-
-    def check_equal(self, h1, h2):
-        raise NotImplementedError()
-
+from mjregrasping.rope_length import get_rope_length
 
 NO_HOMOTOPY = Multiset([-999])
 
 
-class TrueHomotopyComparer(PathComparer):
+class HomotopyChecker:
 
-    def __init__(self, skeletons):
+    def __init__(self, skeletons, sdf):
         self.skeletons = skeletons
+        self.sdf = sdf
 
     def get_signature(self, phy, initial_rope_points, log_loops=False):
         """
@@ -189,24 +178,23 @@ class TrueHomotopyComparer(PathComparer):
                     edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
                     graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
 
-    def check_equal(self, h1, h2):
-        return h1 == h2
+    def get_first_order_different(self, phy1, phy2, log_loops=False, viz=None):
+        rope1 = get_rope_points(phy1)
+        rope2 = get_rope_points(phy2)
+        first_order_sln = get_first_order_homotopy_points(self.sdf, rope1, rope2, -self.sdf.GetResolution())
+        if viz:
+            self.viz.lines()
+        first_order_different = len(first_order_sln) == 0
+        return first_order_different
 
+    def get_true_homotopy_different(self, phy1, phy2, log_loops=False):
+        rope1 = get_rope_points(phy1)
 
-class FirstOrderComparer(PathComparer):
+        h1 = self.get_signature(phy1, rope1, log_loops)
+        h2 = self.get_signature(phy2, rope1, log_loops=False)
+        true_homotopy_different = (h1 != h2)
 
-    def __init__(self, sdf: pysdf_tools.SignedDistanceField):
-        self.sdf = sdf
-
-    def get_signature(self, phy, path):
-        raise NotImplementedError("not sure this even makes sense for first order homotopy")
-
-    def check_equal(self, h1, h2):
-        # indices_path is a list of pairs of ints which describes how to smoothly map from h1 to h2.
-        # If the list is empty, then there is no smooth path, meaning they are _NOT_ equal.
-        # Therefore, return TRUE if the list is NOT EMPTY.
-        indices_path = get_first_order_homotopy_points(self.sdf, h1, h2, sdf_threshold=-self.sdf.GetResolution() + 1e-6)
-        return len(indices_path) > 0
+        return true_homotopy_different
 
 
 def passes_through(graph, i, j):

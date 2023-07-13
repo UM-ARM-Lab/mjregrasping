@@ -7,11 +7,11 @@ from bayes_opt import BayesianOptimization
 
 from arc_utilities.path_utils import densify
 from mjregrasping.goal_funcs import get_rope_points, check_should_be_open
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, sln_to_locs
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
 from mjregrasping.ik import get_reachability_cost, HARD_CONSTRAINT_PENALTY, eq_sim_ik
 from mjregrasping.params import hp
-from mjregrasping.path_comparer import FirstOrderComparer
+from mjregrasping.homotopy_checker import FirstOrderComparer
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
 from mjregrasping.viz import Viz
@@ -45,19 +45,7 @@ class FirstOrderGenerator(RegraspGenerator):
                     bounds[tool_name + '_subgoal_z'] = (0, 0.1)  # TODO: proper workspace bounds
 
             def _cost(**kwargs):
-                candidate_locs = []
-                candidate_subgoals = []
-                for tool_name, is_grasping_i in zip(phy.o.rd.tool_sites, candidate_is_grasping):
-                    if is_grasping_i:
-                        candidate_locs.append(kwargs[tool_name])
-                        candidate_subgoals.append(np.array([kwargs[tool_name + '_subgoal_x'],
-                                                            kwargs[tool_name + '_subgoal_y'],
-                                                            kwargs[tool_name + '_subgoal_z']]))
-                    else:
-                        candidate_locs.append(-1)
-                        candidate_subgoals.append(np.zeros(3))
-                candidate_locs = np.array(candidate_locs)
-                candidate_subgoals = np.array(candidate_subgoals)
+                candidate_locs, candidate_subgoals = args_to_locs_and_subgoals(kwargs)
                 # # DEBUGGING:
                 # candidate_locs = np.array([0.5])
                 # candidate_subgoals = np.array([[1.1, 0.9, 0.30]])
@@ -108,6 +96,7 @@ class FirstOrderGenerator(RegraspGenerator):
                 rr.log_scalar("first_order_costs/homotopy", homotopy_cost)
                 rr.log_scalar("first_order_costs/total_cost", cost)
                 return -cost
+
 
             opt = BayesianOptimization(f=_cost, pbounds=bounds, verbose=0, random_state=self.rng.randint(0, 1000),
                                        allow_duplicate_points=True)
@@ -185,13 +174,3 @@ class FirstOrderGenerator(RegraspGenerator):
         return phy_ik, reached
 
 
-def sln_to_subgoals(params, candidate_is_grasping, tool_names):
-    subgoals = []
-    for tool_name, is_grasping_i in zip(tool_names, candidate_is_grasping):
-        if is_grasping_i:
-            subgoals.append(np.array([params[tool_name + '_subgoal_x'],
-                                      params[tool_name + '_subgoal_y'],
-                                      params[tool_name + '_subgoal_z']]))
-        else:
-            subgoals.append(None)
-    return subgoals
