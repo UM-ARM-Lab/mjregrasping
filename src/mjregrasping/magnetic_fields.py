@@ -8,7 +8,6 @@ from mjregrasping.geometry import squared_norm
 
 
 def get_true_h_signature(path, skeletons: Dict):
-    # NOTE: this function seems to slow down a lot when called from multiple parallel processes?
     path_discretized = discretize_path(path)
     path_deltas = np.diff(path_discretized, axis=0)
     hs = []
@@ -16,7 +15,9 @@ def get_true_h_signature(path, skeletons: Dict):
         bs = skeleton_field_dir(skeleton, path_discretized[:-1])
         # Integrate the field along the path
         h = np.sum(np.sum(bs * path_deltas, axis=-1), axis=0)
-        h = int(h.round(0))  # round to nearest integer since the output should really either be 0 or 1
+        # round to nearest integer since the output should really either be 0 or 1
+        # absolute value because we don't care which "direction" the loop goes through an obstacle
+        h = abs(int(h.round(0)))
         hs.append(h)
     return tuple(hs)
 

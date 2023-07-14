@@ -22,15 +22,13 @@ class HomotopyChecker:
         self.skeletons = skeletons
         self.sdf = sdf
 
-    def get_signature(self, phy, initial_rope_points, log_loops=False):
+    def get_signature(self, phy, log_loops=False):
         """
         The H-signature is a vector the uniquely defines the homotopy class of the current state. The state involves
         both the gripper and arm positions, the rope configuration, and the obstacles. The h_equal() function can be
         used to compare if two states are the same homotopy class (AKA homologous).
         Args:
             phy: The full physics state
-            initial_rope_points: The rope points. Passed separately because the IK solver modifies the rope state
-                 in a stupid way that we don't want.
 
         Returns:
             The h-signature of the current state and the loops and tool positions that were used to compute it.
@@ -38,9 +36,10 @@ class HomotopyChecker:
         """
         graph = self.create_graph_nodes(phy)
 
+        rope_points = get_rope_points(phy)
         arm_points = self.get_arm_points(phy)
         while True:
-            self.add_edges(graph, initial_rope_points, arm_points)
+            self.add_edges(graph, rope_points, arm_points)
 
             skeletons = deepcopy(self.skeletons)
 
@@ -188,10 +187,8 @@ class HomotopyChecker:
         return first_order_different
 
     def get_true_homotopy_different(self, phy1, phy2, log_loops=False):
-        rope1 = get_rope_points(phy1)
-
-        h1 = self.get_signature(phy1, rope1, log_loops)
-        h2 = self.get_signature(phy2, rope1, log_loops=False)
+        h1 = self.get_signature(phy1, log_loops)
+        h2 = self.get_signature(phy2, log_loops)
         true_homotopy_different = (h1 != h2)
 
         return true_homotopy_different

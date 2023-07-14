@@ -52,17 +52,18 @@ def main():
     r = MjRenderer(m)
 
     states_dir = Path("states/untangle")
-    for state_path in states_dir.glob("*.pkl"):
-        state_path = states_dir / '1688067882.pkl'
+    rr.set_time_sequence('homotopy', 0)
+    for state_path in sorted(states_dir.glob("*.pkl")):
+        # state_path = states_dir / '1688067882.pkl'
         d = load_data_and_eq(m, True, state_path)
         phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+
         viz.viz(phy)
+        log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True)
 
         img = r.render(d)
         img_path = (state_path.parent / state_path.stem).with_suffix(".png")
         Image.fromarray(img).save(img_path)
-        viz.viz(phy)
-        log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True)
 
         from time import perf_counter
         t0 = perf_counter()
@@ -75,6 +76,7 @@ def main():
         for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
             viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
         print(f'H generate(): {t1 - t0:.3f}s {locs=:}')
+        print()
 
 
 if __name__ == "__main__":
