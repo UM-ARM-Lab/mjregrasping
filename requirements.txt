@@ -1,12 +1,14 @@
-rerun-sdk
-trimesh
-mujoco
-colorama
-tqdm
+bayesian-optimization
 cffi
-transformations
-numpy==1.23  #the ROS1 point_cloud python package is incompatible with 1.24
-scipy>=1.7.0
-cma
+colorama
+hjson
 imageio[ffmpeg]
+mujoco
 multiset
+networkx
+numpy
+pip>=23.1.0
+rerun-sdk
+tqdm
+transformations
+trimesh
