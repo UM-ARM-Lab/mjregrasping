@@ -4,6 +4,10 @@ from mjregrasping.physics import Physics
 from mjregrasping.rope_length import get_rope_length
 
 
+def grasp_locations_to_is_grasping(grasp_locations):
+    return grasp_locations != -1
+
+
 def grasp_location_to_indices(grasp_locations, rope_body_indices):
     grasp_indices = grasp_locations * (1 + rope_body_indices.max() - rope_body_indices.min()) + rope_body_indices.min()
     grasp_indices = np.clip(grasp_indices, rope_body_indices.min(), rope_body_indices.max())
@@ -53,5 +57,3 @@ def make_full_locs(locs_where_grasping, is_grasping):
             candidate_locs.append(-1)
     candidate_locs = np.array(candidate_locs)
     return candidate_locs
-
-

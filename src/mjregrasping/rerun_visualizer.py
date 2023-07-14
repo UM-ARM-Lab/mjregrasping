@@ -62,34 +62,38 @@ class MjReRun:
         so this method is very hacked at the moment.
         """
         for geom_id in range(m.ngeom):
-            geom = m.geom(geom_id)
-            geom_type = geom.type
-            geom_bodyid = geom.bodyid
+            d_geom = d.geom(geom_id)
+            m_geom = m.geom(geom_id)
+            geom_type = m_geom.type
+            geom_bodyid = m_geom.bodyid
             parent_name, child_name = get_parent_child_names(geom_bodyid, m)
             entity_name = f"{entity_prefix}{parent_name}/{child_name}"
+            d_body = d.body(geom_bodyid)
+            m_body = m.body(geom_bodyid)
+            d_parent_body = d.body(m_body.parentid)
+            m_parent_body = m.body(m_body.parentid)
 
             if geom_type == mjtGeom.mjGEOM_BOX:
                 if detailed:
-                    log_box_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
+                    log_box_from_geom(entity_name, m_geom, d_geom)
                 else:
-                    log_bbox_from_geom(entity_name, m.geom(geom_id), d.geom(geom_id))
+                    log_bbox_from_geom(entity_name, m_geom, d_geom)
             elif geom_type == mjtGeom.mjGEOM_CYLINDER:
                 if detailed:
-                    log_cylinder(entity_name, m.geom(geom_id), d.geom(geom_id))
+                    log_cylinder(entity_name, m_geom, d_geom)
             elif geom_type == mjtGeom.mjGEOM_CAPSULE:
-                log_capsule(entity_name, m.geom(geom_id), d.geom(geom_id))
+                log_capsule(entity_name, m_geom, d_geom)
             elif geom_type == mjtGeom.mjGEOM_SPHERE:
-                log_sphere(entity_name, m.geom(geom_id), d.geom(geom_id))
+                log_sphere(entity_name, m_geom, d_geom)
             elif geom_type == mjtGeom.mjGEOM_MESH:
                 if detailed:
-                    mesh_file_contents = self.get_mesh_file_contents(geom, m)
-                    log_mesh_body(entity_name, d.body(geom_bodyid), mesh_file_contents)
+                    mesh_file_contents = self.get_mesh_file_contents(m_geom, m)
+                    log_mesh_body(entity_name, d_body, mesh_file_contents)
                 else:
                     # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
                     # has NO POS OR QUAT, but instead that info goes in the <body> tag
-                    parent_bodyid = m.body(geom_bodyid).parentid
-                    if m.body(parent_bodyid).name != 'val_base':
-                        log_skeleton(entity_name, m.body(geom_bodyid), d.body(geom_bodyid), d.body(parent_bodyid))
+                    if m_parent_body.name != 'val_base':
+                        log_robot_skeleton(entity_name, m_body, d_body, d_parent_body, color=[0.2, 0.2, 0.2, 1.0])
             else:
                 logger.debug(f"Unsupported geom type {geom_type}")
                 continue
@@ -219,12 +223,14 @@ def log_sphere(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
                  color=tuple(model.rgba))
 
 
-def log_skeleton(body_name, model, data, parent_data):
+def log_robot_skeleton(body_name, model, data, parent_data, **kwargs):
     entity_path = make_entity_path(body_name, model.name)
     rr.log_point(entity_path=entity_path,
-                 position=data.xpos)
+                 position=data.xpos,
+                 **kwargs)
     rr.log_line_strip(entity_path=entity_path,
-                      positions=[data.xpos, parent_data.xpos])
+                      positions=[data.xpos, parent_data.xpos],
+                      **kwargs)
 
 
 def log_mesh_body(entity_path, data, mesh_file_contents):

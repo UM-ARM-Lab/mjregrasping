@@ -1,4 +1,4 @@
-from typing import Optional, Callable, Tuple
+from typing import Optional, Callable
 
 import numpy as np
 
@@ -8,7 +8,7 @@ from mjregrasping.viz import Viz
 
 
 def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mov: Optional[MjMovieMaker] = None,
-           get_result_func: Optional[Callable] = no_results):
+           result_func: Optional[Callable] = no_results):
     ctrl = np.zeros(phy.m.nu)
 
     results = []
@@ -20,7 +20,7 @@ def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mo
         if not is_planning and mov:
             mov.render(phy.d)
 
-        result_tuple = get_result_func(phy)
+        result_tuple = result_func(phy)
 
         results.append(result_tuple)
     results = np.stack(results, dtype=object, axis=1)

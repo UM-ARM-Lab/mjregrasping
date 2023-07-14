@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Callable
 
 import mujoco
 import numpy as np
@@ -7,8 +7,8 @@ from numpy.linalg import norm
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_contact_cost
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_total_contact_force
-from mjregrasping.rollout import control_step
+from mjregrasping.physics import Physics
+from mjregrasping.rollout import control_step, no_results
 from mjregrasping.viz import Viz
 
 
@@ -63,7 +63,8 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     return ctrl, position_error
 
 
-def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Optional[Viz] = None):
+def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Optional[Viz] = None,
+              result_func: Callable = no_results):
     # Next activate the eqs between the grippers and the world to drag them to candidate_pos
     for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
         if candidate_is_grasping[i]:
@@ -72,15 +73,14 @@ def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Option
             gripper_to_world_eq.data[3:6] = candidate_pos[i]
             gripper_to_world_eq.solref[0] = 1.0  # start with a really soft constraint
 
-    accumulated_contact_force = 0
+    results = []
     for t in range(hp['sim_ik_nstep']):
         for i, gripper_to_world_eq_name in enumerate(phy_ik.o.rd.world_gripper_eqs):
             if candidate_is_grasping[i]:
                 gripper_to_world_eq = phy_ik.m.eq(gripper_to_world_eq_name)
                 gripper_to_world_eq.solref[0] *= hp['sim_ik_solref_decay'] + hp['sim_ik_min_solref']
         control_step(phy_ik, np.zeros(phy_ik.m.nu), sub_time_s=hp['sim_ik_sub_time_s'])
-        contact_force = get_total_contact_force(phy_ik)
-        accumulated_contact_force += contact_force
+        results.append(result_func(phy_ik))
         # Check if the grasping grippers are near their targets
         reached = True
         for i, (tool_name, candidate_pos_i) in enumerate(zip(phy_ik.o.rd.tool_sites, candidate_pos)):
@@ -91,8 +91,8 @@ def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Option
         if viz:
             viz.viz(phy_ik, is_planning=True)
         if reached:
-            return True, accumulated_contact_force
-    return False, accumulated_contact_force
+            return True, results
+    return False, results
 
 
 def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):

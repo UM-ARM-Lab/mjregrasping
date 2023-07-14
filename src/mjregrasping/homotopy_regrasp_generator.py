@@ -14,7 +14,7 @@ from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_gras
 from mjregrasping.homotopy_checker import HomotopyChecker
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, eq_sim_ik
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_total_contact_force
 from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
@@ -32,13 +32,19 @@ class HomotopyGenerator(RegraspGenerator):
         self.sdf = sdf
 
     def generate(self, phy: Physics, viz=None):
+        params, is_grasping = self.generate_params(phy, viz)
+        locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
+        _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
+        return locs, subgoals, is_grasping, xpos
+
+    def generate_params(self, phy: Physics, viz=None):
         checker = HomotopyChecker(self.skeletons, self.sdf)
         log_skeletons(self.skeletons, stroke_width=0.01, color=[0, 1.0, 0, 1.0])
 
         # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
-        best_locs = None
-        best_subgoals = None
         best_cost = np.inf
+        best_params = None
+        best_is_grasping = None
         for candidate_is_grasping in get_allowable_is_grasping(phy.o.rd.n_g):
             # The bounds here also define how many params there are and their names
             bounds = {}
@@ -59,20 +65,19 @@ class HomotopyGenerator(RegraspGenerator):
             opt.maximize(n_iter=15, init_points=5)
             sln = opt.max
             cost = -sln['target']  # BayesOpt uses maximization, so we need to negate to get cost
-            locs, subgoals, _ = params_to_locs_and_subgoals(phy, candidate_is_grasping, sln['params'])
 
             if cost < best_cost:
-                best_locs = locs
-                best_subgoals = subgoals
+                best_params = sln['params']
                 best_cost = cost
+                best_is_grasping = candidate_is_grasping
 
         if best_cost > HARD_CONSTRAINT_PENALTY:
             print('No homotopy change found!')
 
-        return best_locs, best_subgoals
+        return best_params, best_is_grasping
 
     def cost(self, checker: HomotopyChecker, candidate_is_grasping: np.ndarray, phy: Physics, viz: Optional[Viz],
-             **params):
+             log_loops=False, viz_ik=False, **params):
         """
 
         Args:
@@ -99,12 +104,15 @@ class HomotopyGenerator(RegraspGenerator):
         # then bringing those to the candidate_subgoals.
         # If we do this with the RegraspMPPI controller it will be very slow, so we will likely need some
         # faster approximation of the dynamics (floating grippers? Virtual-Elastic Band?)
+        # TODO: can we speed up by first finding collision free subgoals? Right now
+        #  we waste a lot of time evaluating subgoals that are in collision
 
         # Visualize the path the tools should take for the candidate_locs and candidate_subgoals
         if viz:
             tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
             for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
                 viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
+                rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
 
         # Simple approximation:
         # 1) Simulate pulling the grippers to the rope
@@ -122,33 +130,45 @@ class HomotopyGenerator(RegraspGenerator):
                 eq.active = 0
 
         # Use EQ constraints to pull the grippers towards the world positions corresponding to candidate_locs
-        total_accumulated_contact_force = 0
-        reached, accumulated_contact_force = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_plan,
-                                                       viz=None)
-        total_accumulated_contact_force += accumulated_contact_force
+        def result_func(phy):
+            contact_force = get_total_contact_force(phy)
+            eq_err = compute_eq_errors(phy_plan)
+            return contact_force, eq_err
+
+        all_results = []
+        eq_errs = []
+        reached, results = eq_sim_ik(candidate_is_grasping, candidate_pos, phy_plan,
+                                     viz=viz if viz_ik else None, result_func=result_func)
+        all_results.extend(results)
+        eq_errs.append(compute_eq_errors(phy_plan))
 
         if reached:
             # Activate rope grasping EQs
             for eq_name, is_grasping_i, loc_i in zip(rope_grasp_eqs, candidate_is_grasping, candidate_locs):
                 if is_grasping_i:
                     activate_grasp(phy_plan, eq_name, loc_i)
-            settle(phy_plan, DEFAULT_SUB_TIME_S, viz=None, is_planning=True)
+            settle(phy_plan, DEFAULT_SUB_TIME_S, viz=viz if viz_ik else None, is_planning=True, result_func=result_func)
+            eq_errs.append(compute_eq_errors(phy_plan))
 
             # 2) Do a straight line motion to the first candidate_subgoal, then the second, etc.
             # this means changing the "target" for the gripper world EQs
             for t, subgoals_t in enumerate(np.moveaxis(candidate_subgoals, 1, 0)):
-                reached, accumulated_contact_force = eq_sim_ik(candidate_is_grasping, subgoals_t, phy_plan,
-                                                               viz=None)
-                total_accumulated_contact_force += accumulated_contact_force
+                reached, results = eq_sim_ik(candidate_is_grasping, subgoals_t, phy_plan, viz=viz if viz_ik else None,
+                                             result_func=result_func)
+                eq_errs.append(compute_eq_errors(phy_plan))
+                all_results.extend(results)
                 if not reached:
                     break
 
-        viz.viz(phy_plan, is_planning=True)
+        if viz_ik:
+            viz.viz(phy_plan, is_planning=True)
 
-        total_accumulated_contact_force = total_accumulated_contact_force * hp['contact_force_weight']
+        contact_forces, _ = zip(*all_results)
 
-        reachability_cost = get_reachability_cost(phy, phy_plan, reached, candidate_locs,
-                                                  candidate_is_grasping)
+        total_accumulated_contact_force = sum(contact_forces) * hp['contact_force_weight']
+        eq_err_cost = sum(eq_errs) * hp['eq_err_weight']
+
+        reachability_cost = get_reachability_cost(phy, phy_plan, reached, candidate_locs, candidate_is_grasping)
 
         # If it's different by true homotopy, it is also different by first order homotopy
         # so the homotopy_cost will be 0. If it's not different by true homotopy, it may still
@@ -156,14 +176,12 @@ class HomotopyGenerator(RegraspGenerator):
         # If it's not different by first order homotopy or true homotopy, the cost is 2 * HARD_CONSTRAINT_PENALTY.
         # This creates a sort of priority: true homotopy is more important than first order homotopy.
         homotopy_cost = 0
-        if not checker.get_true_homotopy_different(phy, phy_plan, log_loops=(viz is not None)):
+        if not checker.get_true_homotopy_different(phy, phy_plan, log_loops=log_loops):
             homotopy_cost += HARD_CONSTRAINT_PENALTY
         if not checker.get_first_order_different(phy, phy_plan):
             homotopy_cost += HARD_CONSTRAINT_PENALTY
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']
-
-        eq_err_cost = compute_eq_errors(phy_plan) * hp['eq_err_weight']
 
         unstable_cost = (phy.d.warning.number.sum() > 0) * HARD_CONSTRAINT_PENALTY
 

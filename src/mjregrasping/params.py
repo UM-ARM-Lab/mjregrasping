@@ -30,7 +30,7 @@ hp = {
     "max_contact_cost":         1,
     "contact_cost":             3.0,
     "contact_force_weight":     0.0001,
-    "eq_err_weight":            1000.0,
+    "eq_err_weight":            100.0,
     "frac_max_dq":              0.5,
     "q_joint_weight":           0.5,
     "mab_reward_threshold":     0.3,
