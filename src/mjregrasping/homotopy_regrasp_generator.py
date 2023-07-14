@@ -51,18 +51,19 @@ class HomotopyGenerator(RegraspGenerator):
             for tool_name, is_grasping_i in zip(phy.o.rd.tool_sites, candidate_is_grasping):
                 if is_grasping_i:
                     bounds[tool_name] = (0, 1)
-                    bounds[tool_name + '_dx_1'] = (-0.25, 0.25)
-                    bounds[tool_name + '_dy_1'] = (-0.25, 0.25)
-                    bounds[tool_name + '_dz_1'] = (-0.25, 0.25)
-                    bounds[tool_name + '_dx_2'] = (-0.25, 0.25)
-                    bounds[tool_name + '_dy_2'] = (-0.25, 0.25)
-                    bounds[tool_name + '_dz_2'] = (-0.25, 0.25)
+                    d_max = 0.15
+                    bounds[tool_name + '_dx_1'] = (-d_max, d_max)
+                    bounds[tool_name + '_dy_1'] = (-d_max, d_max)
+                    bounds[tool_name + '_dz_1'] = (-d_max, d_max)
+                    bounds[tool_name + '_dx_2'] = (-d_max, d_max)
+                    bounds[tool_name + '_dy_2'] = (-d_max, d_max)
+                    bounds[tool_name + '_dz_2'] = (-d_max, d_max)
             opt = BayesianOptimization(f=partial(self.cost, checker, candidate_is_grasping, phy, viz),
                                        pbounds=bounds,
                                        verbose=0,
                                        random_state=self.rng.randint(0, 1000),
                                        allow_duplicate_points=True)
-            opt.maximize(n_iter=15, init_points=5)
+            opt.maximize(n_iter=hp['bayes_opt']['n_iter'], init_points=hp['bayes_opt']['n_init'])
             sln = opt.max
             cost = -sln['target']  # BayesOpt uses maximization, so we need to negate to get cost
 
@@ -94,8 +95,11 @@ class HomotopyGenerator(RegraspGenerator):
         global GLOBAL_ITERS
         rr.set_time_sequence('homotopy', GLOBAL_ITERS)
         GLOBAL_ITERS += 1
+
         t0 = perf_counter()
+
         phy_plan = phy.copy_all()
+
         candidate_locs, candidate_subgoals, candidate_pos = params_to_locs_and_subgoals(phy_plan,
                                                                                         candidate_is_grasping,
                                                                                         params)
@@ -104,15 +108,17 @@ class HomotopyGenerator(RegraspGenerator):
         # then bringing those to the candidate_subgoals.
         # If we do this with the RegraspMPPI controller it will be very slow, so we will likely need some
         # faster approximation of the dynamics (floating grippers? Virtual-Elastic Band?)
-        # TODO: can we speed up by first finding collision free subgoals? Right now
-        #  we waste a lot of time evaluating subgoals that are in collision
 
         # Visualize the path the tools should take for the candidate_locs and candidate_subgoals
-        if viz:
-            tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
-            for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
-                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
-                rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
+        tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
+        for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
+            viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
+            rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
+
+        # First check if the subgoal is straight-line collision free, because if it isn't,
+        #  we waste a lot of time evaluating everything else
+        if not self.collision_free(tool_paths, viz):
+            return -HARD_CONSTRAINT_PENALTY
 
         # Simple approximation:
         # 1) Simulate pulling the grippers to the rope
@@ -170,16 +176,12 @@ class HomotopyGenerator(RegraspGenerator):
 
         reachability_cost = get_reachability_cost(phy, phy_plan, reached, candidate_locs, candidate_is_grasping)
 
-        # If it's different by true homotopy, it is also different by first order homotopy
-        # so the homotopy_cost will be 0. If it's not different by true homotopy, it may still
-        # be different by first order homotopy, in which case the homotopy_cost will be HARD_CONSTRAINT_PENALTY.
-        # If it's not different by first order homotopy or true homotopy, the cost is 2 * HARD_CONSTRAINT_PENALTY.
         # This creates a sort of priority: true homotopy is more important than first order homotopy.
         homotopy_cost = 0
         if not checker.get_true_homotopy_different(phy, phy_plan, log_loops=log_loops):
-            homotopy_cost += HARD_CONSTRAINT_PENALTY
+            homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
         if not checker.get_first_order_different(phy, phy_plan):
-            homotopy_cost += HARD_CONSTRAINT_PENALTY
+            homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']
 
@@ -206,6 +208,23 @@ class HomotopyGenerator(RegraspGenerator):
 
         # BayesOpt uses maximization, so we need to negate the cost
         return -cost
+
+    def collision_free(self, tools_paths, viz: Viz):
+        # subgoals has shape [n_g, T, 3]
+        # and we want to figure out if the straight line path between each subgoal is collision free
+        lengths = np.linalg.norm(tools_paths[:, 1:] - tools_paths[:, :-1], axis=-1)
+        for i, lengths_i in enumerate(lengths):
+            for t in range(tools_paths.shape[1] - 1):
+                for d in np.arange(0, lengths_i[t], self.sdf.GetResolution() / 2):
+                    p = tools_paths[i, t] + d / lengths_i[t] * (tools_paths[i, t + 1] - tools_paths[i, t])
+                    sdf_value = self.sdf.GetValueByCoordinates(*p)[0]
+                    in_collision = sdf_value < -self.sdf.GetResolution() / 2
+                    if viz:
+                        color = 'r' if in_collision else 'g'
+                        viz.sphere(f'collision_check', p, self.sdf.GetResolution() / 2, 'world', color, 0)
+                    if in_collision:
+                        return False
+        return True
 
 
 def params_to_locs_and_subgoals(phy: Physics, candidate_is_grasping, params: Dict):

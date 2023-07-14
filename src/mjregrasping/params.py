@@ -44,6 +44,10 @@ hp = {
     "sim_ik_solref_decay":      0.8,
     "sim_ik_min_solref":        0.02,
     "attach_loop_size":         0.02,
+    "bayes_opt": {
+        "n_iter":              25,
+        "n_init":              15,
+    }
 }
 
 

@@ -51,37 +51,38 @@ def main():
 
     goal = make_untangle_goal(viz)
     checker = HomotopyChecker(skeletons, sdf)
-    h = HomotopyGenerator(goal, skeletons, sdf, seed=1)
     r = MjRenderer(m)
 
     states_dir = Path("states/untangle")
     rr.set_time_sequence('homotopy', 0)
     for state_path in sorted(states_dir.glob("*.pkl")):
-        state_path = states_dir / '1688067882.pkl'
-        d = load_data_and_eq(m, True, state_path)
-        phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+        for seed in range(1, 3):
+            h = HomotopyGenerator(goal, skeletons, sdf, seed=seed)
+            d = load_data_and_eq(m, True, state_path)
+            phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
-        viz.viz(phy)
-        log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True)
+            viz.viz(phy)
+            rr.log_cleared("planned", recursive=True)
+            log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True)
 
-        img = r.render(d)
-        img_path = (state_path.parent / state_path.stem).with_suffix(".png")
-        Image.fromarray(img).save(img_path)
+            img = r.render(d)
+            img_path = (state_path.parent / state_path.stem).with_suffix(".png")
+            Image.fromarray(img).save(img_path)
 
-        from time import perf_counter
-        t0 = perf_counter()
-        params, is_grasping = h.generate_params(phy, viz=viz)
-        t1 = perf_counter()
+            from time import perf_counter
+            t0 = perf_counter()
+            params, is_grasping = h.generate_params(phy, viz=viz)
+            t1 = perf_counter()
 
-        locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
-        _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
+            locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
+            _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
 
-        tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
-        for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
-            viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
-        cost = h.cost(checker, is_grasping, phy, viz, **params, viz_ik=True, viz_loops=True)
-        print(f'H generate(): {t1 - t0:.3f}s {cost=:} {locs=:}')
-        print()
+            tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
+            for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
+                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
+            cost = h.cost(checker, is_grasping, phy, viz, **params, viz_ik=True, viz_loops=True)
+            print(f'H generate(): {t1 - t0:.3f}s {cost=:} {locs=:}')
+            print()
 
 
 if __name__ == "__main__":
