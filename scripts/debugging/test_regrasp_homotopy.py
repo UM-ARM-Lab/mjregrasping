@@ -1,7 +1,4 @@
 #!/usr/bin/env python3
-import argparse
-import time
-from copy import copy
 from pathlib import Path
 
 import mujoco
@@ -12,20 +9,18 @@ from PIL import Image
 
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.goal_funcs import get_rope_points
-from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
 from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import Objects
-from mjregrasping.params import Params, hp
+from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle, conq_hose, make_untangle_goal
+from mjregrasping.scenarios import val_untangle, make_untangle_goal
 from mjregrasping.viz import Viz
 
 
@@ -53,7 +48,7 @@ def main():
     viz.sdf(sdf, frame_id='world', idx=0)
 
     goal = make_untangle_goal(viz)
-    h = HomotopyGenerator(goal, skeletons, sdf)
+    h = HomotopyGenerator(goal, skeletons, sdf, seed=4)
     r = MjRenderer(m)
 
     states_dir = Path("states/untangle")
@@ -73,13 +68,13 @@ def main():
         t0 = perf_counter()
         result = h.generate(phy, viz=viz)
         locs, subgoals = result
-        print(f'H generate(): {perf_counter() - t0:.3f}s')
+        t1 = perf_counter()
 
         _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
         tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
         for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
-            print(f'{tool_name}: {path.shape}')
             viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
+        print(f'H generate(): {t1 - t0:.3f}s {locs=:}')
 
 
 if __name__ == "__main__":

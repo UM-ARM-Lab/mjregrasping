@@ -8,9 +8,9 @@ from mjregrasping.viz import Viz
 
 class RegraspGenerator:
 
-    def __init__(self, op_goal: ObjectPointGoal):
+    def __init__(self, op_goal: ObjectPointGoal, seed=0):
         self.op_goal = op_goal
-        self.rng = np.random.RandomState(0)
+        self.rng = np.random.RandomState(seed)
 
     def generate(self, phy):
         """
