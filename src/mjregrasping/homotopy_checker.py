@@ -1,243 +1,148 @@
-from copy import deepcopy
+"""
+This file contains the HomotopyChecker class, which is used to compare two states to see if they are homologous.
+This considers both true homotopy and first-order homotopy.
+"""
+from typing import Dict
 
 import networkx as nx
 import numpy as np
 import pysdf_tools
 import rerun as rr
-from multiset import Multiset
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
-from mjregrasping.magnetic_fields import get_true_h_signature
+from mjregrasping.homotopy_utils import get_full_h_signature, passes_through, floorify, from_to
 from mjregrasping.mujoco_objects import parents_points
+from mjregrasping.physics import Physics
 from mjregrasping.rope_length import get_rope_length
 
-NO_HOMOTOPY = Multiset([-999])
+
+def get_first_order_different(sdf: pysdf_tools.SignedDistanceField, phy1: Physics, phy2: Physics):
+    rope1 = get_rope_points(phy1)
+    rope2 = get_rope_points(phy2)
+    first_order_sln = get_first_order_homotopy_points(sdf, rope1, rope2, -sdf.GetResolution())
+    first_order_different = len(first_order_sln) == 0
+    return first_order_different
 
 
-class HomotopyChecker:
+def get_true_homotopy_different(skeletons: Dict, phy1: Physics, phy2: Physics, log_loops=False):
+    h1, loops1 = get_full_h_signature_from_phy(skeletons, phy1)
+    h2, loops2 = get_full_h_signature_from_phy(skeletons, phy2)
+    true_homotopy_different = (h1 != h2)
 
-    def __init__(self, skeletons, sdf):
-        self.skeletons = skeletons
-        self.sdf = sdf
+    if log_loops:
+        rr.log_cleared(f'loops1', recursive=True)
+        for i, l in enumerate(loops1):
+            rr.log_line_strip(f'loops1/{i}', l, stroke_width=0.02)
+        rr.log_cleared(f'loops2', recursive=True)
+        for i, l in enumerate(loops2):
+            rr.log_line_strip(f'loops2/{i}', l, stroke_width=0.02)
 
-    def get_signature(self, phy, log_loops=False):
-        """
-        The H-signature is a vector the uniquely defines the homotopy class of the current state. The state involves
-        both the gripper and arm positions, the rope configuration, and the obstacles. The h_equal() function can be
-        used to compare if two states are the same homotopy class (AKA homologous).
-        Args:
-            phy: The full physics state
+    return true_homotopy_different
 
-        Returns:
-            The h-signature of the current state and the loops and tool positions that were used to compute it.
 
-        """
-        graph = self.create_graph_nodes(phy)
+def get_full_h_signature_from_phy(skeletons: Dict, phy: Physics):
+    graph = create_graph_nodes(phy)
+    rope_points = get_rope_points(phy)
+    arm_points = get_arm_points(phy)
 
-        rope_points = get_rope_points(phy)
-        arm_points = self.get_arm_points(phy)
-        while True:
-            self.add_edges(graph, rope_points, arm_points)
+    return get_full_h_signature(skeletons, graph, rope_points, arm_points)
 
-            skeletons = deepcopy(self.skeletons)
 
-            valid_cycles = []
-            for cycle in nx.simple_cycles(graph, length_bound=3):
-                # Cycle must be length 3 and contain the robot base.
-                # There could be a cycle like ['g0', 'g1', 'a'], but we don't need to consider that
-                # Since that only involves the points on the rope, so it will always be in the same homotopy class
-                # Also, we filter out ones that are the same as previous ones up to ordering (aka edges have no direction)
-                # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
-                # detection we don't care about direction.
-                if len(cycle) == 3 and 'b' in cycle and new_cycle(cycle, valid_cycles):
-                    valid_cycles.append(cycle)
+def get_arm_points(phy: Physics):
+    arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in phy.o.rd.tool_bodies]
+    return arm_points
 
-            if len(valid_cycles) == 0:
-                return NO_HOMOTOPY  # No valid cycles, so we give it a bogus h value
 
-            loops = []
-            for valid_cycle in valid_cycles:
-                valid_cycle = valid_cycle + [valid_cycle[0]]
-                loop = []
-                for edge in pairwise(valid_cycle):
-                    edge_path = graph.get_edge_data(*edge)['edge_path']
-                    loop.extend(edge_path)
-                loop.append(loop[0])
-                loop = np.stack(loop)
-                loops.append(loop)
+def create_graph_nodes(phy: Physics):
+    # First construct a graph based on the current constraints/grasps
+    # The nodes in the graph are:
+    #  1. points on the rope fixed in the world (hard-coded based on an EQ with "attach" in its name.)
+    #  2. base of the robot
+    #  3. grasping grippers
+    graph = nx.DiGraph()
+    base_xpos = phy.d.body(phy.o.rd.base_link).xpos
+    graph.add_node('b', loc=-1, xpos=base_xpos, point_idx=-1)  # base of the robot. -1 is a dummy value
+    rope_length = get_rope_length(phy)
+    attach_i = 0
+    for eq_idx in range(phy.m.neq):
+        eq = phy.m.eq(eq_idx)
+        if eq.active:
+            body_idx = int(eq.obj2id)
+            offset = eq.data[3]
+            xmat = phy.d.xmat[body_idx].reshape(3, 3)
+            xpos = np.squeeze(phy.d.xpos[body_idx] + xmat[:, 0] * offset)
+            loc = float(grasp_indices_to_locations(phy.o.rope.body_indices, body_idx) + (offset / rope_length))
+            point_idx = body_idx - phy.o.rope.body_indices[0]
+            if "attach" in eq.name:
+                graph.add_node(f'a{attach_i}', loc=loc, xpos=xpos, point_idx=point_idx)
+                attach_i += 1
+            if eq.name in phy.o.rd.rope_grasp_eqs:
+                eq_name_idx = phy.o.rd.rope_grasp_eqs.index(eq.name)
+                graph.add_node(f'g{eq_name_idx}', loc=loc, xpos=xpos, point_idx=point_idx)
+    return graph
 
-            if log_loops:
-                rr.log_cleared(f'candidate_loop', recursive=True)
-                for i, l in enumerate(loops):
-                    rr.log_line_strip(f'candidate_loop/{i}', l, stroke_width=0.02)
 
-            removed_node = False
-            for loop, cycle in zip(loops, valid_cycles):
-                # If the loop is between grippers, and the h-signature is 0, then delete ones of the two gripper
-                # nodes and re-run the algorithm
-                edge = has_gripper_gripper_edge(cycle)
-                if edge is not None:
-                    h = get_true_h_signature(loop, skeletons)
-                    if np.count_nonzero(h) == 0:
-                        # arbitrarily choose the "larger" node in the edge as the one we remove.
-                        graph.remove_node(max(*edge))
-                        removed_node = True
-                        break
-            if removed_node:
+def add_edges(graph, rope_points, arm_points):
+    """
+    Edges in the graph are added based on the following rules. All edges are bidirectional.
+     1. base can connect to all other nodes
+     2. grippers and connect to attach nodes
+     3. grippers can connect to each other
+    Attach nodes cannot connect to each other, since loops between attach points cannot be effected by
+    regrasping, so for the sake of regrasp planning they are irrelevant.
+    In addition to these general rules, we also disallow edges between nodes which pass "through" other nodes via
+    the rope. Consider nodes A, B, and C represent attach or grasped points on the rope. Each of these nodes
+    has a location on the rope between 0 and 1, for instance A=0.2, B=0.5, C=0.8. Then we disallow edges between
+    A and C, since that would pass through B.
+
+    Each edge also has an associated "edge_path" which connects the two xpos's for those nodes.
+    The points are based on the "edges" in the cycle, but the path itself differs depending on the type of edge.
+    For a "b-g" edge, the points come from FK.
+    For a "g-a" or "g-g" edge, the points come from the rope.
+    Specifically, we use the positions of the rope bodies which are between the body indices,
+    which we get from the EQ constraints. The order of the bodies depends on the order of the edge,
+    i.e "g0->a" vs "a->g0". Finally, an edge like "b->a" is simply the robot base position and the "a" position.
+    order still matters.
+
+    Args:
+        graph: networkx Graph representing the robot and fixed points 'connect' to the object
+        rope_points: points representing the object (rope) [n_rope_points, 3]
+        arm_points: points tracing the robot arms [n_arms, n_points, 3]
+
+    Returns:
+
+    """
+    for i in graph.nodes:
+        for j in graph.nodes:
+            if i == j:
                 continue
-
-            h = Multiset([get_true_h_signature(loop, skeletons) for loop in loops])
-
-            return h
-
-    def get_arm_points(self, phy):
-        arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in phy.o.rd.tool_bodies]
-        return arm_points
-
-    def create_graph_nodes(self, phy):
-        # First construct a graph based on the current constraints/grasps
-        # The nodes in the graph are:
-        #  1. points on the rope fixed in the world (hard-coded based on an EQ with "attach" in its name.)
-        #  2. base of the robot
-        #  3. grasping grippers
-        graph = nx.DiGraph()
-        base_xpos = phy.d.body(phy.o.rd.base_link).xpos
-        graph.add_node('b', loc=-1, xpos=base_xpos, point_idx=-1)  # base of the robot. -1 is a dummy value
-        rope_length = get_rope_length(phy)
-        attach_i = 0
-        for eq_idx in range(phy.m.neq):
-            eq = phy.m.eq(eq_idx)
-            if eq.active:
-                body_idx = int(eq.obj2id)
-                offset = eq.data[3]
-                xmat = phy.d.xmat[body_idx].reshape(3, 3)
-                xpos = np.squeeze(phy.d.xpos[body_idx] + xmat[:, 0] * offset)
-                loc = float(grasp_indices_to_locations(phy.o.rope.body_indices, body_idx) + (offset / rope_length))
-                point_idx = body_idx - phy.o.rope.body_indices[0]
-                if "attach" in eq.name:
-                    graph.add_node(f'a{attach_i}', loc=loc, xpos=xpos, point_idx=point_idx)
-                    attach_i += 1
-                if eq.name in phy.o.rd.rope_grasp_eqs:
-                    eq_name_idx = phy.o.rd.rope_grasp_eqs.index(eq.name)
-                    graph.add_node(f'g{eq_name_idx}', loc=loc, xpos=xpos, point_idx=point_idx)
-        return graph
-
-    def add_edges(self, graph, rope_points, arm_points):
-        # Edges in the graph are added based on the following rules. All edges are bidirectional.
-        #  1. base can connect to all other nodes
-        #  2. grippers and connect to attach nodes
-        #  3. grippers can connect to each other
-        # Attach nodes cannot connect to each other, since loops between attach points cannot be effected by
-        # regrasping, so for the sake of regrasp planning they are irrelevant.
-        # In addition to these general rules, we also disallow edges between nodes which pass "through" other nodes via
-        # the rope. Consider nodes A, B, and C represent attach or grasped points on the rope. Each of these nodes
-        # has a location on the rope between 0 and 1, for instance A=0.2, B=0.5, C=0.8. Then we disallow edges between
-        # A and C, since that would pass through B.
-        #
-        # Each edge also has an associated "edge_path" which connects the two xpos's for those nodes.
-        # The points are based on the "edges" in the cycle, but the path itself differs depending on the type of edge.
-        # For a "b-g" edge, the points come from FK.
-        # For a "g-a" or "g-g" edge, the points come from the rope.
-        # Specifically, we use the positions of the rope bodies which are between the body indices,
-        # which we get from the EQ constraints. The order of the bodies depends on the order of the edge,
-        # i.e "g0->a" vs "a->g0". Finally, an edge like "b->a" is simply the robot base position and the "a" position.
-        # order still matters.
-        for i in graph.nodes:
-            for j in graph.nodes:
-                if i == j:
-                    continue
-                # Check if the edge passes through any other nodes
-                if passes_through(graph, i, j):
-                    continue
-                i_xpos = graph.nodes[i]['xpos']
-                j_xpos = graph.nodes[j]['xpos']
-                i_point_idx = graph.nodes[i]['point_idx']
-                j_point_idx = graph.nodes[j]['point_idx']
-                if i == 'b' and 'g' in j:
-                    arm_idx = int(j[1])
-                    graph.add_edge(i, j, edge_path=arm_points[arm_idx][::-1])  # ::-1 to get base -> gripper
-                elif 'g' in i and j == 'b':
-                    arm_idx = int(i[1])
-                    graph.add_edge(i, j, edge_path=arm_points[arm_idx])
-                elif i == 'b' and 'a' in j:
-                    graph.add_edge(i, j,
-                                   edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
-                elif 'a' in i and j == 'b':
-                    graph.add_edge(i, j,
-                                   edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
-                elif 'g' in i and 'g' in j:
-                    edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
-                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
-                elif 'g' in i and 'a' in j:
-                    edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
-                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
-                elif 'a' in i and 'g' in j:
-                    edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
-                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
-
-    def get_first_order_different(self, phy1, phy2, log_loops=False, viz=None):
-        rope1 = get_rope_points(phy1)
-        rope2 = get_rope_points(phy2)
-        first_order_sln = get_first_order_homotopy_points(self.sdf, rope1, rope2, -self.sdf.GetResolution())
-        if viz:
-            self.viz.lines()
-        first_order_different = len(first_order_sln) == 0
-        return first_order_different
-
-    def get_true_homotopy_different(self, phy1, phy2, log_loops=False):
-        h1 = self.get_signature(phy1, log_loops)
-        h2 = self.get_signature(phy2, log_loops)
-        true_homotopy_different = (h1 != h2)
-
-        return true_homotopy_different
-
-
-def passes_through(graph, i, j):
-    for k in graph.nodes:
-        if k == i or k == j:
-            continue
-        if k == 'b' or i == 'b' or j == 'b':
-            continue
-        i_loc = graph.nodes[i]['loc']
-        j_loc = graph.nodes[j]['loc']
-        k_loc = graph.nodes[k]['loc']
-        lower = min(i_loc, j_loc)
-        upper = max(i_loc, j_loc)
-        if lower < k_loc < upper:
-            return True
-    return False
-
-
-def new_cycle(cycle, valid_cycles):
-    for valid_cycle in valid_cycles:
-        if set(cycle) == set(valid_cycle):
-            return False
-    return True
-
-
-def floorify(xpos):
-    xpos = xpos.copy()
-    xpos[2] = -1
-    return xpos
-
-
-def has_gripper_gripper_edge(loop):
-    # pairwise ( + ) is a way to iterate over a list in pairs but ensure we loop back around
-    for e1, e2 in pairwise(loop + loop[0:1]):
-        if 'g' in e1 and 'g' in e2:
-            return e1, e2
-    return None
-
-
-def pairwise(x):
-    return zip(x[:-1], x[1:])
-
-
-def from_to(i, j):
-    """ Inclusive of both i and j """
-    if i < j:
-        return range(i + 1, j + 1)
-    else:
-        return range(i, j, -1)
+            # Check if the edge passes through any other nodes
+            if passes_through(graph, i, j):
+                continue
+            i_xpos = graph.nodes[i]['xpos']
+            j_xpos = graph.nodes[j]['xpos']
+            i_point_idx = graph.nodes[i]['point_idx']
+            j_point_idx = graph.nodes[j]['point_idx']
+            if i == 'b' and 'g' in j:
+                arm_idx = int(j[1])
+                graph.add_edge(i, j, edge_path=arm_points[arm_idx][::-1])  # ::-1 to get base -> gripper
+            elif 'g' in i and j == 'b':
+                arm_idx = int(i[1])
+                graph.add_edge(i, j, edge_path=arm_points[arm_idx])
+            elif i == 'b' and 'a' in j:
+                graph.add_edge(i, j,
+                               edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
+            elif 'a' in i and j == 'b':
+                graph.add_edge(i, j,
+                               edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
+            elif 'g' in i and 'g' in j:
+                edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
+                graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
+            elif 'g' in i and 'a' in j:
+                edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
+                graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
+            elif 'a' in i and 'g' in j:
+                edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
+                graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))

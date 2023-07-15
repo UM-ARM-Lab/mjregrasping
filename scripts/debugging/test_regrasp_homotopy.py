@@ -13,7 +13,7 @@ from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offset
     grasp_locations_to_is_grasping
 from mjregrasping.homotopy_checker import HomotopyChecker
 from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator, params_to_locs_and_subgoals
-from mjregrasping.magnetic_fields import load_skeletons
+from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects

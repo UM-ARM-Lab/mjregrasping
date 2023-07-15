@@ -2,7 +2,7 @@
 import numpy as np
 
 from arc_utilities import ros_init
-from mjregrasping.magnetic_fields import load_skeletons
+from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.run_evaluation import run_evaluation
 from mjregrasping.scenarios import val_untangle, make_untangle_goal, setup_untangle
 

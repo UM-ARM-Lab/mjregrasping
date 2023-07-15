@@ -9,15 +9,16 @@ import numpy as np
 import rerun as rr
 from PIL import Image
 
+import mjregrasping.homotopy_utils
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.goal_funcs import get_rope_points
-from mjregrasping.magnetic_fields import load_skeletons
+from mjregrasping.homotopy_utils import load_skeletons, NO_HOMOTOPY
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import Params
-from mjregrasping.homotopy_checker import HomotopyChecker, NO_HOMOTOPY
+from mjregrasping.homotopy_checker import HomotopyChecker
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
@@ -74,7 +75,7 @@ def main():
         graph = comparer.create_graph_nodes(phy)
         arm_points = comparer.get_arm_points(phy)
         comparer.add_edges(graph, initial_rope_points, arm_points)
-        h = comparer.get_signature(phy, initial_rope_points, log_loops=True)
+        h = mjregrasping.homotopy_utils.get_full_h_signature(phy, initial_rope_points, log_loops=True)
 
         # TODO: add the nx graphs, and a easier to interpret image of the loops & skeletons
         nx_fig, nx_ax = plt.subplots()

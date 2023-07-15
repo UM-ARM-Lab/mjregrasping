@@ -6,7 +6,7 @@ import numpy as np
 import rerun as rr
 
 from arc_utilities import ros_init
-from mjregrasping.magnetic_fields import load_skeletons
+from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import log_skeletons

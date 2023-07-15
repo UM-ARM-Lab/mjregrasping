@@ -1,6 +1,6 @@
 from functools import partial
+from time import perf_counter
 from typing import Dict, Optional
-from time import perf_counter, time
 
 import numpy as np
 import pysdf_tools
@@ -11,7 +11,7 @@ from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.goal_funcs import check_should_be_open
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
-from mjregrasping.homotopy_checker import HomotopyChecker
+from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first_order_different
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, eq_sim_ik
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
@@ -38,7 +38,6 @@ class HomotopyGenerator(RegraspGenerator):
         return locs, subgoals, is_grasping, xpos
 
     def generate_params(self, phy: Physics, viz=None):
-        checker = HomotopyChecker(self.skeletons, self.sdf)
         log_skeletons(self.skeletons, stroke_width=0.01, color=[0, 1.0, 0, 1.0])
 
         # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
@@ -58,7 +57,7 @@ class HomotopyGenerator(RegraspGenerator):
                     bounds[tool_name + '_dx_2'] = (-d_max, d_max)
                     bounds[tool_name + '_dy_2'] = (-d_max, d_max)
                     bounds[tool_name + '_dz_2'] = (-d_max, d_max)
-            opt = BayesianOptimization(f=partial(self.cost, checker, candidate_is_grasping, phy, viz),
+            opt = BayesianOptimization(f=partial(self.cost, candidate_is_grasping, phy, viz),
                                        pbounds=bounds,
                                        verbose=0,
                                        random_state=self.rng.randint(0, 1000),
@@ -77,12 +76,11 @@ class HomotopyGenerator(RegraspGenerator):
 
         return best_params, best_is_grasping
 
-    def cost(self, checker: HomotopyChecker, candidate_is_grasping: np.ndarray, phy: Physics, viz: Optional[Viz],
+    def cost(self, candidate_is_grasping: np.ndarray, phy: Physics, viz: Optional[Viz],
              log_loops=False, viz_ik=False, **params):
         """
 
         Args:
-            checker: The homotopy checker
             candidate_is_grasping: binary array of length n_g
             phy: Not modified
             viz: The viz object, or None if you don't want to visualize anything
@@ -178,9 +176,9 @@ class HomotopyGenerator(RegraspGenerator):
 
         # This creates a sort of priority: true homotopy is more important than first order homotopy.
         homotopy_cost = 0
-        if not checker.get_true_homotopy_different(phy, phy_plan, log_loops=log_loops):
+        if not get_true_homotopy_different(self.skeletons, phy, phy_plan, log_loops=log_loops):
             homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
-        if not checker.get_first_order_different(phy, phy_plan):
+        if not get_first_order_different(self.sdf, phy, phy_plan):
             homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']

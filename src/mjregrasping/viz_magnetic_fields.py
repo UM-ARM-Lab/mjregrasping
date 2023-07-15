@@ -1,7 +1,7 @@
 import numpy as np
 import rerun as rr
 
-from mjregrasping.magnetic_fields import skeleton_field_dir
+from mjregrasping.homotopy_utils import skeleton_field_dir
 
 
 def animate_field(skeleton):
