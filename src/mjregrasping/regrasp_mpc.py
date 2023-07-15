@@ -11,7 +11,7 @@ from mjregrasping.buffer import Buffer
 from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
-from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, regrasp_rollout
+from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, rollout
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
 from mjregrasping.settle import settle
@@ -94,7 +94,7 @@ class RegraspMPC:
                 self.mov.render(phy.d)
 
             results = regrasp_goal.get_results(phy)
-            did_new_grasp = do_grasp_dynamics(phy, results, is_planning=False)
+            did_new_grasp = do_grasp_dynamics(phy, results)
             if did_new_grasp:
                 print("New grasp!")
                 settle(phy, sub_time_s=0.1, viz=self.viz, is_planning=False, mov=self.mov)
@@ -145,8 +145,8 @@ class RegraspMPC:
             rospy.sleep(0.001)  # needed otherwise messages get dropped :( I hate ROS...
 
         if command is not None:
-            cmd_rollout_results, _, _ = regrasp_rollout(phy.copy_all(), goal, np.expand_dims(command, 0),
-                                                        np.expand_dims(sub_time_s, 0), viz=None)
+            cmd_rollout_results, _, _ = rollout(phy.copy_all(), goal, np.expand_dims(command, 0),
+                                                np.expand_dims(sub_time_s, 0), viz=None)
             goal.viz_result(phy, cmd_rollout_results, i, color='b', scale=0.004)
 
     def close(self):

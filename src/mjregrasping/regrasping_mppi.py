@@ -63,10 +63,13 @@ class RegraspMPPI:
         u_noise = u_samples - self.u_mu
         time_noise = time_samples - self.time_mu
 
-        self.rollout_results, self.cost, costs_by_term = self.regrasp_parallel_rollout(phy, goal, u_samples,
-                                                                                       time_samples,
-                                                                                       num_samples,
-                                                                                       viz=None)
+        self.rollout_results, self.cost, costs_by_term = self.parallel_rollout(self.pool,
+                                                                               phy, goal, u_samples,
+                                                                               time_samples,
+                                                                               num_samples,
+                                                                               horizon=self.horizon,
+                                                                               nu=self.nu,
+                                                                               viz=None)
 
         cost_term_names = goal.cost_names() + ['smoothness', 'ever_not_grasping']
         for cost_term_name, costs_for_term in zip(cost_term_names, costs_by_term.T):
@@ -104,40 +107,41 @@ class RegraspMPPI:
         command = new_u_mu_square[0]
         return command, self.time_mu
 
-    def regrasp_parallel_rollout(self, phy, goal, u_samples, time_samples, num_samples, viz):
-        u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
 
-        # We must also copy model here because EQs are going to be changing
-        args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
+def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_samples, viz):
+    u_samples_square = u_samples.reshape(num_samples, horizon, nu)
 
-        if viz:
-            results = []
-            costs = []
-            costs_by_term = []
-            for args in args_sets:
-                results_i, cost_i, costs_i_by_term = regrasp_rollout(*args, viz)
-                results.append(results_i)
-                costs.append(cost_i)
-                costs_by_term.append(costs_i_by_term)
-        else:
-            futures = [self.pool.submit(regrasp_rollout, *args) for args in args_sets]
-            results = []
-            costs = []
-            costs_by_term = []
-            for f in futures:
-                results_i, cost_i, costs_i_by_term = f.result()
-                results.append(results_i)
-                costs.append(cost_i)
-                costs_by_term.append(costs_i_by_term)
+    # We must also copy model here because EQs are going to be changing
+    args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
 
-        results = np.stack(results, dtype=object, axis=1)
-        costs = np.stack(costs, axis=0)
-        costs_by_term = np.stack(costs_by_term, axis=0)
+    if viz:
+        results = []
+        costs = []
+        costs_by_term = []
+        for args in args_sets:
+            results_i, cost_i, costs_i_by_term = rollout(*args, viz)
+            results.append(results_i)
+            costs.append(cost_i)
+            costs_by_term.append(costs_i_by_term)
+    else:
+        futures = [pool.submit(rollout, *args) for args in args_sets]
+        results = []
+        costs = []
+        costs_by_term = []
+        for f in futures:
+            results_i, cost_i, costs_i_by_term = f.result()
+            results.append(results_i)
+            costs.append(cost_i)
+            costs_by_term.append(costs_i_by_term)
 
-        return results, costs, costs_by_term
+    results = np.stack(results, dtype=object, axis=1)
+    costs = np.stack(costs, axis=0)
+    costs_by_term = np.stack(costs_by_term, axis=0)
+
+    return results, costs, costs_by_term
 
 
-def regrasp_rollout(phy, goal, u_sample, sub_time_s, viz=None):
+def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """
     if viz:
         viz.viz(phy, is_planning=True)
@@ -145,7 +149,7 @@ def regrasp_rollout(phy, goal, u_sample, sub_time_s, viz=None):
     results_0 = goal.get_results(phy)
     # Only do this at the beginning, since it's expensive and if it went in the loop, it could potentially cause
     # rapid oscillations of grasping/not grasping which seems undesirable.
-    do_grasp_dynamics(phy, results_0, is_planning=True)
+    do_grasp_dynamics(phy, results_0)
     results = [results_0]
 
     costs = []
@@ -188,7 +192,7 @@ def regrasp_rollout(phy, goal, u_sample, sub_time_s, viz=None):
     return results, cost, costs_by_term
 
 
-def do_grasp_dynamics(phy, results, is_planning=False):
+def do_grasp_dynamics(phy, results):
     tools_pos = results[0]
     finger_qs = results[7]
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
