@@ -6,7 +6,6 @@ from typing import Dict
 
 import networkx as nx
 import numpy as np
-import pysdf_tools
 import rerun as rr
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
@@ -18,10 +17,35 @@ from mjregrasping.physics import Physics
 from mjregrasping.rope_length import get_rope_length
 
 
-def get_first_order_different(sdf: pysdf_tools.SignedDistanceField, phy1: Physics, phy2: Physics):
+class CollisionChecker:
+    """
+    Defines the simple interface needed for collision checking of points in 3D.
+    """
+
+    def __init__(self):
+        pass
+
+    def is_collision(self, point):
+        """
+        Returns True if the point is in collision, False otherwise.
+        """
+        raise NotImplementedError()
+
+    def get_resolution(self):
+        """
+
+        Returns: The resolution of the collision checker. This is the minimum distance between two points that the
+        collision checker can distinguish between. This is common for voxelgrid or SDF representations, but also sets
+        the precision of collision checking in fully continuous collision checkers.
+
+        """
+        raise NotImplementedError()
+
+
+def get_first_order_different(collision_checker: CollisionChecker, phy1: Physics, phy2: Physics):
     rope1 = get_rope_points(phy1)
     rope2 = get_rope_points(phy2)
-    first_order_sln = get_first_order_homotopy_points(sdf, rope1, rope2, -sdf.GetResolution())
+    first_order_sln = get_first_order_homotopy_points(collision_checker, rope1, rope2, -collision_checker.get_resolution())
     first_order_different = len(first_order_sln) == 0
     return first_order_different
 

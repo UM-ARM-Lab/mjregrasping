@@ -3,7 +3,6 @@ from time import perf_counter
 from typing import Dict, Optional
 
 import numpy as np
-import pysdf_tools
 import rerun as rr
 from bayes_opt import BayesianOptimization
 
@@ -11,7 +10,7 @@ from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.goal_funcs import check_should_be_open
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
-from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first_order_different
+from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first_order_different, CollisionChecker
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, eq_sim_ik
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
@@ -26,10 +25,10 @@ GLOBAL_ITERS = 0
 
 class HomotopyGenerator(RegraspGenerator):
 
-    def __init__(self, op_goal, skeletons: Dict, sdf: pysdf_tools.SignedDistanceField, seed=0):
+    def __init__(self, op_goal, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
         super().__init__(op_goal, seed)
         self.skeletons = skeletons
-        self.sdf = sdf
+        self.cc = collision_checker
 
     def generate(self, phy: Physics, viz=None):
         params, is_grasping = self.generate_params(phy, viz)
@@ -84,6 +83,8 @@ class HomotopyGenerator(RegraspGenerator):
             candidate_is_grasping: binary array of length n_g
             phy: Not modified
             viz: The viz object, or None if you don't want to visualize anything
+            log_loops: Whether to log the loops
+            viz_ik: Whether to visualize the simulation/ik
             **params: The parameters to optimize over
 
         Returns:
@@ -178,7 +179,7 @@ class HomotopyGenerator(RegraspGenerator):
         homotopy_cost = 0
         if not get_true_homotopy_different(self.skeletons, phy, phy_plan, log_loops=log_loops):
             homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
-        if not get_first_order_different(self.sdf, phy, phy_plan):
+        if not get_first_order_different(self.cc, phy, phy_plan):
             homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']
@@ -213,13 +214,12 @@ class HomotopyGenerator(RegraspGenerator):
         lengths = np.linalg.norm(tools_paths[:, 1:] - tools_paths[:, :-1], axis=-1)
         for i, lengths_i in enumerate(lengths):
             for t in range(tools_paths.shape[1] - 1):
-                for d in np.arange(0, lengths_i[t], self.sdf.GetResolution() / 2):
+                for d in np.arange(0, lengths_i[t], self.cc.get_resolution() / 2):
                     p = tools_paths[i, t] + d / lengths_i[t] * (tools_paths[i, t + 1] - tools_paths[i, t])
-                    sdf_value = self.sdf.GetValueByCoordinates(*p)[0]
-                    in_collision = sdf_value < -self.sdf.GetResolution() / 2
+                    in_collision = self.cc.is_collision(p)
                     if viz:
                         color = 'r' if in_collision else 'g'
-                        viz.sphere(f'collision_check', p, self.sdf.GetResolution() / 2, 'world', color, 0)
+                        viz.sphere(f'collision_check', p, self.cc.get_resolution() / 2, 'world', color, 0)
                     if in_collision:
                         return False
         return True

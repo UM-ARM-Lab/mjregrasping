@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 from pathlib import Path
+from time import perf_counter
 
 import mujoco
 import numpy as np
@@ -9,9 +10,7 @@ from PIL import Image
 
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos, \
-    grasp_locations_to_is_grasping
-from mjregrasping.homotopy_checker import HomotopyChecker
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator, params_to_locs_and_subgoals
 from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
@@ -50,7 +49,6 @@ def main():
     viz.sdf(sdf, frame_id='world', idx=0)
 
     goal = make_untangle_goal(viz)
-    checker = HomotopyChecker(skeletons, sdf)
     r = MjRenderer(m)
 
     states_dir = Path("states/untangle")
@@ -69,7 +67,6 @@ def main():
             img_path = (state_path.parent / state_path.stem).with_suffix(".png")
             Image.fromarray(img).save(img_path)
 
-            from time import perf_counter
             t0 = perf_counter()
             params, is_grasping = h.generate_params(phy, viz=viz)
             t1 = perf_counter()
@@ -80,7 +77,7 @@ def main():
             tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
             for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
                 viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
-            cost = h.cost(checker, is_grasping, phy, viz, **params, viz_ik=True, viz_loops=True)
+            cost = h.cost(is_grasping, phy, viz, **params, viz_ik=True, viz_loops=True)
             print(f'H generate(): {t1 - t0:.3f}s {cost=:} {locs=:}')
             print()
 
