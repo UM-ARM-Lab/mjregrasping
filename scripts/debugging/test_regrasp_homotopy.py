@@ -16,7 +16,7 @@ from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator, params_to
 from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
@@ -41,7 +41,7 @@ def main():
 
     viz = Viz(rviz=mjviz, mjrr=MjReRun(scenario.xml_path), tfw=tfw, p=p)
     phy = Physics(m, mujoco.MjData(m),
-                  objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+                  objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     mujoco.mj_forward(phy.m, phy.d)
     viz.viz(phy)
 
@@ -59,7 +59,7 @@ def main():
         for seed in range(1, 3):
             h = HomotopyGenerator(goal, skeletons, sdf, seed=seed)
             d = load_data_and_eq(m, True, state_path)
-            phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+            phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
             viz.viz(phy)
             rr.log_cleared("planned", recursive=True)

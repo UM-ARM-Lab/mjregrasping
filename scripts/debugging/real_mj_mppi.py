@@ -11,7 +11,8 @@ import rerun as rr
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.mujoco_objects import Objects, Object
+from mjregrasping.mujoco_objects import MjObjects
+from mjregrasping.mujoco_object import MjObject
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasping_mppi import RegraspMPPI
@@ -23,7 +24,7 @@ from sensor_msgs.msg import JointState
 
 class RealValCommander:
 
-    def __init__(self, robot: Object):
+    def __init__(self, robot: MjObject):
         self.robot = robot
         self.command_rate = rospy.Rate(100)
         self.should_disconnect = False
@@ -85,7 +86,7 @@ def main():
 
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     d = mujoco.MjData(m)
-    objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
+    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
     phy = Physics(m, d, objects)
 
     mujoco.mj_forward(phy.m, phy.d)

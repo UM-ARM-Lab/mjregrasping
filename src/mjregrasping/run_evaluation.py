@@ -9,7 +9,7 @@ import pysdf_tools
 import rerun as rr
 
 from mjregrasping.movie import MjMovieMaker
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_mpc import RegraspMPC
 from mjregrasping.scenarios import Scenario
@@ -28,7 +28,7 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
     for seed in seeds:
         m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
         d = mujoco.MjData(m)
-        objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
+        objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)
 
         sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))

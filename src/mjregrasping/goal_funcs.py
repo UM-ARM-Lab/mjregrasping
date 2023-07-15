@@ -3,7 +3,7 @@ import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.geometry import point_to_line_segment, pairwise_squared_distances
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 
@@ -28,7 +28,7 @@ def get_contact_cost(phy: Physics):
     return contact_cost
 
 
-def val_self_collision(geom_name1, geom_name2, objects: Objects):
+def val_self_collision(geom_name1, geom_name2, objects: MjObjects):
     return geom_name1 in objects.robot_self_collision_geom_names and geom_name2 in objects.robot_self_collision_geom_names
 
 

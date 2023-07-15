@@ -15,7 +15,7 @@ from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.magnetic_fields import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import Params
 from mjregrasping.homotopy_checker import HomotopyChecker, NO_HOMOTOPY
 from mjregrasping.physics import Physics
@@ -41,7 +41,7 @@ def main():
     p = Params()
 
     viz = Viz(rviz=mjviz, mjrr=MjReRun(scenario.xml_path), tfw=tfw, p=p)
-    objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
+    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
     phy = Physics(m, mujoco.MjData(m), objects)
     mujoco.mj_forward(phy.m, phy.d)
 
@@ -62,7 +62,7 @@ def main():
     results = []
     for i, state_path in enumerate(states_paths):
         d = load_data_and_eq(m, True, state_path)
-        phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+        phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
         img = np.copy(r.render(d))
 

@@ -151,6 +151,19 @@ class MjReRun:
         self.eq_constraints_pub.publish(clear_all_marker)
         self.eq_constraints_pub.publish(eqs_markers)
 
+    def sdf(self, sdf, frame_id, idx):
+        points = []
+        colors = []
+        for x_i in range(0, sdf.GetNumXCells(), 1):
+            for y_i in range(0, sdf.GetNumYCells(), 1):
+                for z_i in [0]:  # range(0, sdf.GetNumZCells(), 1):
+                    origin = sdf.GetOriginTransform().translation()
+                    p = origin + np.array([x_i, y_i, z_i]) * sdf.GetResolution()
+                    points.append(p)
+                    sdf_value = sdf.GetValueByIndex(x_i, y_i, z_i)[0]
+                    colors.append([1, 0, 0, 1.0] if sdf_value < 0 else [0, 1, 0, 1.0])
+        rr.log_points(f'sdf/{idx}', positions=points, colors=colors, radii=sdf.getresolution() / 2)
+
 
 def make_entity_path(*names):
     """ joins names with slashes but ignores empty names """

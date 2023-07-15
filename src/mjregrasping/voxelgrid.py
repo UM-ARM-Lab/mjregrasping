@@ -2,7 +2,7 @@ import mujoco
 import numpy as np
 import pysdf_tools
 
-from mjregrasping.mujoco_objects import Object
+from mjregrasping.mujoco_object import MjObject
 from mjregrasping.physics import Physics
 
 
@@ -38,7 +38,7 @@ def set_cc_sphere_pos(phy, xyz):
     phy.d.qpos[qposadr: qposadr + 3] = xyz
 
 
-def make_vg(phy: Physics, res, extends_2d, origin_point, obstacle: Object):
+def make_vg(phy: Physics, res, extends_2d, origin_point, obstacle: MjObject):
     phy = phy.copy_data()  # make a copy, so we don't mess up the state for the caller
     obstacle = obstacle
     res = res
@@ -73,3 +73,15 @@ def make_vg(phy: Physics, res, extends_2d, origin_point, obstacle: Object):
                 break
 
     return grid, points
+
+
+def get_points_and_values(sdf, indices):
+    points = []
+    values = []
+    for x_i, y_i, z_i in indices:
+        origin = sdf.GetOriginTransform().translation()
+        p = origin + np.array([x_i, y_i, z_i]) * sdf.GetResolution()
+        points.append(p)
+        sdf_value = sdf.GetValueByIndex(x_i, y_i, z_i)[0]
+        values.append(sdf_value)
+    return points, values

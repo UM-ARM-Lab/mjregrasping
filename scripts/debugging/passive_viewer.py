@@ -7,7 +7,7 @@ import rospy
 from arc_utilities import ros_init
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.mjsaver import save_data_and_eq
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.scenarios import conq_hose, setup_conq_hose, cable_harness, setup_cable_harness
 from mjregrasping.viz import make_viz
@@ -20,7 +20,7 @@ def main():
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     d = mujoco.MjData(m)
-    phy = Physics(m, d, objects=Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+    phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     viz = make_viz(scenario)
 
     setup_cable_harness(phy, viz)

@@ -87,17 +87,7 @@ class Viz:
     def sdf(self, sdf: pysdf_tools.SignedDistanceField, frame_id, idx):
         # NOTE: VERY SLOW!!! only use for debugging
         if self.p.rr:
-            origin = sdf.GetOriginTransform().translation()
-            points = []
-            colors = []
-            for x_i in range(0, sdf.GetNumXCells(), 1):
-                for y_i in range(0, sdf.GetNumYCells(), 1):
-                    for z_i in [54]:  # range(0, sdf.GetNumZCells(), 10):
-                        p = origin + np.array([x_i, y_i, z_i]) * sdf.GetResolution()
-                        points.append(p)
-                        sdf_value = sdf.GetValueByIndex(x_i, y_i, z_i)[0]
-                        colors.append([1, 0, 0, 1.0] if sdf_value < 0 else [0, 1, 0, 1.0])
-            rr.log_points(f'sdf/{idx}', positions=points, colors=colors, radii=sdf.GetResolution() / 2)
+            self.mjrr.sdf(sdf, frame_id, idx)
         if self.p.rviz:
             pass
         #     self.rviz.sdf(sdf, frame_id, idx)

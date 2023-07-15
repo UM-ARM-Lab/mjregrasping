@@ -4,15 +4,15 @@ from typing import Optional
 import mujoco
 import numpy as np
 
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 
 
 class Physics:
     m: mujoco.MjModel
     d: mujoco.MjData
-    o: Objects
+    o: MjObjects
 
-    def __init__(self, m: mujoco.MjModel, d: mujoco.MjData, objects: Optional[Objects] = None):
+    def __init__(self, m: mujoco.MjModel, d: mujoco.MjData, objects: Optional[MjObjects] = None):
         self.m = m
         self.d = d
         self.o = objects

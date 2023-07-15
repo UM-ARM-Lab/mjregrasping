@@ -1,4 +1,17 @@
 #!/usr/bin/env python
+# This file depends on the following external libraries:
+#  - sdf_tools python bindings
+#  - mujoco
+#  - hjson
+# And the following files from within this project:
+#  - mjregrasping/mujoco_object.py
+#  - mjregrasping/physics.py
+#  - mjregrasping/rerun_visualizer.py
+#  - mjregrasping/voxelgrid.py
+# You can comment out the rerun code if you don't want it installed,
+# but then you won't be able to visualize anything,
+# so it will hard to know if something isn't right.
+
 import argparse
 import pathlib
 from time import perf_counter
@@ -9,10 +22,10 @@ import numpy as np
 import pysdf_tools
 import rerun as rr
 
-from mjregrasping.mujoco_objects import Object
+from mjregrasping.mujoco_object import MjObject
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
-from mjregrasping.voxelgrid import make_vg
+from mjregrasping.voxelgrid import make_vg, get_points_and_values
 
 
 def main():
@@ -76,7 +89,7 @@ def main():
     res = np.array([res])
     extent = np.array([[xmin, xmax], [ymin, ymax], [zmin, zmax]])
 
-    obstacle = Object(phy.m, 'computer_rack')
+    obstacle = MjObject(phy.m, 'computer_rack')
 
     position = np.mean(extent, axis=1)
     half_size = (extent[:, 1] - extent[:, 0]) / 2
@@ -86,13 +99,36 @@ def main():
     vg, points = make_vg(phy, res, extent, origin_point, obstacle)
     print(f'Computing VoxelGrid: {perf_counter() - t0:.3f}')
 
-    rr.log_points('point_cloud', points)
-
-    print(f"Saving to {outfilename}")
     oob_value = pysdf_tools.COLLISION_CELL(-10000)
     sdf_result = vg.ExtractSignedDistanceField(oob_value.occupancy, False, False)
     sdf: pysdf_tools.SignedDistanceField = sdf_result[0]
-    sdf.SaveToFile(str(outfilename), True)
+    print(f"Saving to {outfilename}")
+    # sdf.SaveToFile(str(outfilename), True)
+
+    # Visualize slice sof the SDF in rerun:
+    red = np.array([1, 0, 0, 1.0])
+    green = np.array([0, 1, 0, 1.0])
+    slice_axis = 2
+    sdf_dims = [sdf.GetNumXCells(), sdf.GetNumYCells(), sdf.GetNumZCells()]
+
+    def x_slices(i, axis):
+        n_j = sdf_dims[(axis + 1) % 3]
+        n_k = sdf_dims[(axis + 2) % 3]
+        for j, k in np.ndindex(n_j, n_k):
+            if axis == 0:
+                yield i, j, k
+            elif axis == 1:
+                yield k, i, j
+            elif axis == 2:
+                yield j, k, i
+            else:
+                raise ValueError(f"Invalid axis {axis}, must be 0, 1 or 2")
+
+    for slice_i in range(0, sdf_dims[slice_axis], 1):
+        indices = x_slices(slice_i, slice_axis)
+        points, values = get_points_and_values(sdf, indices)
+        colors = [red if v < 0 else green for v in values]
+        rr.log_points(f'sdf', positions=points, colors=colors, radii=sdf.GetResolution() / 2)
 
 
 if __name__ == '__main__':

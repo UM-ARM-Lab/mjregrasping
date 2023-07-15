@@ -4,7 +4,7 @@ from pathlib import Path
 import numpy as np
 
 import rospy
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.voxelgrid import VoxelGrid, point_to_idx
 from visualization_msgs.msg import Marker, MarkerArray
@@ -106,7 +106,7 @@ def make_arrow_marker(end_point_msg, start_point_msg, r, idx):
     return markers
 
 
-def make_dfield(phy: Physics, extents_2d, res, goal_point, objects: Objects):
+def make_dfield(phy: Physics, extents_2d, res, goal_point, objects: MjObjects):
     from time import perf_counter
     print("Making dfield...")
     t0 = perf_counter()

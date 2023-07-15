@@ -7,7 +7,7 @@ import rerun as rr
 
 from arc_utilities import ros_init
 from mjregrasping.magnetic_fields import load_skeletons
-from mjregrasping.mujoco_objects import Objects
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.scenarios import cable_harness, setup_cable_harness
@@ -27,7 +27,7 @@ def main():
 
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     d = mujoco.MjData(m)
-    objects = Objects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
+    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
     phy = Physics(m, d, objects)
 
     setup_cable_harness(phy, viz)
