@@ -38,9 +38,8 @@ def set_cc_sphere_pos(phy, xyz):
     phy.d.qpos[qposadr: qposadr + 3] = xyz
 
 
-def make_vg(phy: Physics, res, extends_2d, origin_point, obstacle: MjObject):
+def make_vg(phy: Physics, res, extends_2d, origin_point):
     phy = phy.copy_data()  # make a copy, so we don't mess up the state for the caller
-    obstacle = obstacle
     res = res
     extents_2d = extends_2d
     extents_flat = extents_2d.reshape(-1)
@@ -65,9 +64,8 @@ def make_vg(phy: Physics, res, extends_2d, origin_point, obstacle: MjObject):
         for c in phy.d.contact:
             geom1_name = phy.m.geom(c.geom1).name
             geom2_name = phy.m.geom(c.geom2).name
-            is_obs = geom1_name in obstacle.geom_names or geom2_name in obstacle.geom_names
             cc = geom1_name == 'cc_sphere' or geom2_name == 'cc_sphere'
-            if c.dist < 0 and cc and is_obs:
+            if c.dist < 0 and cc:
                 grid.SetValue(x_i, y_i, z_i, occupied_value)
                 points.append(xyz)
                 break

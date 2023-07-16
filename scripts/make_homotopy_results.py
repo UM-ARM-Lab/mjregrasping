@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import pysdf_tools
 from copy import copy
 from pathlib import Path
 
@@ -51,7 +52,9 @@ def main():
     skeletons = load_skeletons(scenario.skeletons_path)
     log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True, stroke_width=0.02)
 
-    comparer = HomotopyChecker(skeletons)
+    sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
+
+    comparer = HomotopyChecker(skeletons, sdf)
 
     states_dir = Path(f"states/{scenario.name}")
     states_paths = list(states_dir.glob("*.pkl"))

@@ -1,6 +1,6 @@
 <mujoco model="cable_harness_obstacles">
     <worldbody>
-        <body name="cable_harness_obstacles" pos="1.25 0 0" euler="0 0 3.14159">
+        <body name="cable_harness_obstacles" pos="1.25 0 0">
             <geom type="box" name="wall" size="0.05 1 1" pos="0 0 1" material="cream-plaster"/>
             <light mode="fixed" pos="0.3 0.2 1.7" dir="-0.25 0.1 -1" diffuse="0.61 0.61 0.6" castshadow="false"/>
             <light mode="fixed" pos="0.3 -0.2 1.7" dir="-0.25 -0.1 -1" diffuse="0.61 0.61 0.6" castshadow="false"/>

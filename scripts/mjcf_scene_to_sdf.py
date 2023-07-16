@@ -89,14 +89,12 @@ def main():
     res = np.array([res])
     extent = np.array([[xmin, xmax], [ymin, ymax], [zmin, zmax]])
 
-    obstacle = MjObject(phy.m, 'computer_rack')
-
     position = np.mean(extent, axis=1)
     half_size = (extent[:, 1] - extent[:, 0]) / 2
     rr.log_obb('extent', half_size=half_size, position=position)
 
     t0 = perf_counter()
-    vg, points = make_vg(phy, res, extent, origin_point, obstacle)
+    vg, points = make_vg(phy, res, extent, origin_point)
     print(f'Computing VoxelGrid: {perf_counter() - t0:.3f}')
 
     oob_value = pysdf_tools.COLLISION_CELL(-10000)
