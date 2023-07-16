@@ -1,4 +1,5 @@
 <mujoco model="cable_harness_scene">
+    <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
     <include file="materials.xml"/>
     <include file="cc_sphere.xml"/>
     <include file="floor.xml"/>

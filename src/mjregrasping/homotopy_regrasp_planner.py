@@ -1,3 +1,4 @@
+import itertools
 from functools import partial
 from time import perf_counter
 from typing import Dict, Optional
@@ -14,7 +15,6 @@ from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, eq_sim_ik
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
-from mjregrasping.regrasp_generator import RegraspGenerator, get_allowable_is_grasping
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
@@ -23,10 +23,11 @@ from mjregrasping.viz import Viz
 GLOBAL_ITERS = 0
 
 
-class HomotopyGenerator(RegraspGenerator):
+class HomotopyRegraspPlanner:
 
     def __init__(self, op_goal, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
-        super().__init__(op_goal, seed)
+        self.op_goal = op_goal
+        self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
         self.cc = collision_checker
 
@@ -247,3 +248,12 @@ def params_to_locs_and_subgoals(phy: Physics, candidate_is_grasping, params: Dic
         candidate_subgoals.append([pos_i + offset1, pos_i + offset1 + offset2])
     candidate_subgoals = np.array(candidate_subgoals)
     return candidate_locs, candidate_subgoals, candidate_pos
+
+
+def get_allowable_is_grasping(n_g):
+    """
+    Return all possible combinations of is_grasping for n_g grippers, except for the case where no grippers are grasping
+    """
+    all_is_grasping = [np.array(seq) for seq in itertools.product([0, 1], repeat=n_g)]
+    all_is_grasping.pop(0)
+    return all_is_grasping

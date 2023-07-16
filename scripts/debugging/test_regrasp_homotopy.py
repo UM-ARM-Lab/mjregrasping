@@ -10,9 +10,9 @@ from PIL import Image
 
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator, params_to_locs_and_subgoals
 from mjregrasping.homotopy_utils import load_skeletons
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, params_to_locs_and_subgoals
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects
@@ -55,7 +55,7 @@ def main():
     rr.set_time_sequence('homotopy', 0)
     for state_path in sorted(states_dir.glob("*.pkl")):
         for seed in range(1, 3):
-            h = HomotopyGenerator(goal, skeletons, sdf, seed=seed)
+            h = HomotopyRegraspPlanner(goal, skeletons, sdf, seed=seed)
             d = load_data_and_eq(m, True, state_path)
             phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 

@@ -101,7 +101,7 @@ def main():
     sdf_result = vg.ExtractSignedDistanceField(oob_value.occupancy, False, False)
     sdf: pysdf_tools.SignedDistanceField = sdf_result[0]
     print(f"Saving to {outfilename}")
-    # sdf.SaveToFile(str(outfilename), True)
+    sdf.SaveToFile(str(outfilename), True)
 
     # Visualize slice sof the SDF in rerun:
     red = np.array([1, 0, 0, 1.0])

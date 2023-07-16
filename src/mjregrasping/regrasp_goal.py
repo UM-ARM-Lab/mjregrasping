@@ -8,7 +8,7 @@ from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
     grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_is_grasping, get_finger_qs, get_grasp_locs
-from mjregrasping.homotopy_regrasp_generator import HomotopyGenerator
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.sdf_collision_checker import SDFCollisionChecker
@@ -23,7 +23,7 @@ class RegraspGoal(MPPIGoal):
         self.skeletons = skeletons
         self.grasp_goal_radius = grasp_goal_radius
         self.cc = SDFCollisionChecker(sdf)
-        self.homotopy_gen = HomotopyGenerator(op_goal, skeletons, self.cc)
+        self.homotopy_gen = HomotopyRegraspPlanner(op_goal, skeletons, self.cc)
         self.arm = ParamsConfig.Params_Goal
         self.current_locs = None
 
@@ -95,7 +95,8 @@ class RegraspGoal(MPPIGoal):
             home_cost,
         )
 
-    def cost_names(self):
+    @staticmethod
+    def cost_names():
         return [
             "contact",
             "unstable",

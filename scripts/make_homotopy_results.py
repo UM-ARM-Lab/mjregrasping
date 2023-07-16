@@ -74,11 +74,11 @@ def main():
         viz.rviz.viz(phy, is_planning=False)
         viz.mjrr.viz(phy, is_planning=False, detailed=True)
 
-        initial_rope_points = copy(get_rope_points(phy))
+        rope_points = copy(get_rope_points(phy))
         graph = comparer.create_graph_nodes(phy)
         arm_points = comparer.get_arm_points(phy)
         comparer.add_edges(graph, initial_rope_points, arm_points)
-        h = mjregrasping.homotopy_utils.get_full_h_signature(phy, initial_rope_points, log_loops=True)
+        h, loops = mjregrasping.homotopy_utils.get_full_h_signature(skeletons, graph, rope_points, arm_points)
 
         # TODO: add the nx graphs, and a easier to interpret image of the loops & skeletons
         nx_fig, nx_ax = plt.subplots()
