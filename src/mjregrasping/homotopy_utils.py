@@ -19,7 +19,7 @@ NO_HOMOTOPY = Multiset([-999])
 
 def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
     """
-    This function is novel, and not part of the original paper. It computes the full h-signature of the current state.
+    This function computes the full h-signature of the current state.
     Two states are homologous if and only if they have the same h-signature.
 
     The H-signature uniquely defines the homotopy class of the current state, and is represented as  a multi-set.
@@ -42,13 +42,11 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
 
         valid_cycles = []
         for cycle in nx.simple_cycles(graph, length_bound=3):
-            # Cycle must be length 3 and contain the robot base.
-            # There could be a cycle like ['g0', 'g1', 'a'], but we don't need to consider that
-            # Since that only involves the points on the rope, so it will always be in the same homotopy class
+            # Cycle must be length 3 and contain the base.
             # Also, we filter out ones that are the same as previous ones up to ordering (aka edges have no direction)
             # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
             # detection we don't care about direction.
-            if len(cycle) == 3 and 'b' in cycle and new_cycle(cycle, valid_cycles):
+            if len(cycle) == 3 and 'b' in cycle and check_new_cycle(cycle, valid_cycles):
                 valid_cycles.append(cycle)
 
         if len(valid_cycles) == 0:
@@ -56,6 +54,8 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
 
         loops = []
         for valid_cycle in valid_cycles:
+            # Close the cycle by adding the first node to the end,
+            # so that we can get the edge_path of edge from the last node back to the first node.
             valid_cycle = valid_cycle + [valid_cycle[0]]
             loop = []
             for edge in pairwise(valid_cycle):
@@ -69,12 +69,12 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
         for loop, cycle in zip(loops, valid_cycles):
             # If the loop is between grippers, and the h-signature is 0, then delete ones of the two gripper
             # nodes and re-run the algorithm
-            edge = has_gripper_gripper_edge(cycle)
-            if edge is not None:
+            gg_edge = has_gripper_gripper_edge(cycle)
+            if gg_edge is not None:
                 h = get_h_signature(loop, skeletons)
                 if np.count_nonzero(h) == 0:
                     # arbitrarily choose the "larger" node in the edge as the one we remove.
-                    graph.remove_node(max(*edge))
+                    graph.remove_node(max(*gg_edge))
                     removed_node = True
                     break
         if removed_node:
@@ -229,7 +229,7 @@ def passes_through(graph, i, j):
     return False
 
 
-def new_cycle(cycle, valid_cycles):
+def check_new_cycle(cycle, valid_cycles):
     for valid_cycle in valid_cycles:
         if set(cycle) == set(valid_cycle):
             return False
