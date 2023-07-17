@@ -2,19 +2,29 @@
 This file contains the HomotopyChecker class, which is used to compare two states to see if they are homologous.
 This considers both true homotopy and first-order homotopy.
 """
+from copy import deepcopy
+from enum import Enum, auto
 from typing import Dict
 
 import networkx as nx
 import numpy as np
 import rerun as rr
+from multiset import Multiset
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
-from mjregrasping.homotopy_utils import get_full_h_signature, passes_through, floorify, from_to
+from mjregrasping.homotopy_utils import passes_through, floorify, from_to, check_new_cycle, NO_HOMOTOPY, pairwise, \
+    has_gripper_gripper_edge, get_h_signature
 from mjregrasping.mujoco_objects import parents_points
 from mjregrasping.physics import Physics
 from mjregrasping.rope_length import get_rope_length
+
+
+class AllowablePenetration(Enum):
+    NONE = auto()
+    HALF_CELL = auto()
+    FULL_CELL = auto()
 
 
 class CollisionChecker:
@@ -25,7 +35,7 @@ class CollisionChecker:
     def __init__(self):
         pass
 
-    def is_collision(self, point):
+    def is_collision(self, point, allowable_penetration: AllowablePenetration = AllowablePenetration.NONE):
         """
         Returns True if the point is in collision, False otherwise.
         """
@@ -45,7 +55,11 @@ class CollisionChecker:
 def get_first_order_different(collision_checker: CollisionChecker, phy1: Physics, phy2: Physics):
     rope1 = get_rope_points(phy1)
     rope2 = get_rope_points(phy2)
-    first_order_sln = get_first_order_homotopy_points(collision_checker, rope1, rope2, -collision_checker.get_resolution())
+
+    def _in_collision(p):
+        return collision_checker.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
+
+    first_order_sln = get_first_order_homotopy_points(_in_collision, rope1, rope2)
     first_order_different = len(first_order_sln) == 0
     return first_order_different
 
@@ -170,3 +184,71 @@ def add_edges(graph, rope_points, arm_points):
             elif 'a' in i and 'g' in j:
                 edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
                 graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
+
+
+def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
+    """
+    This function computes the full h-signature of the current state.
+    Two states are homologous if and only if they have the same h-signature.
+
+    The H-signature uniquely defines the homotopy class of the current state, and is represented as  a multi-set.
+    # The state involves the arms, the object (rope) configuration, and the obstacles (skeletons).
+    Args:
+        skeletons: The skeletons of the obstacles in the environment.
+        graph: The graph of the current state. This is a networkx DiGraph, where the nodes are the points on the rope,
+            the base of the robot, and the tool bodies of the robot. The edges are the paths between the nodes.
+        rope_points: The points on the rope.
+        arm_points: points of the arms
+
+    Returns:
+        The h-signature of the current state, and the loops and tool positions that were used to compute it.
+
+    """
+    while True:
+        add_edges(graph, rope_points, arm_points)
+
+        skeletons = deepcopy(skeletons)
+
+        valid_cycles = []
+        for cycle in nx.simple_cycles(graph, length_bound=3):
+            # Cycle must be length 3 and contain the base.
+            # Also, we filter out ones that are the same as previous ones up to ordering (aka edges have no direction)
+            # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
+            # detection we don't care about direction.
+            if len(cycle) == 3 and 'b' in cycle and check_new_cycle(cycle, valid_cycles):
+                valid_cycles.append(cycle)
+
+        if len(valid_cycles) == 0:
+            return NO_HOMOTOPY, []  # No valid cycles, so we give it a bogus h value
+
+        loops = []
+        for valid_cycle in valid_cycles:
+            # Close the cycle by adding the first node to the end,
+            # so that we can get the edge_path of edge from the last node back to the first node.
+            valid_cycle = valid_cycle + [valid_cycle[0]]
+            loop = []
+            for edge in pairwise(valid_cycle):
+                edge_path = graph.get_edge_data(*edge)['edge_path']
+                loop.extend(edge_path)
+            loop.append(loop[0])
+            loop = np.stack(loop)
+            loops.append(loop)
+
+        removed_node = False
+        for loop, cycle in zip(loops, valid_cycles):
+            # If the loop is between grippers, and the h-signature is 0, then delete ones of the two gripper
+            # nodes and re-run the algorithm
+            gg_edge = has_gripper_gripper_edge(cycle)
+            if gg_edge is not None:
+                h = get_h_signature(loop, skeletons)
+                if np.count_nonzero(h) == 0:
+                    # arbitrarily choose the "larger" node in the edge as the one we remove.
+                    graph.remove_node(max(*gg_edge))
+                    removed_node = True
+                    break
+        if removed_node:
+            continue
+
+        h = Multiset([get_h_signature(loop, skeletons) for loop in loops])
+
+        return h, loops

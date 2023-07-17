@@ -1,20 +1,21 @@
 from concurrent.futures import ThreadPoolExecutor
-from mjregrasping.cfg import ParamsConfig
 from typing import Optional
 
 import numpy as np
 import rerun as rr
 from matplotlib import cm
+from mjregrasping.cfg import ParamsConfig
 
 import rospy
 from mjregrasping.buffer import Buffer
-from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
+from mjregrasping.physics import Physics
+from mjregrasping.regrasp_fsm import RegraspFSM
+from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, rollout
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
-from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
 
 
@@ -41,13 +42,12 @@ class RegraspMPC:
         self.state_history.reset()
         self.max_dq = 0
 
-    def run(self, phy):
+    def run(self, phy: Physics):
         num_samples = hp['regrasp_n_samples']
 
-        regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, self.sdf, hp['grasp_goal_radius'], self.viz)
+        regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, self.sdf, hp['grasp_goal_radius'], self.viz, phy)
         regrasp_goal.viz_goal(phy)
-        # regrasp_goal.recompute_candidates(phy)
-        self.viz.p.config['selected_arm'] = ParamsConfig.Params_Goal
+        regrasp_goal.recompute_candidates(phy)
 
         self.mppi.reset()
         self.reset_trap_detection()
@@ -68,16 +68,14 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
-            if self.get_mab_reward(phy) < hp['mab_reward_threshold']:
-                print("Trap detected!")
+            is_stuck = self.check_is_stuck(phy)
+
+            state_changed = regrasp_goal.update_fsms(phy, is_stuck)
+            if state_changed:
                 regrasp_goal.recompute_candidates(phy)
                 warmstart_count = 0
                 self.mppi.reset()
                 self.reset_trap_detection()
-
-            # TODO: how to choose the new regrasp goal?
-            arm = self.viz.p.config['selected_arm']
-            regrasp_goal.update_arm(phy, arm)
 
             while warmstart_count < hp['warmstart']:
                 command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)
@@ -94,19 +92,14 @@ class RegraspMPC:
                 self.mov.render(phy.d)
 
             results = regrasp_goal.get_results(phy)
-            did_new_grasp = do_grasp_dynamics(phy, results)
-            if did_new_grasp:
-                print("New grasp!")
-                settle(phy, sub_time_s=0.1, viz=self.viz, is_planning=False, mov=self.mov)
-                warmstart_count = 0
-                self.mppi.reset()
-                self.reset_trap_detection()
+            do_grasp_dynamics(phy, results)
 
             self.mppi.roll()
 
             itr += 1
 
-    def get_mab_reward(self, phy):
+    def check_is_stuck(self, phy):
+        # TODO: split up q on a per-gripper basis
         latest_q = self.get_q_for_trap_detection(phy)
         self.state_history.insert(latest_q)
         qs = np.array(self.state_history.data)
@@ -119,9 +112,10 @@ class RegraspMPC:
             rr.log_scalar('mab/dq', dq, color=[0, 255, 0])
             rr.log_scalar('mab/max_dq', self.max_dq, color=[0, 0, 255])
             rr.log_scalar('mab/frac_dq', frac_dq, color=[255, 0, 255])
-            return frac_dq
+            # FIXME:
+            return [frac_dq < hp['mab_reward_threshold']] * 2
         else:
-            return np.inf
+            return [False, False]
 
     def get_q_for_trap_detection(self, phy):
         return np.concatenate(

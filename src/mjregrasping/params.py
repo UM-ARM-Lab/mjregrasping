@@ -15,7 +15,7 @@ hp = {
     "grasp_finger_weight":      0.5,
     "grasp_loc_diff_thresh":    0.07,  # A percentage of rope length
     "smoothness_weight":        0.02,
-    "home_weight":              1.0,
+    "home_weight":              0.005,
     "nearby_locs_weight":       10,
     "unstable_weight":          100,
     "ever_not_grasping_weight": 5.0,

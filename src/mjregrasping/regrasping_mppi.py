@@ -63,13 +63,13 @@ class RegraspMPPI:
         u_noise = u_samples - self.u_mu
         time_noise = time_samples - self.time_mu
 
-        self.rollout_results, self.cost, costs_by_term = self.parallel_rollout(self.pool,
-                                                                               phy, goal, u_samples,
-                                                                               time_samples,
-                                                                               num_samples,
-                                                                               horizon=self.horizon,
-                                                                               nu=self.nu,
-                                                                               viz=None)
+        self.rollout_results, self.cost, costs_by_term = parallel_rollout(self.pool,
+                                                                          self.horizon,
+                                                                          self.nu,
+                                                                          phy, goal, u_samples,
+                                                                          time_samples,
+                                                                          num_samples,
+                                                                          viz=None)
 
         cost_term_names = goal.cost_names() + ['smoothness', 'ever_not_grasping']
         for cost_term_name, costs_for_term in zip(cost_term_names, costs_by_term.T):

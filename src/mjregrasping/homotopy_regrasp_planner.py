@@ -11,7 +11,8 @@ from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.goal_funcs import check_should_be_open
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
-from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first_order_different, CollisionChecker
+from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first_order_different, CollisionChecker, \
+    AllowablePenetration
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, eq_sim_ik
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
@@ -32,15 +33,19 @@ class HomotopyRegraspPlanner:
         self.cc = collision_checker
 
     def generate(self, phy: Physics, viz=None):
-        params, is_grasping = self.generate_params(phy, viz)
-        locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
-        _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
-        return locs, subgoals, is_grasping, xpos
+        return np.array([0.5, -1]), np.array([
+            [[0.7, -0.2, 0.8], [0.6, -0.2, 0.9]],
+            [[0, 0, 0], [0, 0, 0]],
+        ]), None, None
+        # params, is_grasping = self.generate_params(phy, viz)
+        # locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
+        # _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
+        # return locs, subgoals, is_grasping, xpos
 
     def generate_params(self, phy: Physics, viz=None):
         log_skeletons(self.skeletons, stroke_width=0.01, color=[0, 1.0, 0, 1.0])
 
-        # NOTE: what if there is no way to change homotopy? We need some kind of stopping condition.
+        # Parallelize this
         best_cost = np.inf
         best_params = None
         best_is_grasping = None
@@ -217,7 +222,7 @@ class HomotopyRegraspPlanner:
             for t in range(tools_paths.shape[1] - 1):
                 for d in np.arange(0, lengths_i[t], self.cc.get_resolution() / 2):
                     p = tools_paths[i, t] + d / lengths_i[t] * (tools_paths[i, t + 1] - tools_paths[i, t])
-                    in_collision = self.cc.is_collision(p)
+                    in_collision = self.cc.is_collision(p, allowable_penetration=AllowablePenetration.HALF_CELL)
                     if viz:
                         color = 'r' if in_collision else 'g'
                         viz.sphere(f'collision_check', p, self.cc.get_resolution() / 2, 'world', color, 0)

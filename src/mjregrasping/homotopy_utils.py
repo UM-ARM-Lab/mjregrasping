@@ -2,87 +2,16 @@
 Functions for computing h-signatures of paths through the environment.
 Based on this paper: https://www.roboticsproceedings.org/rss07/p02.pdf
 """
-from copy import deepcopy
 from typing import Dict
 
 import hjson
-import networkx as nx
 import numpy as np
 from multiset import Multiset
 from numpy.linalg import norm
 
 from mjregrasping.geometry import squared_norm
-from mjregrasping.homotopy_checker import add_edges
 
 NO_HOMOTOPY = Multiset([-999])
-
-
-def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
-    """
-    This function computes the full h-signature of the current state.
-    Two states are homologous if and only if they have the same h-signature.
-
-    The H-signature uniquely defines the homotopy class of the current state, and is represented as  a multi-set.
-    # The state involves the arms, the object (rope) configuration, and the obstacles (skeletons).
-    Args:
-        skeletons: The skeletons of the obstacles in the environment.
-        graph: The graph of the current state. This is a networkx DiGraph, where the nodes are the points on the rope,
-            the base of the robot, and the tool bodies of the robot. The edges are the paths between the nodes.
-        rope_points: The points on the rope.
-        arm_points: points of the arms
-
-    Returns:
-        The h-signature of the current state, and the loops and tool positions that were used to compute it.
-
-    """
-    while True:
-        add_edges(graph, rope_points, arm_points)
-
-        skeletons = deepcopy(skeletons)
-
-        valid_cycles = []
-        for cycle in nx.simple_cycles(graph, length_bound=3):
-            # Cycle must be length 3 and contain the base.
-            # Also, we filter out ones that are the same as previous ones up to ordering (aka edges have no direction)
-            # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
-            # detection we don't care about direction.
-            if len(cycle) == 3 and 'b' in cycle and check_new_cycle(cycle, valid_cycles):
-                valid_cycles.append(cycle)
-
-        if len(valid_cycles) == 0:
-            return NO_HOMOTOPY  # No valid cycles, so we give it a bogus h value
-
-        loops = []
-        for valid_cycle in valid_cycles:
-            # Close the cycle by adding the first node to the end,
-            # so that we can get the edge_path of edge from the last node back to the first node.
-            valid_cycle = valid_cycle + [valid_cycle[0]]
-            loop = []
-            for edge in pairwise(valid_cycle):
-                edge_path = graph.get_edge_data(*edge)['edge_path']
-                loop.extend(edge_path)
-            loop.append(loop[0])
-            loop = np.stack(loop)
-            loops.append(loop)
-
-        removed_node = False
-        for loop, cycle in zip(loops, valid_cycles):
-            # If the loop is between grippers, and the h-signature is 0, then delete ones of the two gripper
-            # nodes and re-run the algorithm
-            gg_edge = has_gripper_gripper_edge(cycle)
-            if gg_edge is not None:
-                h = get_h_signature(loop, skeletons)
-                if np.count_nonzero(h) == 0:
-                    # arbitrarily choose the "larger" node in the edge as the one we remove.
-                    graph.remove_node(max(*gg_edge))
-                    removed_node = True
-                    break
-        if removed_node:
-            continue
-
-        h = Multiset([get_h_signature(loop, skeletons) for loop in loops])
-
-        return h, loops
 
 
 def get_h_signature(path, skeletons: Dict):

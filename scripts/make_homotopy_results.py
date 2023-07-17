@@ -10,16 +10,17 @@ import numpy as np
 import rerun as rr
 from PIL import Image
 
+import mjregrasping.homotopy_checker
 import mjregrasping.homotopy_utils
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_utils import load_skeletons, NO_HOMOTOPY
+from mjregrasping.homotopy_checker import add_edges, create_graph_nodes, get_arm_points, get_full_h_signature
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import Params
-from mjregrasping.homotopy_checker import HomotopyChecker
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
@@ -50,11 +51,6 @@ def main():
     r = MjRenderer(m)
 
     skeletons = load_skeletons(scenario.skeletons_path)
-    log_skeletons(skeletons, color=(0, 255, 0, 255), timeless=True, stroke_width=0.02)
-
-    sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
-
-    comparer = HomotopyChecker(skeletons, sdf)
 
     states_dir = Path(f"states/{scenario.name}")
     states_paths = list(states_dir.glob("*.pkl"))
@@ -73,33 +69,40 @@ def main():
         # Visualize the robot in rerun
         viz.rviz.viz(phy, is_planning=False)
         viz.mjrr.viz(phy, is_planning=False, detailed=True)
+        log_skeletons(skeletons, color=(0, 255, 0, 255), stroke_width=0.02)
 
         rope_points = copy(get_rope_points(phy))
-        graph = comparer.create_graph_nodes(phy)
-        arm_points = comparer.get_arm_points(phy)
-        comparer.add_edges(graph, initial_rope_points, arm_points)
-        h, loops = mjregrasping.homotopy_utils.get_full_h_signature(skeletons, graph, rope_points, arm_points)
+        graph = create_graph_nodes(phy)
+        arm_points = get_arm_points(phy)
+        add_edges(graph, rope_points, arm_points)
+        h, loops = get_full_h_signature(skeletons, graph, rope_points, arm_points)
+
+        rr.log_cleared(f'loops', recursive=True)
+        for i, l in enumerate(loops):
+            rr.log_line_strip(f'loops/{i}', l, stroke_width=0.02)
 
         # TODO: add the nx graphs, and a easier to interpret image of the loops & skeletons
         nx_fig, nx_ax = plt.subplots()
         loc_labels = {k: f'{k}\nloc={v:.1f}' for k, v in nx.get_node_attributes(graph, 'loc').items()}
-        nx.draw(graph, labels=loc_labels, node_size=5000, ax=nx_ax)
-        nx_fig.show()
+        nx.draw(graph, labels=loc_labels, node_size=5000, ax=nx_ax, margins=(0.075, 0.075))
         nx_fig.savefig(states_dir / f"{state_path.stem}_nx.pdf", dpi=300, format="pdf")
-        nx_fig.savefig(states_dir / f"{state_path.stem}_nx.png", dpi=300)
+        nx_img_path = states_dir / f"{state_path.stem}_nx.png"
+        nx_fig.tight_layout(pad=0)
+        nx_fig.savefig(nx_img_path, dpi=300)
 
         img_path = states_dir / f"{state_path.stem}_mj.png"
         Image.fromarray(img).save(img_path)
 
         results.append({
-            'h': h,
-            'mj_img': img,
-            'nx_img': nx_fig,
+            'h':           h,
+            'loops':       loops,
+            'mj_img':      img,
+            'nx_img_path': nx_img_path,
         })
 
     plt.style.use('paper')
     fig, axes = plt.subplots(nrows, ncols, figsize=(ncols * 10, nrows * 6))
-    results = sorted(results, key=lambda r: r['h'])
+    results = sorted(results, key=lambda r: len(str(r['h'])))
     for i, result in enumerate(results):
         h = result['h']
         if h == NO_HOMOTOPY:
@@ -107,25 +110,29 @@ def main():
         else:
             h = sorted(h)
         mj_img = result['mj_img']
+        nx_img = Image.open(result['nx_img_path'])
 
         row = i // ncols
         col = i % ncols
         ax = axes[row, col]
 
         ax.imshow(mj_img)
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
+
+        sub_ax_size = 0.35
+        sub_ax = ax.inset_axes([1 - sub_ax_size, 1 - sub_ax_size, sub_ax_size, sub_ax_size])
+        sub_ax.imshow(nx_img)
+        sub_ax.axis("off")
+
+        ax.axis("off")
         ax.set_title(f"$\mathcal{{H}}=${h}")
 
-    # Remove any extra unused axes
-    for i in range(n_states, nrows * ncols):
-        row = i // ncols
-        col = i % ncols
-        ax = axes[row, col]
-        ax.axis('off')
+    # turn off all the (extra) axes
+    for i in range(nrows):
+        for j in range(ncols):
+            axes[i, j].axis("off")
 
-    plt.savefig("results/homotopy_results.pdf", dpi=300, format="pdf")
     fig.show()
+    plt.savefig("results/homotopy_results.pdf", dpi=300, format="pdf")
 
 
 if __name__ == "__main__":
