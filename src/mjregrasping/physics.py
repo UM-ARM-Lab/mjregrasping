@@ -35,7 +35,9 @@ class Physics:
 
 
 def get_contact_forces(phy: Physics):
-    contact_geoms = phy.d.contact.geom1
+    contact_geoms1 = phy.d.contact.geom1
+    contact_geoms2 = phy.d.contact.geom2
+    contact_geoms = np.unique(np.concatenate([contact_geoms1, contact_geoms2]))
     contact_bodies = phy.m.geom_bodyid[contact_geoms]
     contact_forces = phy.d.cfrc_ext[contact_bodies]
     return contact_forces

@@ -1,8 +1,11 @@
+import time
 from enum import Enum, auto
+from pathlib import Path
 
 import numpy as np
 
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.mjsaver import save_data_and_eq
 from mjregrasping.params import hp
 from mjregrasping.viz import Viz
 
@@ -32,6 +35,7 @@ class RegraspFSM:
                 self.mode = Modes.REGRASPING
                 print("Stuck! Replanning...")
                 self.locs, self.subgoals, _, _ = planner.generate(phy, self.viz)
+                save_data_and_eq(phy, Path(f'states/on_stuck/{int(time.time())}.pkl'))
                 self.timer = TIMER_MAX
                 # planner.cost(np.array([1, 0]), phy.copy_all(), self.viz, viz_ik=True, log_loops=True,
                 #              left_tool=0.553,
@@ -45,6 +49,7 @@ class RegraspFSM:
             self.timer -= 1
             if self.timer <= 0:
                 print("Regrasp timed out! Replanning...")
+                save_data_and_eq(phy, Path(f'states/on_timeout/{int(time.time())}.pkl'))
                 self.locs, self.subgoals, _, _ = planner.generate(phy, self.viz)
                 self.timer = TIMER_MAX
                 return True
