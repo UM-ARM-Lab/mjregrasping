@@ -22,6 +22,7 @@
         <mesh name="A35_BRACKET" file="A35_BRACKET_simplified.stl"/>
         <mesh name="PINCER_HOUSING2" file="PINCER_HOUSING2.stl"/>
         <mesh name="PINCER_FINGER" file="PINCER_FINGER.stl"/>
+        <mesh name="soft_gripper_thin" file="soft_gripper_thin.stl"/>
         <mesh name="FINGER_PAD" file="FINGER_PAD.stl"/>
     </asset>
     <worldbody>
@@ -161,7 +162,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="leftgripper_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER" name="leftgripper"
+                                                    <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
                                                     <body name="left_finger_pad" pos="0.05 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad"
@@ -176,7 +177,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="leftgripper2_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER" name="leftgripper2"
+                                                    <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper2" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
                                                     <body name="left_finger_pad2" pos="0.05 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad2"
@@ -290,7 +291,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="rightgripper_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER" name="rightgripper"
+                                                    <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
                                                     <body name="right_finger_pad" pos="0.05 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad"
@@ -305,7 +306,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <site name="rightgripper2_sensor_site"/>
-                                                    <geom type="mesh" mesh="PINCER_FINGER" name="rightgripper2"
+                                                    <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper2" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
                                                     <body name="right_finger_pad2" pos="0.05 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad2"

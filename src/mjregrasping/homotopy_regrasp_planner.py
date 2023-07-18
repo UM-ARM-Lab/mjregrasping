@@ -6,13 +6,13 @@ from typing import Dict, Optional
 import numpy as np
 import rerun as rr
 from bayes_opt import BayesianOptimization
+from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.eq_errors import compute_eq_errors
-from mjregrasping.goal_funcs import check_should_be_open
+from mjregrasping.goal_funcs import check_should_be_open, get_rope_points
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
-from mjregrasping.homotopy_checker import get_true_homotopy_different, get_first_order_different, CollisionChecker, \
-    AllowablePenetration
+from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration, get_full_h_signature_from_phy
 from mjregrasping.ik import HARD_CONSTRAINT_PENALTY, get_reachability_cost, eq_sim_ik
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
@@ -31,18 +31,19 @@ class HomotopyRegraspPlanner:
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
         self.cc = collision_checker
+        self.true_h_blacklist = []
+        self.first_order_blacklist = []
 
     def generate(self, phy: Physics, viz=None):
-        return np.array([0.5, -1]), np.array([
-            [[0.7, -0.2, 0.8], [0.6, -0.2, 0.9]],
-            [[0, 0, 0], [0, 0, 0]],
-        ]), None, None
-        # params, is_grasping = self.generate_params(phy, viz)
-        # locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
-        # _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
-        # return locs, subgoals, is_grasping, xpos
+        params, is_grasping = self.generate_params(phy, viz)
+        locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
+        _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
 
-    def generate_params(self, phy: Physics, viz=None):
+        return locs, subgoals, is_grasping, xpos
+
+    def generate_params(self, phy: Physics, viz=None, log_loops=False, viz_ik=False):
+        self.update_blacklists(phy)
+
         log_skeletons(self.skeletons, stroke_width=0.01, color=[0, 1.0, 0, 1.0])
 
         # Parallelize this
@@ -62,7 +63,7 @@ class HomotopyRegraspPlanner:
                     bounds[tool_name + '_dx_2'] = (-d_max, d_max)
                     bounds[tool_name + '_dy_2'] = (-d_max, d_max)
                     bounds[tool_name + '_dz_2'] = (-d_max, d_max)
-            opt = BayesianOptimization(f=partial(self.cost, candidate_is_grasping, phy, viz),
+            opt = BayesianOptimization(f=partial(self.cost, candidate_is_grasping, phy, viz, log_loops, viz_ik),
                                        pbounds=bounds,
                                        verbose=0,
                                        random_state=self.rng.randint(0, 1000),
@@ -80,6 +81,26 @@ class HomotopyRegraspPlanner:
             print('No homotopy change found!')
 
         return best_params, best_is_grasping
+
+    def update_blacklists(self, phy):
+        current_true_h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
+        new = True
+        for blacklisted_true_h in self.true_h_blacklist:
+            if current_true_h == blacklisted_true_h:
+                new = False
+                break
+        if new:
+            self.true_h_blacklist.append(current_true_h)
+
+        current_path = get_rope_points(phy)
+        new = True
+        for blacklisted_path in self.first_order_blacklist:
+            sln = get_first_order_homotopy_points(self.in_collision, blacklisted_path, current_path)
+            if len(sln) > 0:
+                new = False
+                break
+        if new:
+            self.first_order_blacklist.append(current_path)
 
     def cost(self, candidate_is_grasping: np.ndarray, phy: Physics, viz: Optional[Viz],
              log_loops=False, viz_ik=False, **params):
@@ -114,16 +135,17 @@ class HomotopyRegraspPlanner:
         # If we do this with the RegraspMPPI controller it will be very slow, so we will likely need some
         # faster approximation of the dynamics (floating grippers? Virtual-Elastic Band?)
 
-        # Visualize the path the tools should take for the candidate_locs and candidate_subgoals
         tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
-        for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
-            viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
-            rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
 
         # First check if the subgoal is straight-line collision free, because if it isn't,
         #  we waste a lot of time evaluating everything else
-        if not self.collision_free(tool_paths, viz):
-            return -HARD_CONSTRAINT_PENALTY
+        if not self.collision_free(tool_paths):
+            return -10 * HARD_CONSTRAINT_PENALTY
+
+        if viz:
+            for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
+                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
+                rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
 
         # Simple approximation:
         # 1) Simulate pulling the grippers to the rope
@@ -153,12 +175,16 @@ class HomotopyRegraspPlanner:
         all_results.extend(results)
         eq_errs.append(compute_eq_errors(phy_plan))
 
+        settle_diff = 0
         if reached:
             # Activate rope grasping EQs
             for eq_name, is_grasping_i, loc_i in zip(rope_grasp_eqs, candidate_is_grasping, candidate_locs):
                 if is_grasping_i:
                     activate_grasp(phy_plan, eq_name, loc_i)
+            pre_settle_rope_points = get_rope_points(phy_plan)
             settle(phy_plan, DEFAULT_SUB_TIME_S, viz=viz if viz_ik else None, is_planning=True, result_func=result_func)
+            post_settle_rope_points = get_rope_points(phy_plan)
+            settle_diff = np.mean(np.linalg.norm(pre_settle_rope_points - post_settle_rope_points, axis=-1))
             eq_errs.append(compute_eq_errors(phy_plan))
 
             # 2) Do a straight line motion to the first candidate_subgoal, then the second, etc.
@@ -181,16 +207,24 @@ class HomotopyRegraspPlanner:
 
         reachability_cost = get_reachability_cost(phy, phy_plan, reached, candidate_locs, candidate_is_grasping)
 
-        # This creates a sort of priority: true homotopy is more important than first order homotopy.
         homotopy_cost = 0
-        if not get_true_homotopy_different(self.skeletons, phy, phy_plan, log_loops=log_loops):
-            homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
-        if not get_first_order_different(self.cc, phy, phy_plan):
-            homotopy_cost += HARD_CONSTRAINT_PENALTY / 2
+        h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
+        rope_points_plan = get_rope_points(phy_plan)
+        for blacklisted_h in self.true_h_blacklist:
+            if h_plan == blacklisted_h:
+                homotopy_cost += HARD_CONSTRAINT_PENALTY / len(self.true_h_blacklist)
+
+        for blacklisted_rope_points in self.first_order_blacklist:
+            first_order_sln = get_first_order_homotopy_points(self.in_collision, blacklisted_rope_points,
+                                                              rope_points_plan)
+            if len(first_order_sln) > 0:
+                homotopy_cost += HARD_CONSTRAINT_PENALTY / len(self.first_order_blacklist)
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']
 
         unstable_cost = (phy.d.warning.number.sum() > 0) * HARD_CONSTRAINT_PENALTY
+
+        settle_cost = settle_diff * hp['settle_weight']
 
         cost = sum([
             reachability_cost,
@@ -199,13 +233,22 @@ class HomotopyRegraspPlanner:
             total_accumulated_contact_force,
             eq_err_cost,
             unstable_cost,
+            settle_cost,
         ])
+
+        # Visualize the path the tools should take for the candidate_locs and candidate_subgoals
+        if log_loops:
+            rr.log_cleared(f'loops_plan', recursive=True)
+        for i, l in enumerate(loops_plan):
+            rr.log_line_strip(f'loops_plan/{i}', l, stroke_width=0.02)
+            rr.log_extension_components(f'loops_plan/{i}', ext={'candidate_locs': f'{candidate_locs}'})
         rr.log_scalar('homotopy_costs/reachability_cost', reachability_cost, color=[0, 0, 1, 1.0])
         rr.log_scalar('homotopy_costs/homotopy_cost', homotopy_cost, color=[0, 1, 0, 1.0])
         rr.log_scalar('homotopy_costs/geodesics_cost', geodesics_cost, color=[1, 0, 0, 1.0])
         rr.log_scalar('homotopy_costs/contact_force_cost', total_accumulated_contact_force, color=[1, 0, 1, 1.0])
         rr.log_scalar('homotopy_costs/eq_err_cost', eq_err_cost, color=[1, 1, 0, 1.0])
         rr.log_scalar('homotopy_costs/unstable_cost', unstable_cost, color=[1, 0.5, 0, 1.0])
+        rr.log_scalar('homotopy_costs/settle_cost', settle_cost, color=[0, 1, 1, 1.0])
         rr.log_scalar('homotopy_costs/total_cost', cost, color=[1, 1, 1, 1.0])
 
         t1 = perf_counter()
@@ -214,7 +257,7 @@ class HomotopyRegraspPlanner:
         # BayesOpt uses maximization, so we need to negate the cost
         return -cost
 
-    def collision_free(self, tools_paths, viz: Viz):
+    def collision_free(self, tools_paths):
         # subgoals has shape [n_g, T, 3]
         # and we want to figure out if the straight line path between each subgoal is collision free
         lengths = np.linalg.norm(tools_paths[:, 1:] - tools_paths[:, :-1], axis=-1)
@@ -223,12 +266,12 @@ class HomotopyRegraspPlanner:
                 for d in np.arange(0, lengths_i[t], self.cc.get_resolution() / 2):
                     p = tools_paths[i, t] + d / lengths_i[t] * (tools_paths[i, t + 1] - tools_paths[i, t])
                     in_collision = self.cc.is_collision(p, allowable_penetration=AllowablePenetration.HALF_CELL)
-                    if viz:
-                        color = 'r' if in_collision else 'g'
-                        viz.sphere(f'collision_check', p, self.cc.get_resolution() / 2, 'world', color, 0)
                     if in_collision:
                         return False
         return True
+
+    def in_collision(self, p):
+        return self.cc.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
 
 
 def params_to_locs_and_subgoals(phy: Physics, candidate_is_grasping, params: Dict):
@@ -259,6 +302,7 @@ def get_allowable_is_grasping(n_g):
     """
     Return all possible combinations of is_grasping for n_g grippers, except for the case where no grippers are grasping
     """
-    all_is_grasping = [np.array(seq) for seq in itertools.product([0, 1], repeat=n_g)]
-    all_is_grasping.pop(0)
-    return all_is_grasping
+    return [np.array([1, 0]), np.array([0, 1])]
+    # all_is_grasping = [np.array(seq) for seq in itertools.product([0, 1], repeat=n_g)]
+    # all_is_grasping.pop(0)
+    # return all_is_grasping

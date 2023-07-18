@@ -28,25 +28,27 @@ hp = {
     "thread_orient_weight":     0.0,  # for threading
     "contact_exponent":         0.5,
     "max_contact_cost":         1,
+    "max_expected_contacts":    6,
     "contact_cost":             3.0,
-    "contact_force_weight":     0.0001,
-    "eq_err_weight":            100.0,
+    "contact_force_weight":     0.0006,
+    "settle_weight":            100.0,
+    "eq_err_weight":            500.0,
     "frac_max_dq":              0.5,
     "q_joint_weight":           0.5,
-    "mab_reward_threshold":     0.3,
+    "frac_dq_threshold":        0.2,
     "grasp_goal_radius":        0.045,
     "sub_time_s":               0.15,
     "min_sub_time_s":           0.05,
     "max_sub_time_s":           0.30,
-    "geodesic_weight":          5.0,
+    "geodesic_weight":          25.0,
     "sim_ik_nstep":             20,
     "sim_ik_sub_time_s":        0.25,
     "sim_ik_solref_decay":      0.8,
     "sim_ik_min_solref":        0.02,
     "attach_loop_size":         0.02,
-    "bayes_opt": {
-        "n_iter":              25,
-        "n_init":              15,
+    "bayes_opt":                {
+        "n_iter": 20,
+        "n_init": 10,
     }
 }
 

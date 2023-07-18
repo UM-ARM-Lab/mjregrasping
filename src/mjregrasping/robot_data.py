@@ -10,6 +10,7 @@ class RobotData:
     base_link: str
     allowed_robot_collision_geoms_names: List[str]
     ignored_robot_self_collision_geoms_names: List[str]
+    gripper_geom_names: List[List[str]]
     gripper_actuator_names: List[str]
     tool_sites: List[str]
     n_g: int
@@ -32,6 +33,10 @@ val = RobotData(
         'right_finger_pad', 'right_finger_pad2',
         'leftgripper', 'leftgripper2',
         'rightgripper', 'rightgripper2'
+    ],
+    gripper_geom_names=[
+        ['left_finger_pad', 'left_finger_pad2', 'leftgripper', 'leftgripper2'],
+        ['right_finger_pad', 'right_finger_pad2', 'rightgripper', 'rightgripper2'],
     ],
     gripper_actuator_names=['leftgripper_vel', 'rightgripper_vel'],
     tool_sites=[
@@ -61,6 +66,7 @@ conq = RobotData(
     base_link="conq_base",
     allowed_robot_collision_geoms_names=['front_left_leg', 'front_right_leg', 'back_left_leg', 'back_right_leg'],
     ignored_robot_self_collision_geoms_names=[],
+    gripper_geom_names=[['hand']],
     tool_sites=['hand_tool'],
     n_g=1,
     rope_grasp_eqs=['hand'],

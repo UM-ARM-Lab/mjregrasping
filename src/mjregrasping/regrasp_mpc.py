@@ -4,18 +4,18 @@ from typing import Optional
 import numpy as np
 import rerun as rr
 from matplotlib import cm
-from mjregrasping.cfg import ParamsConfig
 
 import rospy
 from mjregrasping.buffer import Buffer
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_fsm import RegraspFSM
 from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, rollout
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
+from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import Viz
 
 
@@ -45,16 +45,19 @@ class RegraspMPC:
     def run(self, phy: Physics):
         num_samples = hp['regrasp_n_samples']
 
-        regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, self.sdf, hp['grasp_goal_radius'], self.viz, phy)
+        cc = SDFCollisionChecker(self.sdf)
+        planner = HomotopyRegraspPlanner(self.op_goal, self.skeletons, cc)
+
+        regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, hp['grasp_goal_radius'], self.viz, phy)
         regrasp_goal.viz_goal(phy)
-        regrasp_goal.recompute_candidates(phy)
 
         self.mppi.reset()
         self.reset_trap_detection()
 
         itr = 0
         max_iters = 5000
-        warmstart_count = 0
+        command = None
+        sub_time_s = None
         self.viz.viz(phy)
         while True:
             if rospy.is_shutdown():
@@ -68,22 +71,21 @@ class RegraspMPC:
                 print("Goal reached!")
                 return True
 
-            is_stuck = self.check_is_stuck(phy)
+            stuck_frac = self.check_is_stuck(phy)
+            is_stuck_vec = np.array([stuck_frac, stuck_frac]) < hp['frac_dq_threshold']
 
-            state_changed = regrasp_goal.update_fsms(phy, is_stuck)
-            if state_changed:
-                regrasp_goal.recompute_candidates(phy)
-                warmstart_count = 0
+            needs_reset = regrasp_goal.update_fsms(phy, is_stuck_vec, planner)
+
+            n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
+
+            if needs_reset:
                 self.mppi.reset()
                 self.reset_trap_detection()
+                n_warmstart = hp['warmstart']
 
-            while warmstart_count < hp['warmstart']:
+            for k in range(n_warmstart):
                 command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)
                 self.mppi_viz(self.mppi, regrasp_goal, phy, command, sub_time_s)
-                warmstart_count += 1
-
-            command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)
-            self.mppi_viz(self.mppi, regrasp_goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s)
             self.viz.viz(phy)
@@ -109,13 +111,10 @@ class RegraspMPC:
             dq = (np.abs(qs[-1] - qs[0]) / len(self.state_history)).mean()
             self.max_dq = max(self.max_dq, dq)
             frac_dq = dq / self.max_dq
-            rr.log_scalar('mab/dq', dq, color=[0, 255, 0])
-            rr.log_scalar('mab/max_dq', self.max_dq, color=[0, 0, 255])
             rr.log_scalar('mab/frac_dq', frac_dq, color=[255, 0, 255])
-            # FIXME:
-            return [frac_dq < hp['mab_reward_threshold']] * 2
+            return frac_dq
         else:
-            return [False, False]
+            return 1
 
     def get_q_for_trap_detection(self, phy):
         return np.concatenate(

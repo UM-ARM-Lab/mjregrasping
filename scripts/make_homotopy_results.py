@@ -131,8 +131,8 @@ def main():
         for j in range(ncols):
             axes[i, j].axis("off")
 
-    fig.show()
     plt.savefig("results/homotopy_results.pdf", dpi=300, format="pdf")
+    fig.show()
 
 
 if __name__ == "__main__":

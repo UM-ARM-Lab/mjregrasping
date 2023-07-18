@@ -113,7 +113,7 @@ def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
     return new_contact_cost + dq_cost + nearby_locs_cost if reached else HARD_CONSTRAINT_PENALTY
 
 
-HARD_CONSTRAINT_PENALTY = 1e3
+HARD_CONSTRAINT_PENALTY = 1e2
 IK_OFFSET = np.array([0, 0, 0.145])
 
 

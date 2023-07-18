@@ -3,9 +3,27 @@ import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.geometry import point_to_line_segment, pairwise_squared_distances
+from mjregrasping.grasping import get_is_grasping
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+
+
+def get_nongrasping_rope_contact_cost(phy: Physics, desired_grasp_locs):
+    contact_cost = 0
+    for desired_grasp_loc, gripper_geom_names_i in zip(desired_grasp_locs, phy.o.rd.gripper_geom_names):
+        if desired_grasp_loc != -1:
+            continue
+        for contact in phy.d.contact:
+            geom_name1 = phy.m.geom(contact.geom1).name
+            geom_name2 = phy.m.geom(contact.geom2).name
+            if (geom_name1 in gripper_geom_names_i and geom_name2 in phy.o.rope.geom_names) or \
+                    (geom_name2 in gripper_geom_names_i and geom_name1 in phy.o.rope.geom_names):
+                contact_cost += 1
+    contact_cost /= hp['max_expected_contacts']
+    # clamp to be between 0 and 1, and more sensitive to just a few contacts
+    contact_cost = min(np.power(contact_cost, hp['contact_exponent']), hp['max_contact_cost']) * hp['contact_cost']
+    return contact_cost
 
 
 def get_contact_cost(phy: Physics):
@@ -21,8 +39,7 @@ def get_contact_cost(phy: Physics):
                 (geom_name2 in all_obstacle_geoms and geom_name1 in phy.o.robot_collision_geom_names) or \
                 val_self_collision(geom_name1, geom_name2, phy.o):
             contact_cost += 1
-    max_expected_contacts = 6.0
-    contact_cost /= max_expected_contacts
+    contact_cost /= hp['max_expected_contacts']
     # clamp to be between 0 and 1, and more sensitive to just a few contacts
     contact_cost = min(np.power(contact_cost, hp['contact_exponent']), hp['max_contact_cost']) * hp['contact_cost']
     return contact_cost

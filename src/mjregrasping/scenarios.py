@@ -84,7 +84,7 @@ def setup_untangle(phy, viz):
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
     rope_body_indices = np.array(phy.o.rope.body_indices)
-    activate_grasp(phy, 'right', 0.95)
+    activate_grasp(phy, 'right', 1.0)
     robot_q2[-1] = 0.05  # close right gripper
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 

@@ -22,6 +22,7 @@ from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rviz import MjRViz
 from mjregrasping.scenarios import val_untangle, make_untangle_goal
+from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import Viz
 
 
@@ -46,16 +47,26 @@ def main():
 
     skeletons = load_skeletons(scenario.skeletons_path)
     sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
-    viz.sdf(sdf, frame_id='world', idx=0)
+    cc = SDFCollisionChecker(sdf)
 
     goal = make_untangle_goal(viz)
     r = MjRenderer(m)
 
     states_dir = Path("states/untangle")
     rr.set_time_sequence('homotopy', 0)
-    for state_path in sorted(states_dir.glob("*.pkl")):
+    states_paths = [
+        Path('states/untangle/debugging3.pkl'),
+        Path('states/untangle/debugging2.pkl'),
+        Path('states/untangle/debugging.pkl'),
+        Path('states/untangle/1688067719.pkl'),
+        Path('states/untangle/1688067882.pkl'),
+        Path('states/untangle/1688071991.pkl'),
+        Path('states/untangle/1688072614.pkl'),
+        Path('states/untangle/1688067686.pkl'),
+    ]
+    for state_path in states_paths:
         for seed in range(1, 3):
-            h = HomotopyRegraspPlanner(goal, skeletons, sdf, seed=seed)
+            h = HomotopyRegraspPlanner(goal, skeletons, cc, seed=seed)
             d = load_data_and_eq(m, True, state_path)
             phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
@@ -68,7 +79,7 @@ def main():
             Image.fromarray(img).save(img_path)
 
             t0 = perf_counter()
-            params, is_grasping = h.generate_params(phy, viz=viz)
+            params, is_grasping = h.generate_params(phy, viz=viz, viz_ik=True)
             t1 = perf_counter()
 
             locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
@@ -76,7 +87,7 @@ def main():
 
             tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
             for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
-                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
+                viz.lines(path, f'homotopy/{tool_name}_path_sln', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
             cost = h.cost(is_grasping, phy, viz, **params, viz_ik=True, viz_loops=True)
             print(f'H generate(): {t1 - t0:.3f}s {cost=:} {locs=:}')
             print()
