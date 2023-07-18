@@ -53,6 +53,9 @@ class HomotopyRegraspPlanner:
         best_is_grasping = None
         for candidate_is_grasping in get_allowable_is_grasping(phy.o.rd.n_g):
             # The bounds here also define how many params there are and their names
+            # TODO: Instead of {grasping, not grasping}, what if we use {new grasp, release, do nothing, change grasp} ?
+            #  that would give us a better chance at sampling something where one gripper stays grasping and the other
+            #  non-grasping gripper makes a new grasp
             bounds = {}
             for tool_name, is_grasping_i in zip(phy.o.rd.tool_sites, candidate_is_grasping):
                 if is_grasping_i:

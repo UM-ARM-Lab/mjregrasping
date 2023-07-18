@@ -11,7 +11,7 @@ hp = {
     "regrasp_temp":             0.15,
     "goal_weight":              1.0,
     "grasp_pos_weight":         1.0,
-    "grasp_near_weight":        5.0,
+    "grasp_near_weight":        50.0,
     "grasp_finger_weight":      0.5,
     "grasp_loc_diff_thresh":    0.07,  # A percentage of rope length
     "smoothness_weight":        0.02,
