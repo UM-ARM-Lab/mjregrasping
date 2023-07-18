@@ -22,7 +22,7 @@ hp = {
     "finger_q_open":            0.3,
     "finger_q_closed":          0.08,
     "state_history_size":       8,
-    "warmstart":                10,
+    "warmstart":                8,
     "settle_steps":             10,
     "thread_dir_weight":        1.0,  # for threading
     "thread_orient_weight":     0.0,  # for threading
@@ -30,8 +30,8 @@ hp = {
     "max_contact_cost":         1,
     "max_expected_contacts":    6,
     "contact_cost":             3.0,
-    "contact_force_weight":     0.0006,
-    "settle_weight":            100.0,
+    "contact_force_weight":     0.001,
+    "settle_weight":            50.0,
     "eq_err_weight":            500.0,
     "frac_max_dq":              0.5,
     "q_joint_weight":           0.5,
@@ -40,14 +40,15 @@ hp = {
     "sub_time_s":               0.15,
     "min_sub_time_s":           0.05,
     "max_sub_time_s":           0.30,
-    "geodesic_weight":          25.0,
-    "sim_ik_nstep":             20,
+    "geodesic_weight":          30.0,
+    "first_order_weight":       10.0,
+    "sim_ik_nstep":             25,
     "sim_ik_sub_time_s":        0.25,
     "sim_ik_solref_decay":      0.8,
     "sim_ik_min_solref":        0.02,
     "attach_loop_size":         0.02,
     "bayes_opt":                {
-        "n_iter": 20,
+        "n_iter": 25,
         "n_init": 10,
     }
 }

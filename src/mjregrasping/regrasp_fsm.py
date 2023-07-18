@@ -33,6 +33,13 @@ class RegraspFSM:
                 print("Stuck! Replanning...")
                 self.locs, self.subgoals, _, _ = planner.generate(phy, self.viz)
                 self.timer = TIMER_MAX
+                # planner.cost(np.array([1, 0]), phy.copy_all(), self.viz, viz_ik=True, log_loops=True,
+                #              left_tool=0.553,
+                #              right_tool=-1,
+                #              left_tool_dx_1=0, left_tool_dy_1=0.03, left_tool_dz_1=0.04,
+                #              left_tool_dx_2=-0.1, left_tool_dy_2=0.03, left_tool_dz_2=0.04,
+                #              right_tool_dx_1=0, right_tool_dy_1=0.03, right_tool_dz_1=0.04,
+                #              right_tool_dx_2=-0.1, right_tool_dy_2=0.03, right_tool_dz_2=0.04)
                 return True
         elif self.mode == Modes.REGRASPING:
             self.timer -= 1

@@ -79,7 +79,7 @@ def main():
             Image.fromarray(img).save(img_path)
 
             t0 = perf_counter()
-            params, is_grasping = h.generate_params(phy, viz=viz, viz_ik=True)
+            params, is_grasping = h.generate_params(phy, viz=viz, viz_ik=False)
             t1 = perf_counter()
 
             locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)

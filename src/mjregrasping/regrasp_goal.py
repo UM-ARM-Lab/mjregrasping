@@ -72,6 +72,7 @@ class RegraspGoal(MPPIGoal):
                                                                                grasp_xpos, tools_pos, rope_points)
 
         # penalize distance of q's from 0
+        # TODO: only do this for joints which are not participating in any grasps
         home_cost = np.sum(np.abs(joint_positions)) * hp['home_weight']
 
         if self.fsm.mode == Modes.REGRASPING:

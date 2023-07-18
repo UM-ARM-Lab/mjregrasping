@@ -16,7 +16,7 @@ def main():
         make_goal=make_untangle_goal,
         skeletons=load_skeletons(val_untangle.skeletons_path),
         setup_scene=setup_untangle,
-        seeds=[1],
+        seeds=[2],
     )
 
 

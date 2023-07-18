@@ -6,6 +6,7 @@ from typing import Dict, Optional
 import numpy as np
 import rerun as rr
 from bayes_opt import BayesianOptimization
+from matplotlib import cm
 from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.eq_errors import compute_eq_errors
@@ -143,6 +144,7 @@ class HomotopyRegraspPlanner:
             return -10 * HARD_CONSTRAINT_PENALTY
 
         if viz:
+            rr.log_cleared(f'homotopy', recursive=True)
             for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
                 viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
                 rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
@@ -218,7 +220,7 @@ class HomotopyRegraspPlanner:
             first_order_sln = get_first_order_homotopy_points(self.in_collision, blacklisted_rope_points,
                                                               rope_points_plan)
             if len(first_order_sln) > 0:
-                homotopy_cost += HARD_CONSTRAINT_PENALTY / len(self.first_order_blacklist)
+                homotopy_cost += hp['first_order_weight']
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']
 
@@ -242,6 +244,12 @@ class HomotopyRegraspPlanner:
         for i, l in enumerate(loops_plan):
             rr.log_line_strip(f'loops_plan/{i}', l, stroke_width=0.02)
             rr.log_extension_components(f'loops_plan/{i}', ext={'candidate_locs': f'{candidate_locs}'})
+        if viz:
+            rr.log_cleared(f'homotopy', recursive=True)
+            for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
+                color = cm.Greens(1 - min(cost, 1000) / 1000)
+                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=color)
+                rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
         rr.log_scalar('homotopy_costs/reachability_cost', reachability_cost, color=[0, 0, 1, 1.0])
         rr.log_scalar('homotopy_costs/homotopy_cost', homotopy_cost, color=[0, 1, 0, 1.0])
         rr.log_scalar('homotopy_costs/geodesics_cost', geodesics_cost, color=[1, 0, 0, 1.0])
@@ -250,6 +258,7 @@ class HomotopyRegraspPlanner:
         rr.log_scalar('homotopy_costs/unstable_cost', unstable_cost, color=[1, 0.5, 0, 1.0])
         rr.log_scalar('homotopy_costs/settle_cost', settle_cost, color=[0, 1, 1, 1.0])
         rr.log_scalar('homotopy_costs/total_cost', cost, color=[1, 1, 1, 1.0])
+        print(candidate_locs, cost)
 
         t1 = perf_counter()
         # print(f'evaluating regrasp cost: {t1 - t0:.2f}s')
@@ -302,7 +311,7 @@ def get_allowable_is_grasping(n_g):
     """
     Return all possible combinations of is_grasping for n_g grippers, except for the case where no grippers are grasping
     """
-    return [np.array([1, 0]), np.array([0, 1])]
-    # all_is_grasping = [np.array(seq) for seq in itertools.product([0, 1], repeat=n_g)]
-    # all_is_grasping.pop(0)
-    # return all_is_grasping
+    # return [np.array([1, 0]), np.array([0, 1])]
+    all_is_grasping = [np.array(seq) for seq in itertools.product([0, 1], repeat=n_g)]
+    all_is_grasping.pop(0)
+    return all_is_grasping

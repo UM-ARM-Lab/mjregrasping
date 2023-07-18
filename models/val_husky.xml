@@ -164,7 +164,7 @@
                                                     <site name="leftgripper_sensor_site"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
-                                                    <body name="left_finger_pad" pos="0.05 0.1 0">
+                                                    <body name="left_finger_pad" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
                                                     </body>
@@ -179,7 +179,7 @@
                                                     <site name="leftgripper2_sensor_site"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper2" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
-                                                    <body name="left_finger_pad2" pos="0.05 0.1 0">
+                                                    <body name="left_finger_pad2" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad2"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
                                                     </body>
@@ -293,7 +293,7 @@
                                                     <site name="rightgripper_sensor_site"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
-                                                    <body name="right_finger_pad" pos="0.05 0.1 0">
+                                                    <body name="right_finger_pad" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
                                                     </body>
@@ -308,7 +308,7 @@
                                                     <site name="rightgripper2_sensor_site"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper2" friction="0.001"
                                                           rgba="0.1 0.1 0.1 1" group="1"/>
-                                                    <body name="right_finger_pad2" pos="0.05 0.1 0">
+                                                    <body name="right_finger_pad2" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad2"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
                                                     </body>
