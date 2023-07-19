@@ -25,18 +25,7 @@ def jacobian_ik_is_reachable(phy, body_idx, target_point, n_steps=100, pos_tol=0
 
 
 def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
-    # compute the "end-effector" jacobian which relates the joint velocities to the end-effector velocity
-    # where the ee_offset specifies the location/offset from the end-effector body
-    Jp = np.zeros((3, phy.m.nv))
-    Jr = np.zeros((3, phy.m.nv))
-    mujoco.mj_jac(phy.m, phy.d, Jp, Jr, ee_offset, body_idx)
-    J = np.concatenate((Jp, -Jr), axis=0)
-    deduplicated_indices = np.array([0, 1,
-                                     2, 3, 4, 5, 6, 7, 8,
-                                     9,
-                                     11, 12, 13, 14, 15, 16, 17,
-                                     18])
-    J = J[:, deduplicated_indices]
+    J = full_jacobian(phy, body_idx, ee_offset)
     J_T = J.T
     # TODO: account for ee_offset here
     current_ee_pos = phy.d.body(body_idx).xpos
@@ -44,8 +33,8 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     ee_vel = np.concatenate((ee_vel_p, np.zeros(3)), axis=0)
     eps = 1e-3
     ctrl = J_T @ np.linalg.solve(J @ J_T + eps * np.eye(6), ee_vel)
-    ctrl[9] = 0  # ignore the gripper joint
-    ctrl[17] = 0  # ignore the gripper joint
+    gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
+    ctrl[gripper_ctrl_indices] = 0  # ignore the grippers
     # TODO: use nullspace to respect joint limits by trying to move towards the home configuration
 
     # rescale to respect velocity limits
@@ -61,6 +50,17 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     position_error = np.linalg.norm(target_position - phy.d.body(body_idx).xpos)
 
     return ctrl, position_error
+
+
+def full_jacobian(phy, body_idx, ee_offset):
+    # compute the "end-effector" jacobian which relates the joint velocities to the end-effector velocity
+    # where the ee_offset specifies the location/offset from the end-effector body
+    Jp = np.zeros((3, phy.m.nv))
+    Jr = np.zeros((3, phy.m.nv))
+    mujoco.mj_jac(phy.m, phy.d, Jp, Jr, ee_offset, body_idx)
+    J = np.concatenate((Jp, Jr), axis=0)
+    J = J[:, phy.m.actuator_trnid[:, 0]]
+    return J
 
 
 def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Optional[Viz] = None,
@@ -96,13 +96,9 @@ def eq_sim_ik(candidate_is_grasping, candidate_pos, phy_ik: Physics, viz: Option
 
 
 def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
-    q_before = phy_before.d.qpos[phy_before.o.robot.qpos_indices]
-    q_after = phy_after.d.qpos[phy_after.o.robot.qpos_indices]
     contact_cost_before = get_contact_cost(phy_before)
     contact_cost_after = get_contact_cost(phy_after)
     new_contact_cost = contact_cost_after - contact_cost_before
-
-    dq_cost = np.linalg.norm(q_after - q_before)
 
     # Penalize the distance between locations if grasping with multiple grippers
     dists = pairwise_squared_distances(locs[:, None], locs[:, None])
@@ -110,10 +106,10 @@ def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
     is_pair_grasping = is_grasping_mat * is_grasping_mat.T
     valid_grasp_dists = np.triu(dists * is_pair_grasping, k=1)
     nearby_locs_cost = np.sum(valid_grasp_dists) * hp['nearby_locs_weight']
-    return new_contact_cost + dq_cost + nearby_locs_cost if reached else HARD_CONSTRAINT_PENALTY
+    return new_contact_cost + nearby_locs_cost if reached else BIG_PENALTY
 
 
-HARD_CONSTRAINT_PENALTY = 1e2
+BIG_PENALTY = 1e2
 IK_OFFSET = np.array([0, 0, 0.145])
 
 

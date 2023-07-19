@@ -79,16 +79,16 @@ def main():
             Image.fromarray(img).save(img_path)
 
             t0 = perf_counter()
-            params, is_grasping = h.generate_params(phy, viz=viz, viz_ik=False)
+            params, strategy = h.generate_params(phy, viz=viz, viz_ik=True)
             t1 = perf_counter()
 
-            locs, subgoals, _ = params_to_locs_and_subgoals(phy, is_grasping, params)
+            locs, subgoals, _ = params_to_locs_and_subgoals(phy, strategy, params)
             _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
 
             tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
             for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):
                 viz.lines(path, f'homotopy/{tool_name}_path_sln', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
-            cost = h.cost(is_grasping, phy, viz, **params, viz_ik=True, viz_loops=True)
+            cost = h.cost(strategy, phy, viz, **params, viz_ik=True, viz_loops=True)
             print(f'H generate(): {t1 - t0:.3f}s {cost=:} {locs=:}')
             print()
 

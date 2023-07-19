@@ -66,6 +66,8 @@ class RegraspGoal(MPPIGoal):
 
         goal_cost = keypoint_dist * hp['goal_weight']
 
+        nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
+
         # NOTE: reading class variables from multiple processes without any protection!
         grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
                                                                                current_locs, grasp_locs,
@@ -113,8 +115,8 @@ class RegraspGoal(MPPIGoal):
 
         grasp_xpos = as_float(result[9])[t0]
         for name, xpos in zip(phy.o.rd.rope_grasp_eqs, grasp_xpos):
-            self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4),
-                            frame_id='world', idx=0)
+            self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), idx=0,
+                            frame_id='world')
 
     def update_fsms(self, phy: Physics, is_stuck: List[bool], planner: HomotopyRegraspPlanner):
         if self.maintain_locs is None:

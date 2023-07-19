@@ -6,9 +6,9 @@ from mjregrasping.physics import Physics
 
 def compute_eq_errors(phy: Physics):
     eq_errs = []
-    for i in range(phy.m.neq):
-        eq = phy.m.eq(i)
-        if eq.active and eq.type == mujoco.mjtEq.mjEQ_CONNECT:
+    for eq_name in phy.o.rd.rope_grasp_eqs:
+        eq = phy.m.eq(eq_name)
+        if eq.active:
             eq_err = compute_eq_error(phy, eq)
             eq_errs.append(eq_err)
     return sum(eq_errs)

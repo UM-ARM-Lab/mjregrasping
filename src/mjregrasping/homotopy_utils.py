@@ -93,7 +93,7 @@ def make_ring_skeleton(position, z_axis, radius, delta_angle=0.5):
     ring_skeleton_canonical = np.stack([radius * np.cos(angles), radius * np.sin(angles), zeros, ones], -1)
     ring_mat = make_ring_mat(position, z_axis)
     skeleton = (ring_skeleton_canonical @ ring_mat.T)[:, :3]
-    return skeleton
+    return np.squeeze(skeleton)
 
 
 def make_ring_mat(ring_position, ring_z_axis):
@@ -121,19 +121,17 @@ def make_ring_mat(ring_position, ring_z_axis):
     return ring_mat
 
 
-def discretize_path(path, n=1000):
-    path_deltas = np.diff(path, axis=0)
-    delta_lengths = np.linalg.norm(path_deltas, axis=-1)
-    delta_cumsums = np.cumsum(delta_lengths)
-    delta_cumsums = np.insert(delta_cumsums, 0, 0)
-    total_length = np.sum(delta_lengths)
-    ε = 1e-3
-    l_s = np.linspace(ε, total_length - ε, n)
-    i_s = np.searchsorted(delta_cumsums, l_s)
-    discretized_path_points = path[i_s - 1] + (l_s - delta_cumsums[i_s - 1])[:, None] * path_deltas[i_s - 1] / \
-                              delta_lengths[i_s - 1][:, None]
-    discretized_path_points = np.insert(discretized_path_points, 0, path[0], axis=0)
-    return discretized_path_points
+def discretize_path(path: np.ndarray, n=1000):
+    """ densely resamples a path to one containing n points """
+    num_points = path.shape[0]
+    t = np.linspace(0, 1, num_points)
+    t_new = np.linspace(0, 1, n)
+    path_discretized = np.zeros((n, 3))
+
+    for i in range(3):
+        path_discretized[:, i] = np.interp(t_new, t, path[:, i])
+
+    return path_discretized
 
 
 def load_skeletons(skeleton_filename):

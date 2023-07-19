@@ -57,7 +57,7 @@ class MPPIGoal:
         raise NotImplementedError()
 
     def viz_sphere(self, position, radius):
-        self.viz.sphere(ns='goal', position=position, radius=radius, frame_id='world', color=[1, 0, 1, 0.5], idx=0)
+        self.viz.sphere(ns='goal', position=position, radius=radius, color=[1, 0, 1, 0.5], idx=0, frame_id='world')
         self.viz.tf(translation=position, quat_xyzw=[0, 0, 0, 1], parent='world', child='goal')
 
     def viz_result(self, phy: Physics, result, idx: int, scale, color):

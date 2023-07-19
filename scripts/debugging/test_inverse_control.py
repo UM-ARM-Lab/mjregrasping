@@ -50,7 +50,7 @@ def main():
         mujoco.mj_step(phy.m, phy.d, nstep=25)
 
         viz.viz(phy)
-        viz.sphere(ns='goal', position=current_target_point, radius=0.01, color=(0, 1, 0, 1), frame_id='world', idx=0)
+        viz.sphere(ns='goal', position=current_target_point, radius=0.01, color=(0, 1, 0, 1), idx=0, frame_id='world')
         rospy.sleep(0.002)
 
 

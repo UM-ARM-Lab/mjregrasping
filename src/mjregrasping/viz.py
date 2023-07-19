@@ -9,7 +9,7 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
-from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz, plot_ring_rviz
+from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz, plot_ring_rviz, plot_arrows_rviz
 from visualization_msgs.msg import MarkerArray
 
 
@@ -31,7 +31,7 @@ class Viz:
 
         self.markers_pub = rospy.Publisher("markers", MarkerArray, queue_size=10)
 
-    def sphere(self, ns: str, position, radius, frame_id, color, idx):
+    def sphere(self, ns: str, position, radius, color, idx=0, frame_id='world'):
         if self.p.rviz:
             plot_sphere_rviz(pub=self.markers_pub, position=position, radius=radius, frame_id=frame_id, color=color,
                              label=f'{ns}', idx=idx)
@@ -91,3 +91,10 @@ class Viz:
         if self.p.rviz:
             pass
         #     self.rviz.sdf(sdf, frame_id, idx)
+
+    def arrow(self, ns, start, direction, color, idx=0, frame_id='world', s=1):
+        if self.p.rviz:
+            plot_arrows_rviz(self.markers_pub, [start], [direction], ns, idx, color, frame_id, s)
+        if self.p.rr:
+            rr_color = to_rgba(color)
+            rr.log_arrow(f'{ns}/{idx}', start, direction, color=rr_color)

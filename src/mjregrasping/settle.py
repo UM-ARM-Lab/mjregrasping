@@ -23,6 +23,5 @@ def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mo
         result_tuple = result_func(phy)
 
         results.append(result_tuple)
-    results = np.stack(results, dtype=object, axis=1)
 
     return results

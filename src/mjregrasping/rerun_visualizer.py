@@ -43,6 +43,9 @@ class MjReRun:
             joint = phy.m.joint(joint_idx)
             if joint.type == mujoco.mjtJoint.mjJNT_HINGE:
                 rr.log_scalar(f'qpos/{joint.name}', float(phy.d.qpos[joint.qposadr]))
+        for act_i in range(phy.m.na):
+            act = phy.m.actuator(act_i)
+            rr.log_scalar(f'ctrl/{act.name}', float(phy.d.ctrl[act.id]))
 
         rr.log_scalar(f'contact/num_contacts', len(phy.d.contact))
 
