@@ -7,7 +7,7 @@ import rerun as rr
 from arc_utilities import ros_init
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
-from mjregrasping.ik import full_jacobian
+from mjregrasping.ik import full_body_jacobian
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import angle_between
@@ -84,8 +84,8 @@ def main():
     while True:
         tool_site_pos = tool_site.xpos
         gripper_body_pos = gripper_body.xpos
-        gripper_mat = tool_site.xmat.reshape(3, 3)
-        gripper_z = gripper_mat[:, 2]
+        tool_mat = tool_site.xmat.reshape(3, 3)
+        tool_z = tool_mat[:, 2]
         # b points in the right direction, but b gets bigger when you get closer, but we want it to get smaller
         b = skeleton_field_dir(skeleton, tool_site_pos[None])[0]
         b_normalized = b / np.linalg.norm(b)
@@ -93,14 +93,14 @@ def main():
         v_norm = np.linalg.norm(v)
         if v_norm > 0.01:
             v = v / v_norm * 0.01
-        viz.arrow("gripper_z", tool_site_pos, gripper_z, 'm')
+        viz.arrow("tool_z", tool_site_pos, tool_z, 'm')
         viz.arrow("grasp_x", rope_point, rope_grasp_x, 'r')
         viz.arrow("grasp_y", rope_point, rope_grasp_y, 'g')
         viz.arrow("grasp_z", rope_point, rope_grasp_z, 'b')
 
         # First transform the grasp matrix to the gripper frame
-        grasp_mat_in_gripper = rope_grasp_mat.T @ gripper_mat
-        z_error = angle_between(rope_grasp_z, gripper_z)
+        grasp_mat_in_gripper = rope_grasp_mat.T @ tool_mat
+        z_error = angle_between(rope_grasp_z, tool_z)
         v_mix = z_error / np.pi
         start_v = start_gripper_pos - gripper_body_pos
         v = v_mix * start_v + (1 - v_mix) * v
@@ -112,25 +112,20 @@ def main():
         W_in_gripper = logm(grasp_mat_in_gripper).real
         w_in_gripper = np.array([W_in_gripper[2, 1], W_in_gripper[0, 2], W_in_gripper[1, 0]]) * w_scale
         # Now transform w to base/world frame
-        w = gripper_mat @ w_in_gripper
+        w = tool_mat @ w_in_gripper
 
         twist = np.concatenate([v, w])
 
-        # J_base = full_jacobian(phy, gripper_body.id, ee_offset=np.array([0, 0, 0.181]))
-        J_base = full_jacobian(phy, gripper_body.id, ee_offset=np.zeros(3))
-        viz.arrow(f'Jp', gripper_body_pos, J_base[:3, 0], 'r')
-        # for i, Jp_i in enumerate(J_base.T):
-        #     viz.arrow(f'Jp', gripper_body_pos, Jp_i[:3], 'r')
+        Jp = np.zeros((3, phy.m.nv))
+        Jr = np.zeros((3, phy.m.nv))
+        mujoco.mj_jacSite(phy.m, phy.d, Jp, Jr, tool_site.id)
+        J_base = np.concatenate((Jp, Jr), axis=0)
+        J_base = J_base[:, phy.m.actuator_trnid[:, 0]]
         # Transform J from base from to gripper frame
-        # J_gripper = block_diag(gripper_mat.T, gripper_mat.T) @ J_base
-        # print(J_base[:, 0], J_base[:, 1])
-        # ctrl = np.linalg.pinv(J_gripper) @ np.concatenate([np.zeros(3), np.array([1.0, 0, 0])])
-
-        # project the rotation into the null space of position. in other words, find the joint velocities that
-        # cause the gripper to rotate without moving
-        # J_pos = J[:3, :]
-        # ctrl = (np.eye(phy.m.nu) - np.linalg.pinv(J_pos) @ J_pos) @ rot_ctrl
-        # J_pos @ rot_ctrl
+        J_gripper = block_diag(tool_mat.T, tool_mat.T) @ J_base
+        # print(J_gripper[:, 0])
+        viz.arrow(f'Jp', gripper_body_pos, J_base[:3, 1], 'r')
+        ctrl = np.linalg.pinv(J_gripper) @ np.concatenate([np.zeros(3), np.array([0.2, 0, 0])])
 
         # # grippers
         # current_gripper_q = phy.d.qpos[gripper_q_indices[tool_idx]]
@@ -151,9 +146,7 @@ def main():
         #     offending_joint = np.argmin(ctrl)
         #     ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
 
-        ctrl = np.zeros(phy.m.nu)
-        ctrl[0] = 0.4
-        control_step(phy, ctrl, 0.05)
+        control_step(phy, ctrl, 0.02)
 
         viz.viz(phy)
         viz.lines(skeleton, "ring", 0, 0.003, 'g')

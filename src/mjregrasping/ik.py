@@ -24,8 +24,8 @@ def jacobian_ik_is_reachable(phy, body_idx, target_point, n_steps=100, pos_tol=0
     return False
 
 
-def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
-    J = full_jacobian(phy, body_idx, ee_offset)
+def position_jacobian(phy, body_idx, target_position):
+    J = full_body_jacobian(phy, body_idx)
     J_T = J.T
     # TODO: account for ee_offset here
     current_ee_pos = phy.d.body(body_idx).xpos
@@ -52,12 +52,12 @@ def position_jacobian(phy, body_idx, target_position, ee_offset=np.zeros(3)):
     return ctrl, position_error
 
 
-def full_jacobian(phy, body_idx, ee_offset):
+def full_body_jacobian(phy, body_idx):
     # compute the "end-effector" jacobian which relates the joint velocities to the end-effector velocity
     # where the ee_offset specifies the location/offset from the end-effector body
     Jp = np.zeros((3, phy.m.nv))
     Jr = np.zeros((3, phy.m.nv))
-    mujoco.mj_jac(phy.m, phy.d, Jp, Jr, ee_offset, body_idx)
+    mujoco.mj_jacBody(phy.m, phy.d, Jp, Jr, body_idx)
     J = np.concatenate((Jp, Jr), axis=0)
     J = J[:, phy.m.actuator_trnid[:, 0]]
     return J
