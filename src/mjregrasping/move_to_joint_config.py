@@ -12,16 +12,16 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
     kP = 5.0
-    q_prev = get_q_current(phy)
+    q_prev = get_q(phy)
     for i in range(100):
         viz.viz(phy)
-        q_current = get_q_current(phy)
+        q_current = get_q(phy)
         command = kP * (q_target - q_current)
 
         control_step(phy, command, sub_time_s=sub_time_s)
 
         # get the new current q
-        q_current = get_q_current(phy)
+        q_current = get_q(phy)
 
         error = np.abs(q_current - q_target)
         max_joint_error = np.max(error)
@@ -44,6 +44,6 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
     logger.error(f"PID failed to converge. {reason}")
 
 
-def get_q_current(phy: Physics):
+def get_q(phy: Physics):
     qpos_for_act = phy.m.actuator_trnid[:, 0]
     return copy(phy.d.qpos[qpos_for_act])
