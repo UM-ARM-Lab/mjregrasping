@@ -1,4 +1,6 @@
 import mujoco
+import open3d as o3d
+import matplotlib.pyplot as plt
 import numpy as np
 import rerun as rr
 from scipy.linalg import logm, block_diag
@@ -7,6 +9,7 @@ from arc_utilities import ros_init
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.move_to_joint_config import pid_to_joint_config, get_q
+from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -33,14 +36,9 @@ def main():
     mujoco.mj_forward(phy.m, phy.d)
     viz.viz(phy)
 
-    rope_idx = 4
-    rope_body = phy.d.body(phy.o.rope.body_indices[rope_idx])
-    # TODO: detect a supporting plane, and use that axis if there is one, else use vector from the camera to rope?
-
     tool_idx = 1
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
-    gripper_body = phy.d.body(phy.o.rd.tool_bodies[1])
 
     w_scale = 0.2
     v_scale = 0.05
@@ -58,7 +56,36 @@ def main():
     gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
 
+    renderer = MjRenderer(phy.m)
+
     while True:
+        rgb = renderer.render(d).copy()
+        depth = renderer.render(d, depth=True).copy()
+
+        seg = renderer.render_with_flags(d, {mujoco.mjtRndFlag.mjRND_IDCOLOR: 1, mujoco.mjtRndFlag.mjRND_SEGMENT: 1})
+        seg = seg[:, :, 0].copy()  # only the R component is used
+
+        # not sure why this +1 works
+        rope_mask = np.zeros_like(seg)
+        for seg_id in phy.o.rope.geom_indices + 1:
+            rope_body_mask = (seg == seg_id)
+            rope_mask = rope_mask | rope_body_mask
+
+        rr.log_image("rgb", rgb)
+        rr.log_image("depth", depth)
+        rr.log_image("rope_mask", rope_mask)
+
+        # TODO: convert segmented rope to point cloud and pick the closest point to the camera
+        rope_depth = depth[rope_mask]
+        # Get camera intrinsics
+        # convert rgbd to points
+        # add wrist cameras
+        rope_pc = o3d.geometry.PointCloud()
+        rope_pc.points = o3d.utility.Vector3dVector(rope_depth)
+        # rope_idx = 4
+        # rope_body = phy.d.body(phy.o.rope.body_indices[rope_idx])
+        # TODO: detect a supporting plane, and use that axis if there is one, else use vector from the camera to rope?
+
         # define the coordinate frame of where we want to grasp the rope
         radius = 0.01
         rope_grasp_z = np.array([0.0, 0, -1.0])

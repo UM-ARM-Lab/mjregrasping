@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import imageio
 import mujoco
 import numpy as np
@@ -36,9 +38,10 @@ class MjRenderer:
         self.cam = mujoco.MjvCamera()
         self.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
         self.cam.fixedcamid = 0
-        self.img = np.zeros([h, w, 3], dtype=np.uint8)
+        self.rgb = np.zeros([h, w, 3], dtype=np.uint8)
+        self.depth = np.zeros([h, w], dtype=np.float32)
 
-    def render(self, d: mujoco.MjData):
+    def render(self, d: mujoco.MjData, depth=False):
         """ Render the current mujoco scene and store the resulting image """
         catmask = mujoco.mjtCatBit.mjCAT_ALL
         mujoco.mjv_updateScene(self.m,
@@ -51,5 +54,19 @@ class MjRenderer:
 
         # render the scene from a mujoco camera and store the result in img
         mujoco.mjr_render(self.viewport, self.scene, self.con)
-        mujoco.mjr_readPixels(rgb=self.img, depth=None, viewport=self.viewport, con=self.con)
-        return np.flipud(self.img)
+        mujoco.mjr_readPixels(rgb=self.rgb, depth=self.depth, viewport=self.viewport, con=self.con)
+
+        if depth:
+            img = self.depth
+        else:
+            img = self.rgb
+
+        return np.flipud(img)
+
+    def render_with_flags(self, d: mujoco.MjData, flags):
+        before_flags = deepcopy(self.scene.flags)
+        for flag, value in flags.items():
+            self.scene.flags[flag] = value
+        img = self.render(d)
+        self.scene.flags = before_flags
+        return img

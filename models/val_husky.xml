@@ -24,6 +24,7 @@
         <mesh name="PINCER_FINGER" file="PINCER_FINGER.stl"/>
         <mesh name="soft_gripper_thin" file="soft_gripper_thin.stl"/>
         <mesh name="FINGER_PAD" file="FINGER_PAD.stl"/>
+        <mesh name="d405_mount" file="d405_mount.stl"/>
     </asset>
     <worldbody>
         <body pos="0 0 0.145" name="val_base">
@@ -144,6 +145,7 @@
                                                        damping="0.08" frictionloss="0.1"/>
                                                 <geom type="mesh" mesh="PINCER_HOUSING2" name="drive47_housing_mesh"
                                                       rgba="0.2 0.2 0.2 1"/>
+                                                <geom type="mesh" mesh="d405_mount" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0" name="left_d405_mount"/>
                                                 <site name="left_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
                                                 <body name="leftgripper_link" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
