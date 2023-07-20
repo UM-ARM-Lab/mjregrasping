@@ -252,3 +252,43 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
         h = Multiset([get_h_signature(loop, skeletons) for loop in loops])
 
         return h, loops
+
+
+def get_h_signature_for_goal(skeletons: Dict, rope_points, goal_rope_points):
+    """
+    Compares rope_points to goal_rope_points, using the skeletons to compute the h-signature.
+
+    Args:
+        skeletons: A dictionary of skeletons, where the keys are the names of the obstacles and the values are the
+            skeletons of the obstacles.
+        rope_points: The points representing the rope in the current state, which we want to compare to the goal
+        goal_rope_points: The points representing the rope in the goal state.
+
+    Returns: a list of h-signatures, one for each skeleton.
+
+    """
+    # Create a closed loop by connecting the start and end points of the two rope states
+    loop = np.concatenate((rope_points, goal_rope_points[::-1], rope_points[0][None]))
+    h = get_h_signature(loop, skeletons)
+    return h
+
+
+def compare_h_signature_to_goal(skeletons: Dict, rope_points, goal_rope_points):
+    """
+    Returns True if the rope_points and goal_rope_points are in the same homotopy class.
+    ASSUMPTION: the start and end points of rope_points and goal_rope_points are close or the same.
+    """
+    h = get_h_signature_for_goal(skeletons, rope_points, goal_rope_points)
+    zero_h = (0, ) * len(skeletons)
+    return h == zero_h
+
+
+def compare_to_goal(skeletons: Dict, rope_points, goal_rope_points, tol=0.05):
+    """
+    Returns True if the rope_points and goal_rope_points are in the same homotopy class AND have close start/end points.
+    tol is the allowable distance between the start/end points, in meters.
+    """
+    h_same = compare_h_signature_to_goal(skeletons, rope_points, goal_rope_points)
+    start_same = np.linalg.norm(rope_points[0] - goal_rope_points[0]) < tol
+    end_same = np.linalg.norm(rope_points[-1] - goal_rope_points[-1]) < tol
+    return h_same and start_same and end_same

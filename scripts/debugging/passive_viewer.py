@@ -6,7 +6,7 @@ import mujoco.viewer
 import rospy
 from arc_utilities import ros_init
 from mjregrasping.grasping import activate_grasp
-from mjregrasping.mjsaver import save_data_and_eq
+from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.scenarios import conq_hose, setup_conq_hose, cable_harness, setup_cable_harness
@@ -20,10 +20,12 @@ def main():
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     d = mujoco.MjData(m)
+    state_path = Path("states/CableHarness/1689602983.pkl")
+    d = load_data_and_eq(m, True, state_path)
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     viz = make_viz(scenario)
 
-    setup_cable_harness(phy, viz)
+    # setup_cable_harness(phy, viz)
 
     latest_cmd = ""
 
@@ -39,9 +41,9 @@ def main():
         while viewer.is_running():
             step_start = time.time()
 
-            mujoco.mj_step(m, d)
-
             viewer.sync()
+
+            mujoco.mj_step(m, d)
 
             # Rudimentary time keeping, will drift relative to wall clock.
             time_until_next_step = m.opt.timestep - (time.time() - step_start)

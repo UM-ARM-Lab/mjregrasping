@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import pysdf_tools
 from copy import copy
 from pathlib import Path
 
@@ -10,13 +9,12 @@ import numpy as np
 import rerun as rr
 from PIL import Image
 
-import mjregrasping.homotopy_checker
-import mjregrasping.homotopy_utils
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.homotopy_checker import add_edges, create_graph_nodes, get_arm_points, get_full_h_signature, \
+    compare_to_goal, compare_h_signature_to_goal
 from mjregrasping.homotopy_utils import load_skeletons, NO_HOMOTOPY
-from mjregrasping.homotopy_checker import add_edges, create_graph_nodes, get_arm_points, get_full_h_signature
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects
@@ -59,6 +57,14 @@ def main():
     nrows = int(np.ceil(np.sqrt(n_states)))
     ncols = int(np.ceil(n_states / nrows))
 
+    # To demonstrate how homotopy can be used to compare a state to the goal state,
+    # we load the goal state and compare it each of the other states.
+    # The goal comparison is somewhat distinct from the comparison we do for grasping.
+    goal_path = states_dir / "goal_state.pkl"
+    d = load_data_and_eq(m, True, goal_path)
+    phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+    goal_rope_points = copy(get_rope_points(phy))
+
     results = []
     for i, state_path in enumerate(states_paths):
         d = load_data_and_eq(m, True, state_path)
@@ -77,6 +83,12 @@ def main():
         add_edges(graph, rope_points, arm_points)
         h, loops = get_full_h_signature(skeletons, graph, rope_points, arm_points)
 
+        goal_h_same = compare_h_signature_to_goal(skeletons, rope_points, goal_rope_points)
+        goal_tol = 0.05  # distance between start/end pairs in meters
+        start_same = np.linalg.norm(rope_points[0] - goal_rope_points[0]) < goal_tol
+        end_same = np.linalg.norm(rope_points[-1] - goal_rope_points[-1]) < goal_tol
+        goal_reached = goal_h_same and start_same and end_same
+
         rr.log_cleared(f'loops', recursive=True)
         for i, l in enumerate(loops):
             rr.log_line_strip(f'loops/{i}', l, stroke_width=0.02)
@@ -94,10 +106,13 @@ def main():
         Image.fromarray(img).save(img_path)
 
         results.append({
-            'h':           h,
-            'loops':       loops,
-            'mj_img':      img,
-            'nx_img_path': nx_img_path,
+            'h':              h,
+            'loops':          loops,
+            'mj_img':         img,
+            'nx_img_path':    nx_img_path,
+            'start_end_same': start_same and end_same,
+            'goal_h_same':    goal_h_same,
+            'goal_reached':   goal_reached,
         })
 
     plt.style.use('paper')
@@ -111,6 +126,8 @@ def main():
             h = sorted(h)
         mj_img = result['mj_img']
         nx_img = Image.open(result['nx_img_path'])
+        goal_h_same = result['goal_h_same']
+        start_end_same = result['start_end_same']
 
         row = i // ncols
         col = i % ncols
@@ -124,7 +141,14 @@ def main():
         sub_ax.axis("off")
 
         ax.axis("off")
-        ax.set_title(f"$\mathcal{{H}}=${h}")
+        start_end_indicator = "✓" if start_end_same else "✗"
+        goal_h_indicator = "✓" if goal_h_same else "✗"
+        title_lines = [
+            f"$\mathcal{{H}}=${h}",
+            f"goal start/end reached: {start_end_indicator}",
+            f"goal h same: {goal_h_indicator}"
+        ]
+        ax.set_title('\n'.join(title_lines))
 
     # turn off all the (extra) axes
     for i in range(nrows):
