@@ -5,6 +5,9 @@
         <geom solref="0.002 1"/>
     </default>
     <size njmax="500" nconmax="100"/>
+    <visual>
+        <scale framewidth="0.02" framelength="0.2"/>
+    </visual>
     <asset>
         <mesh name="base_link" file="base_link_simplified.stl"/>
         <mesh name="wheel" file="wheel_simplified.stl"/>
@@ -145,8 +148,14 @@
                                                        damping="0.08" frictionloss="0.1"/>
                                                 <geom type="mesh" mesh="PINCER_HOUSING2" name="drive47_housing_mesh"
                                                       rgba="0.2 0.2 0.2 1"/>
-                                                <geom type="mesh" mesh="d405_mount" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0" name="left_d405_mount"/>
-                                                <site name="left_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
+                                                <site name="left_tool" pos="0 0 0.181" size="0.001"/>
+                                                <body name="left_d405" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
+                                                    <geom type="mesh" mesh="d405_mount" name="left_d405_mount" rgba="0.9 0.9 0.9 1"/>
+                                                    <camera mode="fixed" name="left_hand" euler="1.22 0 0" pos="0 0.01 0.03"/>
+                                                    <!-- The default camera frame is weird, so we use this site instead -->
+                                                    <site name="left_hand_cam"  euler="1.22 3.14159 3.14159" pos="0 0.01 0.03" size="0.001"/>
+                                                    <light name="left_hand" mode="fixed" dir="0 1 -0.35" pos="0 0 0.03"/>
+                                                </body>
                                                 <body name="leftgripper_link" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
                                                     <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true"
@@ -155,7 +164,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper" friction="0.00001"
-                                                          rgba="0.1 0.1 0.1 1" group="1"/>
+                                                          rgba="0.8 0.8 0.8 1" group="1"/>
                                                     <body name="left_finger_pad" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
@@ -169,7 +178,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper2" friction="0.00001"
-                                                          rgba="0.1 0.1 0.1 1" group="1"/>
+                                                          rgba="0.8 0.8 0.8 1" group="1"/>
                                                     <body name="left_finger_pad2" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad2"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
@@ -266,7 +275,17 @@
                                                        damping=".08" frictionloss="0.1"/>
                                                 <geom type="mesh" mesh="PINCER_HOUSING2" name="drive7_housing_mesh"
                                                       rgba="0.2 0.2 0.2 1"/>
-                                                <site name="right_tool" pos="0 0 0.181" type="sphere" size="0.002"/>
+                                                <site name="right_tool" pos="0 0 0.181" size="0.001"/>
+                                                <body name="right_d450">
+                                                    <body name="right_d405" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
+                                                        <geom type="mesh" mesh="d405_mount" name="right_d405_mount" rgba="0.9 0.9 0.9 1"/>
+                                                        <camera mode="fixed" name="right_hand" euler="1.22 0 0" pos="0.01 0 0.03"/>
+                                                        <!-- The default camera frame is weird, so we use this site instead -->
+                                                        <site name="right_hand_cam"  euler="1.22 3.14159 3.14159" pos="0.01 0 0.03" size="0.001"/>
+                                                        <light name="right_hand" mode="fixed" dir="0 1 -0.35" pos="0 0 0.03"/>
+                                                    </body>
+                                                </body>
+
                                                 <body name="rightgripper_link" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
                                                     <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true"
@@ -275,7 +294,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper" friction="0.00001"
-                                                          rgba="0.1 0.1 0.1 1" group="1"/>
+                                                          rgba="0.9 0.9 0.9 1" group="1"/>
                                                     <body name="right_finger_pad" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
@@ -289,7 +308,7 @@
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
                                                     <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper2" friction="0.00001"
-                                                          rgba="0.1 0.1 0.1 1" group="1"/>
+                                                          rgba="0.9 0.9 0.9 1" group="1"/>
                                                     <body name="right_finger_pad2" pos="0.052 0.1 0">
                                                         <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad2"
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
@@ -336,30 +355,48 @@
     </worldbody>
     <actuator>
         <!--  0 -->
-        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="2000" forcelimited="true" forcerange="-50 50"/>
-        <intvelocity name="joint57_vel" joint="joint57" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-1.5708 1.5708" kp="20000" forcelimited="true" forcerange="-55 55"/>
+        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="2000"
+                     forcelimited="true" forcerange="-50 50"/>
+        <intvelocity name="joint57_vel" joint="joint57" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-1.5708 1.5708" kp="20000"
+                     forcelimited="true" forcerange="-55 55"/>
 
         <!--  2 -->
-        <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000" forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-8 8"/>
+        <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000"
+                     forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="0 3.14159" kp="5000"
+                     forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
+                     forcelimited="true" forcerange="-3 3"/>
+        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
+                     forcelimited="true" forcerange="-8 8"/>
         <!--  6 -->
-        <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-2 2"/>
-        <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4"/>
-        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-3.5 3.5"/>
-        <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="25" forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
+                     forcerange="-2 2"/>
+        <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
+                     forcelimited="true" forcerange="-4 4"/>
+        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
+                     forcelimited="true" forcerange="-3.5 3.5"/>
+        <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="25"
+                     forcelimited="true" forcerange="-1 1"/>
 
         <!--  10 -->
-        <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000" forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-8 8"/>
+        <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000"
+                     forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0" kp="5000"
+                     forcelimited="true" forcerange="-15 15"/>
+        <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
+                     forcelimited="true" forcerange="-3 3"/>
+        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
+                     forcelimited="true" forcerange="-8 8"/>
         <!--  14 -->
-        <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-2 2"/>
-        <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4"/>
-        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-3.5 3.5"/>
-        <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="25" forcelimited="true" forcerange="-1 1"/>
+        <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
+                     forcerange="-2 2"/>
+        <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
+                     forcelimited="true" forcerange="-4 4"/>
+        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
+                     forcelimited="true" forcerange="-3.5 3.5"/>
+        <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.1166 1" kp="25"
+                     forcelimited="true" forcerange="-1 1"/>
     </actuator>
     <equality>
         <joint name="left_mimic" joint1="leftgripper" joint2="leftgripper2" solref="0.01 1"/>

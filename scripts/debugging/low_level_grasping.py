@@ -1,6 +1,4 @@
 import mujoco
-import open3d as o3d
-import matplotlib.pyplot as plt
 import numpy as np
 import rerun as rr
 from scipy.linalg import logm, block_diag
@@ -9,11 +7,12 @@ from arc_utilities import ros_init
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.move_to_joint_config import pid_to_joint_config, get_q
-from mjregrasping.movie import MjRenderer
+from mjregrasping.movie import MjRenderer, MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
+from mjregrasping.rviz import plot_points_rviz
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.viz import make_viz, Viz
 
@@ -56,13 +55,21 @@ def main():
     gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
 
-    renderer = MjRenderer(phy.m)
+    camera_name = "left_hand"
+    camera_site_name = f'{camera_name}_cam'
+    left_hand_mcam = phy.m.camera(camera_name)
+    left_hand_vcam = mujoco.MjvCamera()
+    left_hand_vcam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+    left_hand_vcam.fixedcamid = left_hand_mcam.id
+
+    left_hand_r = MjRenderer(phy.m, cam=left_hand_vcam)
+    left_hand_rgbd = MjRGBD(left_hand_mcam, left_hand_r)
 
     while True:
-        rgb = renderer.render(d).copy()
-        depth = renderer.render(d, depth=True).copy()
+        rgb = left_hand_r.render(d).copy()
+        depth = left_hand_r.render(d, depth=True).copy()
 
-        seg = renderer.render_with_flags(d, {mujoco.mjtRndFlag.mjRND_IDCOLOR: 1, mujoco.mjtRndFlag.mjRND_SEGMENT: 1})
+        seg = left_hand_r.render_with_flags(d, {mujoco.mjtRndFlag.mjRND_IDCOLOR: 1, mujoco.mjtRndFlag.mjRND_SEGMENT: 1})
         seg = seg[:, :, 0].copy()  # only the R component is used
 
         # not sure why this +1 works
@@ -71,23 +78,32 @@ def main():
             rope_body_mask = (seg == seg_id)
             rope_mask = rope_mask | rope_body_mask
 
-        rr.log_image("rgb", rgb)
-        rr.log_image("depth", depth)
-        rr.log_image("rope_mask", rope_mask)
+        rr.log_image("img/rgb", rgb)
+        rr.log_image("img/depth", np.clip(depth, 0, 1))
+        rr.log_image("img/rope_mask", rope_mask * 255)
 
-        # TODO: convert segmented rope to point cloud and pick the closest point to the camera
-        rope_depth = depth[rope_mask]
-        # Get camera intrinsics
-        # convert rgbd to points
-        # add wrist cameras
-        rope_pc = o3d.geometry.PointCloud()
-        rope_pc.points = o3d.utility.Vector3dVector(rope_depth)
-        # rope_idx = 4
-        # rope_body = phy.d.body(phy.o.rope.body_indices[rope_idx])
+        # v in pixel space is x in camera space
+        # u in pixel space is y in camera space
+        rope_us, rope_vs = np.where(rope_mask)
+        rope_depth = depth[rope_us, rope_vs]
+
+        rope_uvs = np.stack([rope_us, rope_vs, np.ones_like(rope_us)], axis=0)
+        np.linalg.inv(left_hand_rgbd.K) @ rope_uvs
+
+        rope_xs = rope_depth * (rope_vs - left_hand_rgbd.cx) / left_hand_rgbd.fpx
+        rope_ys = rope_depth * (rope_us - left_hand_rgbd.cy) / left_hand_rgbd.fpx
+        rope_zs = rope_depth
+        xyz_in_cam = np.stack([rope_xs, rope_ys, rope_zs], axis=1)
+
+        dcam_site = phy.d.site(camera_site_name)
+        xyz_in_world = dcam_site.xpos[None] + xyz_in_cam @ dcam_site.xmat.reshape([3, 3]).T
+        plot_points_rviz(viz.markers_pub, xyz_in_world, color='orange', frame_id='world', idx=0, label='rope_xyz_world')
+
         # TODO: detect a supporting plane, and use that axis if there is one, else use vector from the camera to rope?
-
         # define the coordinate frame of where we want to grasp the rope
         radius = 0.01
+        rope_idx = 4
+        rope_body = phy.d.body(phy.o.rope.body_indices[rope_idx])
         rope_grasp_z = np.array([0.0, 0, -1.0])
         rope_grasp_z = rope_grasp_z / np.linalg.norm(rope_grasp_z)
         rope_grasp_x = rope_body.xmat.reshape(3, 3)[:, 0]

@@ -3,6 +3,7 @@ from copy import deepcopy
 import imageio
 import mujoco
 import numpy as np
+from mujoco._structs import _MjModelCameraViews
 
 
 class MjMovieMaker:
@@ -26,18 +27,22 @@ class MjMovieMaker:
 
 
 class MjRenderer:
-    def __init__(self, m: mujoco.MjModel, w=1280, h=720):
+    def __init__(self, m: mujoco.MjModel, w=1280, h=720, cam: mujoco.MjvCamera = None):
         """ Initialize a movie maker for a mujoco model """
         self.m = m
+        self.w = w
+        self.h = h
         self.gl_ctx = mujoco.GLContext(w, h)
         self.gl_ctx.make_current()
         self.con = mujoco.MjrContext(m, 1)
         self.scene = mujoco.MjvScene(m, maxgeom=500)
         self.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
         self.viewport = mujoco.MjrRect(0, 0, w, h)
-        self.cam = mujoco.MjvCamera()
-        self.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
-        self.cam.fixedcamid = 0
+        if cam is None:
+            cam = mujoco.MjvCamera()
+            cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+            cam.fixedcamid = 0
+        self.cam = cam
         self.rgb = np.zeros([h, w, 3], dtype=np.uint8)
         self.depth = np.zeros([h, w], dtype=np.float32)
 
@@ -57,7 +62,13 @@ class MjRenderer:
         mujoco.mjr_readPixels(rgb=self.rgb, depth=self.depth, viewport=self.viewport, con=self.con)
 
         if depth:
-            img = self.depth
+            extent = self.m.stat.extent
+            near = self.m.vis.map.znear * extent
+            far = self.m.vis.map.zfar * extent
+            # Convert from [0 1] to depth in meters, see links below:
+            # http://stackoverflow.com/a/6657284/1461210
+            # https://www.khronos.org/opengl/wiki/Depth_Buffer_Precision
+            img = near / (1 - self.depth * (1 - near / far))
         else:
             img = self.rgb
 
@@ -70,3 +81,24 @@ class MjRenderer:
         img = self.render(d)
         self.scene.flags = before_flags
         return img
+
+
+class MjRGBD:
+
+    def __init__(self, mcam: _MjModelCameraViews, renderer: MjRenderer):
+        self.mcam = mcam
+        self.r = renderer
+        self.w = renderer.w
+        self.h = renderer.h
+        self.fpx = 0.5 * self.h / np.tan(mcam.fovy[0] * np.pi / 360)
+        self.cx = self.w / 2
+        self.cy = self.h / 2
+        self.K = np.array([[-self.fpx, 0, self.cx],
+                           [0, self.fpx, self.cy],
+                           [0, 0, 1]])
+        self.Kinv = np.array([[-1 / self.fpx, 0, -self.cx / self.fpx],
+                              [0, 1 / self.fpx, -self.cy / self.fpx],
+                              [0, 0, 1]])
+
+    def depth_to_pc(self):
+        pass

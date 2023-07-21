@@ -9,7 +9,8 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
-from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz, plot_ring_rviz, plot_arrows_rviz
+from mjregrasping.rviz import MjRViz, plot_sphere_rviz, plot_lines_rviz, plot_ring_rviz, plot_arrows_rviz, \
+    plot_points_rviz
 from visualization_msgs.msg import MarkerArray
 
 
@@ -38,6 +39,13 @@ class Viz:
         if self.p.rr:
             rr_color = to_rgba(color)
             rr.log_point(f'{ns}/{idx}', position, color=rr_color, radius=radius)
+
+    def points(self, ns: str, positions, color, idx=0):
+        if self.p.rviz:
+            plot_points_rviz(self.markers_pub, positions, idx=idx, label=f'{ns}', color=color)
+        if self.p.rr:
+            rr_color = to_rgba(color)
+            rr.log_points(f'{ns}/{idx}', positions, colors=rr_color)
 
     def lines(self, positions, ns: str, idx: int, scale: float, color):
         if self.p.rviz:

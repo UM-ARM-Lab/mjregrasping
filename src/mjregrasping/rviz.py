@@ -193,6 +193,20 @@ class MjRViz:
                     parent="world",
                     child=name + "_body",
                 )
+        for cam_id in range(phy.m.ncam):
+            mcam = phy.m.camera(cam_id)
+            dcam = phy.d.camera(cam_id)
+            pos = dcam.xpos
+            mat = dcam.xmat
+            quat = np.zeros(4)
+            mujoco.mju_mat2Quat(mat=mat, quat=quat)
+            if self.tfw:
+                self.tfw.send_transform(
+                    translation=pos,
+                    quaternion=np_wxyz_to_xyzw(quat),
+                    parent="world",
+                    child=mcam.name + "_cam",
+                )
         for geom_id in range(phy.m.ngeom):
             name = mj_id2name(phy.m, mju_str2Type("geom"), geom_id)
             pos = phy.d.geom_xpos[geom_id]
