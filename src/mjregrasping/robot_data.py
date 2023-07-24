@@ -13,6 +13,7 @@ class RobotData:
     gripper_geom_names: List[List[str]]
     gripper_actuator_names: List[str]
     tool_sites: List[str]
+    camera_names: List[str]
     n_g: int
     rope_grasp_eqs: List[str]
     world_gripper_eqs: List[str]
@@ -53,6 +54,7 @@ val = RobotData(
         'rope_left_world', 'rope_right_world'
     ],
     tool_bodies=["drive50", "drive10"],
+    camera_names=['left_hand', 'right_hand'],
     ik_tol=0.01,
     noise_sigma=np.deg2rad(2),
     workspace_bbox=np.array([
@@ -60,6 +62,7 @@ val = RobotData(
         [-0.6, 0.6],
         [0.5, 1.5]
     ])
+
 )
 
 conq = RobotData(
@@ -75,6 +78,7 @@ conq = RobotData(
     tool_bodies=["hand"],
     gripper_actuator_names=['finger_vel'],
     ik_tol=0.02,
+    camera_names=['hand'],
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
     workspace_bbox=np.array([
         [0, 1.5],
