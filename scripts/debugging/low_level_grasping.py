@@ -85,8 +85,9 @@ def main():
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
 
-    w_scale = 0.2
+    w_scale = 0.5
     v_scale = 0.05
+    max_v_norm = 0.03
     gripper_kp = 1.0
     jnt_lim_avoidance = 0.1
 
@@ -159,8 +160,6 @@ def main():
         _, _, V = torch.pca_lowrank(torch.from_numpy(rope_points_in_tool))
         rope_x_in_tool = V[:, 0]
 
-        # robot_q[-1] -= np.deg2rad(10)
-        # pid_to_joint_config(phy, viz, robot_q, sub_time_s=DEFAULT_SUB_TIME_S)
         gripper_q = phy.d.qpos[gripper_q_indices[tool_idx]]
         # TODO: generalize getting a set of surface points for the gripper given tool_idx
         finger_tips_in_world = []
@@ -217,45 +216,29 @@ def main():
 
         problem = pymanopt.Problem(manifold, cost)
 
-        optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=25, min_step_size=1e-3)
+        optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=25, min_step_size=1e-3, verbosity=0)
         result = optimizer.run(problem, initial_point=(closest_xyz_in_tool, np.eye(3)))
-        best_pos, best_mat = result.point
+        grasp_pos_in_tool, grasp_mat_in_tool = result.point
 
         q_wxyz = np.zeros(4)
-        mujoco.mju_mat2Quat(q_wxyz, best_mat.flatten())
-        viz.tfw.send_transform(best_pos, np_wxyz_to_xyzw(q_wxyz), 'right_tool_site', 'candidate_grasp')
+        mujoco.mju_mat2Quat(q_wxyz, grasp_mat_in_tool.flatten())
+        viz.tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), 'right_tool_site', 'grasp_pose_in_tool')
         viz.viz(phy)
 
-        rope_points = get_rope_points(phy)
-        # define the coordinate frame of where we want to grasp the rope
-        # rope_idx = 4
-        # rope_body = phy.d.body(phy.o.rope.body_indices[rope_idx])
-        # rope_grasp_z = np.array([0.0, 0, -1.0])
-        # rope_grasp_z = rope_grasp_z / np.linalg.norm(rope_grasp_z)
-        # rope_grasp_x = rope_body.xmat.reshape(3, 3)[:, 0]
-        # rope_grasp_y = np.cross(rope_grasp_z, rope_grasp_x)
-        # rope_grasp_mat = np.stack([rope_grasp_x, rope_grasp_y, rope_grasp_z], axis=1)
-
-        grasp_point_in_tool = cam2tool_mat @ closest_xyz_in_cam
         radius = 0.01
-        skeleton = make_ring_skeleton(grasp_point_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
-        viz.lines(skeleton, "ring", 0, 0.003, 'g')
+        grasp_z_in_tool = grasp_mat_in_tool[:, 2]
+        skeleton = make_ring_skeleton(grasp_pos_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
+        viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id='right_tool_site')
 
-        tool_z = tool2world_mat[:, 2]
         # b points in the right direction, but b gets bigger when you get closer, but we want it to get smaller
-        b = skeleton_field_dir(skeleton, tool_site_pos[None])[0]
+        # since we're doing everything in tool frame, the tool is always at the origin, so query the field at (0,0,0)
+        b = skeleton_field_dir(skeleton, np.zeros([1, 3]))[0]
         b_normalized = b / np.linalg.norm(b)
         # v here means linear velocity, not to be confused with pixel column
         v_in_tool = b_normalized / np.linalg.norm(b) * v_scale
         v_norm = np.linalg.norm(v_in_tool)
-        if v_norm > 0.01:
-            v_in_tool = v_in_tool / v_norm * 0.01
-
-        grasp_point_in_world = tool2world_mat @ grasp_point_in_tool
-        viz.arrow("tool_z", tool_site_pos, tool_z, 'm')
-        viz.arrow("grasp_x", grasp_point_in_world, grasp_x_in_world, 'r')
-        viz.arrow("grasp_y", grasp_point_in_world, grasp_y_in_world, 'g')
-        viz.arrow("grasp_z", grasp_point_in_world, grasp_z_in_world, 'b')
+        if v_norm > max_v_norm:
+            v_in_tool = v_in_tool / v_norm * max_v_norm
 
         v_in_world = tool2world_mat @ v_in_tool
         viz.arrow("v", tool_site_pos, v_in_world, 'w')
@@ -293,15 +276,19 @@ def main():
         vmax = phy.m.actuator_ctrlrange[:, 1]
         if np.any(ctrl > vmax):
             offending_joint = np.argmax(ctrl)
-        ctrl = ctrl / np.max(ctrl) * vmax[offending_joint]
+            ctrl = ctrl / np.max(ctrl) * vmax[offending_joint]
         if np.any(ctrl < vmin):
             offending_joint = np.argmin(ctrl)
-        ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
+            ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
 
-        control_step(phy, ctrl, 0.02)
+        for _ in range(5):
+            control_step(phy, ctrl, 0.02)
 
         viz.viz(phy)
-        viz.lines(skeleton, "ring", 0, 0.003, 'g')
+
+        if gripper_q < hp['finger_q_closed']:
+            print("Grasp successful!")
+            break
 
 
 def get_masked_points(rgbd: MjRGBD, depth: np.ndarray, mask: np.ndarray):

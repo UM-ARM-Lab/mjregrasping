@@ -42,12 +42,13 @@ class Viz:
 
     def points(self, ns: str, positions, color, idx=0, radius=0.01, frame_id='world'):
         if self.p.rviz:
-            plot_points_rviz(self.markers_pub, positions, idx=idx, label=f'{ns}', color=color, s=radius / 0.01, frame_id=frame_id)
+            plot_points_rviz(self.markers_pub, positions, idx=idx, label=f'{ns}', color=color, s=radius / 0.01,
+                             frame_id=frame_id)
         if self.p.rr:
             rr_color = to_rgba(color)
             rr.log_points(f'{ns}/{idx}', positions, colors=rr_color, radii=radius)
 
-    def lines(self, positions, ns: str, idx: int, scale: float, color):
+    def lines(self, positions, ns: str, idx: int, scale: float, color, frame_id='world'):
         if self.p.rviz:
             plot_lines_rviz(
                 pub=self.markers_pub,
@@ -55,7 +56,7 @@ class Viz:
                 label=f'{ns}',
                 idx=idx,
                 color=color,
-                frame_id='world',
+                frame_id=frame_id,
                 scale=scale,
             )
 
