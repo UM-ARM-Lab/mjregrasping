@@ -100,3 +100,23 @@ def angle_between(v1, v2):
     v1_u = unit_vector(v1)
     v2_u = unit_vector(v2)
     return np.arccos(np.clip(np.sum(v1_u * v2_u, axis=-1), -1.0, 1.0))
+
+
+def mj_transform_points(a, b, points_in_a):
+    """
+    Takes two mujoco objects with xmat and xpos attributes and transforms points from a to b
+    Args:
+        a: geom, site, or any mujoco object with xmat and xpos attributes
+        b: geom, site, or any mujoco object with xmat and xpos attributes
+        points_in_a: [n, 3] set of points in frame a
+
+    Returns: [n, 3] set of points in frame b
+
+    """
+    xmat_a = a.xmat.reshape(3, 3)
+    xmat_b = b.xmat.reshape(3, 3)
+    return transform_points(xmat_a, a.xpos, xmat_b, b.xpos, points_in_a)
+
+
+def transform_points(xmat_a, xpos_a, xmat_b, xpos_b, points_in_a):
+    return (xmat_b.T @ xmat_a @ points_in_a.T).T + xmat_b.T @ (xpos_a - xpos_b)

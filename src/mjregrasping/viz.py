@@ -40,9 +40,9 @@ class Viz:
             rr_color = to_rgba(color)
             rr.log_point(f'{ns}/{idx}', position, color=rr_color, radius=radius)
 
-    def points(self, ns: str, positions, color, idx=0, radius=0.01):
+    def points(self, ns: str, positions, color, idx=0, radius=0.01, frame_id='world'):
         if self.p.rviz:
-            plot_points_rviz(self.markers_pub, positions, idx=idx, label=f'{ns}', color=color, s=radius / 0.01)
+            plot_points_rviz(self.markers_pub, positions, idx=idx, label=f'{ns}', color=color, s=radius / 0.01, frame_id=frame_id)
         if self.p.rr:
             rr_color = to_rgba(color)
             rr.log_points(f'{ns}/{idx}', positions, colors=rr_color, radii=radius)

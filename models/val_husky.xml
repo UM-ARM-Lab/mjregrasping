@@ -156,7 +156,7 @@
                                                     <site name="left_hand_cam"  euler="1.22 3.14159 3.14159" pos="0 0.01 0.03" size="0.001"/>
                                                     <light name="left_hand" mode="fixed" dir="0 1 -0.35" pos="0 0 0.03"/>
                                                 </body>
-                                                <body name="leftgripper_link" pos="0 0.0135 0.068553"
+                                                <body name="leftgripper" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
                                                     <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true"
                                                            range="-0.1166 1"
@@ -170,7 +170,7 @@
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
                                                     </body>
                                                 </body>
-                                                <body name="leftgripper2_link" pos="0 -0.0135 0.068553"
+                                                <body name="leftgripper2" pos="0 -0.0135 0.068553"
                                                       euler="1.99 1.5707 0">
                                                     <joint name="leftgripper2" type="hinge" axis="0 0 1" limited="true"
                                                            range="-0.1166 1"
@@ -286,7 +286,7 @@
                                                     </body>
                                                 </body>
 
-                                                <body name="rightgripper_link" pos="0 0.0135 0.068553"
+                                                <body name="rightgripper" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
                                                     <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true"
                                                            range="-0.1166 1"
@@ -300,7 +300,7 @@
                                                               rgba="0.6 0.4 0.2 1" group="1"/>
                                                     </body>
                                                 </body>
-                                                <body name="rightgripper2_link" pos="0 -0.0135 0.068553"
+                                                <body name="rightgripper2" pos="0 -0.0135 0.068553"
                                                       euler="1.99 1.5707 0">
                                                     <joint name="rightgripper2" type="hinge" axis="0 0 1" limited="true"
                                                            range="-0.1166 1"
