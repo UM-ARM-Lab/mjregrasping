@@ -1,16 +1,19 @@
+from pathlib import Path
+
 import mujoco
 import numpy as np
 import pymanopt
 import pysdf_tools
 import rerun as rr
 import torch
+from matplotlib import cm
 from pymanopt.manifolds import SpecialOrthogonalGroup, Euclidean, Product
 from scipy.linalg import logm, block_diag
 
 from arc_utilities import ros_init
-from mjregrasping.geometry_torch import alignment
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
+from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.move_to_joint_config import pid_to_joint_config, get_q
 from mjregrasping.movie import MjRenderer, MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
@@ -19,7 +22,9 @@ from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.scenarios import val_untangle
+from mjregrasping.sdf_autograd import sdf_lookup, point_to_idx
 from mjregrasping.viz import make_viz, Viz
+from sdf_tools.utils_3d import get_gradient
 
 
 def batch_rotate_and_translate(points, mat, pos=None):
@@ -40,17 +45,38 @@ def main():
     viz: Viz = make_viz(scenario)
 
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
-    d = mujoco.MjData(m)
     objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
+
+    d = mujoco.MjData(m)
     phy = Physics(m, d, objects)
+    robot_q = np.array([
+        0.1, 0.0,  # torso
+        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+        0.3,  # left gripper
+        0.3, 0.0, 0, 0.0, np.pi / 2, -1.1, 0.3,  # right arm
+        0.3,  # right gripper
+    ])
+    pid_to_joint_config(phy, viz, robot_q, sub_time_s=DEFAULT_SUB_TIME_S)
+    robot_q = np.array([
+        0.1, 0.4,  # torso
+        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
+        0.3,  # left gripper
+        0.7, 0.0, 0, 0.0, 1.3, -1.1, 0.3,  # right arm
+        0.3,  # right gripper
+    ])
+    pid_to_joint_config(phy, viz, robot_q, sub_time_s=DEFAULT_SUB_TIME_S)
+
+    # d = load_data_and_eq(m, Path("states/grasp/1690310029.pkl"))
+    # phy = Physics(m, d, objects)
 
     sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
-    # sdf_np = np.array(sdf.GetRawData(), dtype=np.float32)
-    # sdf_origin = torch.tensor(sdf.GetOriginTransform().translation(), dtype=torch.float32)
-    # sdf_res = torch.tensor(sdf.GetResolution(), dtype=torch.float32)
-    # sdf_grad_np = get_gradient(sdf)
-    # sdf_torch = torch.from_numpy(sdf_np)
-    # sdf_grad_torch = torch.from_numpy(sdf_grad_np)
+    sdf_np = np.array(sdf.GetRawData(), dtype=np.float64)
+    sdf_np = sdf_np.reshape([sdf.GetNumXCells(), sdf.GetNumYCells(), sdf.GetNumZCells()])
+    sdf_origin = torch.tensor(sdf.GetOriginTransform().translation(), dtype=torch.float64)
+    sdf_res = torch.tensor(sdf.GetResolution(), dtype=torch.float64)
+    sdf_grad_np = get_gradient(sdf, dtype=np.float64)
+    sdf_torch = torch.from_numpy(sdf_np)
+    sdf_grad_torch = torch.from_numpy(sdf_grad_np)
 
     mujoco.mj_forward(phy.m, phy.d)
     viz.viz(phy)
@@ -64,22 +90,10 @@ def main():
     gripper_kp = 1.0
     jnt_lim_avoidance = 0.1
 
-    robot_q = np.array([
-        0.1, 0.0,  # torso
-        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
-        0.3,  # left gripper
-        0.3, 0.0, 0, 0.0, np.pi / 2, -1.1, 0.3,  # right arm
-        0.3,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, robot_q, sub_time_s=DEFAULT_SUB_TIME_S)
-    robot_q = np.array([
-        0.1, 0.4,  # torso
-        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
-        0.3,  # left gripper
-        0.8, 0.0, 0, 0.0, 1.3, -1.3, 0.3,  # right arm
-        0.3,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, robot_q, sub_time_s=DEFAULT_SUB_TIME_S)
+    sdf_weight = 0.001
+    d_rot_weight = 0.01
+    rope_pos_weight = 0.1
+
     gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
 
@@ -125,6 +139,8 @@ def main():
 
         tool2world_mat = tool_site.xmat.reshape(3, 3)
         tool_site_pos = tool_site.xpos
+        tool2world_mat_torch = torch.from_numpy(tool2world_mat)
+        tool_site_pos_torch = torch.from_numpy(tool_site_pos)
 
         rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
         bg_points_in_tool = mj_transform_points(dcam_site, tool_site, bg_points_in_cam)
@@ -164,22 +180,31 @@ def main():
 
         @pymanopt.function.pytorch(manifold)
         def cost(pos, mat):
-            d_to_rope = torch.linalg.norm(pos - closest_xyz_in_tool_torch) * 10
-            d_rot = torch.linalg.norm(torch.eye(3) - mat) / 50
-            new_finger_tips_torch = batch_rotate_and_translate(finger_tips_in_tool_torch, mat, pos)
-            # TODO: figure out contact cost
-            d_to_contact = 0
+            d_to_rope = torch.linalg.norm(pos - closest_xyz_in_tool_torch) * rope_pos_weight
+            d_rot = torch.linalg.norm(torch.eye(3) - mat) * d_rot_weight
+            new_finger_tips_in_tool = batch_rotate_and_translate(finger_tips_in_tool_torch, mat, pos)
+            new_finger_tips_in_world = batch_rotate_and_translate(new_finger_tips_in_tool, tool2world_mat_torch,
+                                                                  tool_site_pos_torch)
+            # TODO: do a bilinear interpolation to get a more accurate SDF value given a low res grid?
+            #  or just make the grid a lower resolution?
+            tip_dists = sdf_lookup(sdf_torch, sdf_grad_torch, sdf_origin, sdf_res, new_finger_tips_in_world)
+            d_to_contact = torch.exp(-tip_dists.min()) * sdf_weight
             candidate_grasp_x = mat[:, 0]
-            x_align = torch.minimum(torch.dot(candidate_grasp_x, rope_x_in_tool),
-                                    torch.dot(candidate_grasp_x, -rope_x_in_tool))
+            x_align = -torch.abs(torch.dot(candidate_grasp_x, rope_x_in_tool))
 
             # visualize the candidate grasp
             # if not (torch.isnan(pos).any() or torch.isnan(mat).any()):
             #     q_wxyz = np.zeros(4)
             #     mujoco.mju_mat2Quat(q_wxyz, mat.flatten().detach().numpy())
             #     viz.tfw.send_transform(pos, np_wxyz_to_xyzw(q_wxyz), 'right_tool_site', 'candidate_grasp')
-            #     viz.points(f'finger tips', new_finger_tips_torch.detach().numpy(), 'm', frame_id='right_tool_site',
-            #                radius=0.02)
+            #     contact_color = cm.RdYlGn(np.clip(d_to_contact.detach().numpy(), 0, 1))
+            #     viz.points(f'finger tips', new_finger_tips_in_world.detach().numpy(), contact_color, radius=0.02)
+            #     try:
+            #         sdf_grads = sdf_grad_torch[torch.unbind(point_to_idx(new_finger_tips_in_world, sdf_origin, sdf_res), 1)]
+            #         for i, grad_i in enumerate(sdf_grads):
+            #             viz.arrow(f'sdf_grad{i}', new_finger_tips_in_world[i], grad_i * sdf_weight, 'w')
+            #     except IndexError:
+            #         pass
             #     viz.viz(phy)
 
             total_cost = sum([
@@ -192,8 +217,7 @@ def main():
 
         problem = pymanopt.Problem(manifold, cost)
 
-        optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=25)
-        # NOTE: adding a good guess for initial solution seems to break everything???
+        optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=25, min_step_size=1e-3)
         result = optimizer.run(problem, initial_point=(closest_xyz_in_tool, np.eye(3)))
         best_pos, best_mat = result.point
 
