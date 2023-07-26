@@ -21,7 +21,7 @@ def main():
 
     d = mujoco.MjData(m)
     state_path = Path("states/CableHarness/1689602983.pkl")
-    d = load_data_and_eq(m, True, state_path)
+    d = load_data_and_eq(m, state_path, True)
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     viz = make_viz(scenario)
 

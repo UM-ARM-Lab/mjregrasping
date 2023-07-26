@@ -61,13 +61,13 @@ def main():
     # we load the goal state and compare it each of the other states.
     # The goal comparison is somewhat distinct from the comparison we do for grasping.
     goal_path = states_dir / "goal_state.pkl"
-    d = load_data_and_eq(m, True, goal_path)
+    d = load_data_and_eq(m, goal_path, True)
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     goal_rope_points = copy(get_rope_points(phy))
 
     results = []
     for i, state_path in enumerate(states_paths):
-        d = load_data_and_eq(m, True, state_path)
+        d = load_data_and_eq(m, state_path, True)
         phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
         img = np.copy(r.render(d))

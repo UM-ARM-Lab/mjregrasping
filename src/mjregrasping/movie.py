@@ -93,12 +93,3 @@ class MjRGBD:
         self.fpx = 0.5 * self.h / np.tan(mcam.fovy[0] * np.pi / 360)
         self.cx = self.w / 2
         self.cy = self.h / 2
-        self.K = np.array([[-self.fpx, 0, self.cx],
-                           [0, self.fpx, self.cy],
-                           [0, 0, 1]])
-        self.Kinv = np.array([[-1 / self.fpx, 0, -self.cx / self.fpx],
-                              [0, 1 / self.fpx, -self.cy / self.fpx],
-                              [0, 0, 1]])
-
-    def depth_to_pc(self):
-        pass

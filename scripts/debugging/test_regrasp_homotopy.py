@@ -67,7 +67,7 @@ def main():
     for state_path in states_paths:
         for seed in range(1, 3):
             h = HomotopyRegraspPlanner(goal, skeletons, cc, seed=seed)
-            d = load_data_and_eq(m, True, state_path)
+            d = load_data_and_eq(m, state_path, True)
             phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
             viz.viz(phy)

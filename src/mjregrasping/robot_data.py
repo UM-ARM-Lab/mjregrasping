@@ -22,6 +22,7 @@ class RobotData:
     ik_tol: float
     noise_sigma: np.ndarray
     workspace_bbox: np.ndarray
+    q_home: np.ndarray
 
 
 val = RobotData(
@@ -61,8 +62,14 @@ val = RobotData(
         [0.7, 1.2],
         [-0.6, 0.6],
         [0.5, 1.5]
+    ]),
+    q_home=np.array([
+        0, 0,
+        0, 0.15, 0, 0, 0, 0, 0,
+        0,
+        0, -0.15, 0, 0, 0, 0, 0,
+        0
     ])
-
 )
 
 conq = RobotData(
@@ -84,5 +91,6 @@ conq = RobotData(
         [0, 1.5],
         [-1.0, 1.0],
         [0.0, 0.5],
-    ])
+    ]),
+    q_home=np.array([])
 )

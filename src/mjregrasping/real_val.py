@@ -3,6 +3,7 @@ import weakref
 from copy import deepcopy
 from threading import Thread
 
+import mujoco
 import numpy as np
 
 import rospy
@@ -45,16 +46,20 @@ class RealValCommander:
         except ReferenceError:
             pass
 
-    def send_vel_command(self, phy, command):
+    def send_vel_command(self, m: mujoco.MjModel, command):
         if not self.first_valid_command:
             self.first_valid_command = True
 
         # Compute the desired positions based on the joint limits, and the desired velocity direction
-        low = phy.m.actuator_actrange[:, 0]
-        high = phy.m.actuator_actrange[:, 1]
+        low = m.actuator_actrange[:, 0]
+        high = m.actuator_actrange[:, 1]
         positions = np.where(command >= 0, high, low)
 
         # Then update the latest command message with the new positions and velocities
         self.latest_cmd.header.stamp = rospy.Time.now()
         self.latest_cmd.position = positions.tolist()
         self.latest_cmd.velocity = command.tolist()
+
+    def stop(self):
+        self.should_disconnect = True
+        self.command_thread.join()

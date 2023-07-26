@@ -25,7 +25,7 @@ def save_data_and_eq(phy: Physics, path=DEFAULT_PATH):
         pickle.dump(data_and_eq, f)
 
 
-def load_data_and_eq(m: mujoco.MjModel, forward=True, path=DEFAULT_PATH):
+def load_data_and_eq(m: mujoco.MjModel, path=DEFAULT_PATH, forward=True):
     """ Modifies the model in place and returns a new instance of MjData """
     with path.open("rb") as f:
         data_and_eq = pickle.load(f)
