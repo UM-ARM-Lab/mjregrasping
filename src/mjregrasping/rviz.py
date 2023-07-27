@@ -12,6 +12,7 @@ import ros_numpy
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
+from mjregrasping.goal_funcs import is_valid_contact
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics
 from mjregrasping.homotopy_utils import make_ring_mat
@@ -31,6 +32,12 @@ def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
             break
         parent_name = _parent_name
     return parent_name, child_name
+
+
+def make_clear_marker():
+    clear_all_marker = MarkerArray()
+    clear_all_marker.markers.append(Marker(action=Marker.DELETEALL))
+    return clear_all_marker
 
 
 class MjRViz:
@@ -248,15 +255,15 @@ class MjRViz:
             contact_marker.scale.z = 0.01
             contact_marker.ns = f"{geom1_name}_{geom2_name}"
             contact_marker.id = contact_idx
-            contact_marker.color = ColorRGBA(*to_rgba("r"))
+            contact_color = 'r' if is_valid_contact(phy, geom1_name, geom2_name) else 'orange'
+            contact_marker.color = ColorRGBA(*to_rgba(contact_color))
             contact_marker.pose.orientation.w = 1
             contact_marker.pose.position.x = float(contact.pos[0])
             contact_marker.pose.position.y = float(contact.pos[1])
             contact_marker.pose.position.z = float(contact.pos[2])
             contact_markers.markers.append(contact_marker)
 
-        clear_all_marker = MarkerArray()
-        clear_all_marker.markers.append(Marker(action=Marker.DELETEALL))
+        clear_all_marker = make_clear_marker()
         self.contacts_pub.publish(clear_all_marker)
         self.contacts_pub.publish(contact_markers)
 

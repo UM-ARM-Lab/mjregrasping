@@ -159,7 +159,7 @@
                                                 <body name="leftgripper" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
                                                     <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true"
-                                                           range="-0.1166 1"
+                                                           range="-0.01 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -173,7 +173,7 @@
                                                 <body name="leftgripper2" pos="0 -0.0135 0.068553"
                                                       euler="1.99 1.5707 0">
                                                     <joint name="leftgripper2" type="hinge" axis="0 0 1" limited="true"
-                                                           range="-0.1166 1"
+                                                           range="-0.01 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -289,7 +289,7 @@
                                                 <body name="rightgripper" pos="0 0.0135 0.068553"
                                                       euler="1.15 -1.5707 0">
                                                     <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true"
-                                                           range="-0.1166 1"
+                                                           range="-0.01 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>
@@ -303,7 +303,7 @@
                                                 <body name="rightgripper2" pos="0 -0.0135 0.068553"
                                                       euler="1.99 1.5707 0">
                                                     <joint name="rightgripper2" type="hinge" axis="0 0 1" limited="true"
-                                                           range="-0.1166 1"
+                                                           range="-0.01 1"
                                                            damping="0.01" frictionloss="0.01"/>
                                                     <inertial mass="0.0646" diaginertia="6.2e-05 6.09e-05 6.79e-06"
                                                               pos="0.0111 0.0437 0" quat="0.593 0.385 -0.593 0.385"/>

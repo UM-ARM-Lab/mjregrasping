@@ -33,8 +33,6 @@ val = RobotData(
     ignored_robot_self_collision_geoms_names=[
         'left_finger_pad', 'left_finger_pad2',
         'right_finger_pad', 'right_finger_pad2',
-        'leftgripper', 'leftgripper2',
-        'rightgripper', 'rightgripper2'
     ],
     gripper_geom_names=[
         ['left_finger_pad', 'left_finger_pad2', 'leftgripper', 'leftgripper2'],

@@ -83,7 +83,7 @@ class Viz:
             # TODO: also show in rerun
             pass
 
-    def viz(self, phy: Physics, is_planning: bool = False):
+    def viz(self, phy: Physics, is_planning: bool = False, detailed: bool = False):
         if self.p.rviz:
             if is_planning:
                 if self.p.viz_planning:
@@ -91,7 +91,7 @@ class Viz:
             else:
                 self.rviz.viz(phy, is_planning, alpha=1.0)
         if self.p.rr:
-            self.mjrr.viz(phy, is_planning)
+            self.mjrr.viz(phy, is_planning, detailed)
 
     def sdf(self, sdf: pysdf_tools.SignedDistanceField, frame_id, idx):
         # NOTE: VERY SLOW!!! only use for debugging

@@ -8,7 +8,7 @@ import numpy as np
 import rerun as rr
 from bayes_opt import BayesianOptimization
 from matplotlib import cm
-from pymjregrasping_cpp import get_first_order_homotopy_points, RRTPlanner
+from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.goal_funcs import get_rope_points
@@ -20,6 +20,7 @@ from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
+from mjregrasping.rrt import rrt
 from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
 
@@ -78,7 +79,7 @@ class HomotopyRegraspPlanner:
         self.true_h_blacklist = []
         self.first_order_blacklist = []
 
-        self.rrt_planner = RRTPlanner()
+        self.rrt_rng = np.random.RandomState(seed)
 
     def generate(self, phy: Physics, viz=None):
         params, strategy = self.generate_params(phy, viz)
@@ -210,14 +211,18 @@ class HomotopyRegraspPlanner:
         _, _, candidate_pos = grasp_locations_to_indices_and_offsets_and_xpos(phy_plan, candidate_locs)
 
         # Run RRT to find a collision free path from the current q to candidate_pos
-        # Then in theory we should do it for the subgoals to
+        # Then in theory we should do it for the subgoals too
         q0 = phy_plan.d.qpos[phy_plan.o.robot.qpos_indices]
         strategy_strs = [s.name for s in strategy]
         is_grasping0 = get_is_grasping(phy_plan)
-        reached, trajectory = plan_from_q_to_target_pos(phy_plan, q0, candidate_pos, strategy_strs, is_grasping0)
-        q_final = np.array(trajectory.points[-1].position)
+        # candidate_pos, strategy_strs, is_grasping0
+        state_checker
+        goal_sampler
+        goal_checker
+        path = rrt(phy_plan, q0, self.rrt_rng, state_checker, goal_sampler, goal_checker, viz)
+        q_final = path[-1]
 
-        reachability_cost = BIG_PENALTY if reached else 0
+        reachability_cost = BIG_PENALTY if path is None else 0
 
         homotopy_cost = 0
         h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
@@ -268,7 +273,7 @@ class HomotopyRegraspPlanner:
         return -cost
 
     def cost_mpc(self, strategy: List[Strategies], phy: Physics, viz: Optional[Viz],
-             log_loops=False, viz_ik=False, **params):
+                 log_loops=False, viz_ik=False, **params):
         """
 
         Args:
