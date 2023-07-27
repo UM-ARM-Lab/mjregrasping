@@ -14,6 +14,7 @@ from networkx import is_connected
 from sklearn.neighbors import KDTree
 
 from arc_utilities import ros_init
+from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_contact_cost
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
@@ -57,8 +58,8 @@ def rrt(phy: Physics,
         goal_sampler_process.join()
 
     i = 0
-    t0 = perf_counter()
-    while (perf_counter() - t0) < max_time_s or len(qs) < min_nodes:
+    planning_t0 = perf_counter()
+    while (perf_counter() - planning_t0) < max_time_s or len(qs) < min_nodes:
         if not goal_queue.empty():
             goal_q = goal_queue.get(block=False)
             goal_samples.append(goal_q)
@@ -77,6 +78,7 @@ def rrt(phy: Physics,
         _, parent_id = kd.query(q_rand[None], k=1)
         kd_time += perf_counter() - t0
         parent_id = int(parent_id[0, 0])
+
         q_near = qs[parent_id]
 
         if viz.p.viz_q_near:
@@ -113,7 +115,7 @@ def rrt(phy: Physics,
                     parent_id = parent_ids[parent_id]
                 path = np.array(path[::-1])
 
-                print(f'{kd_time=:.3f}, {fk_time=:.3f}, {state_checking_time=:.3f}')
+                print(f'{kd_time=:.3f} {fk_time=:.3f} {state_checking_time=:.3f} {len(qs)=}')
 
                 _stop_and_cleanup()
                 return path
@@ -123,64 +125,10 @@ def rrt(phy: Physics,
             kd_time += perf_counter() - t0
         i += 1
 
-    print(f'{kd_time=:.3f}, {fk_time=:.3f}, {state_checking_time=:.3f}')
+    print(f'{kd_time=:.3f}, {fk_time=:.3f}, {state_checking_time=:.3f} {len(qs)=}')
 
     _stop_and_cleanup()
     return None
-
-
-def bio_ik_goal_sampler(phy: Physics, goal_tool_positions, mujoco2moveit):
-    # These two objects must be initialized in the new process, you can't copy them over from the parent even though
-    # they are picklable, the ros subscribers will break silently.
-    ik = pybio_ik.BioIK("hdt_michigan/robot_description")
-
-    goal_tool_positions_h = np.concatenate((goal_tool_positions, np.ones([2, 1])), axis=-1).T
-    goal_tool_positions_moveit = (mujoco2moveit @ goal_tool_positions_h)[:3].T
-
-    grippers_qs = []
-    gripper_q_ids = []
-    for act_name in phy.o.rd.gripper_actuator_names:
-        act = phy.m.actuator(act_name)
-        grippers_qs.append(np.arange(0, np.deg2rad(15), step=np.deg2rad(10)).tolist())
-        gripper_q_ids.append(act.trnid[0])
-
-    while True:
-        phy_i = phy.copy_data()
-
-        rng = np.random.RandomState(0)
-        ik_seed_q = duplicate_gripper_qs(uniform_rand_q(phy_i.m, rng))
-
-        for _ in range(10):
-            # use bio IK to find a joint configuration that satisfies the goal tool positions
-            q_duplicated = ik.ik_from(targets=dict(zip(phy_i.o.rd.tool_sites, goal_tool_positions_moveit)),
-                                      start=ik_seed_q,
-                                      group_name='whole_body')
-
-            if not q_duplicated:
-                continue
-
-            q = deduplicate_gripper_qs(q_duplicated)
-
-            # discretize gripper q's because they don't change the tool position,
-            # but they may matter for collision checking
-            for gripper_qs in itertools.product(*grippers_qs):
-                # FIXME: hard-coded for val
-                q[9] = gripper_qs[0]
-                q[17] = gripper_qs[1]
-
-                set_q_and_do_fk(phy_i, q)
-
-                contact_cost = get_contact_cost(phy_i)
-
-                if contact_cost > 0:
-                    # Clever trick -- the simulator will resolve contacts in a way that doesn't push us too far away
-                    # so if we step the simulation, the resulting q is probably a good seed for our next IK attempt
-                    mujoco.mj_step(phy_i.m, phy_i.d, nstep=2)
-                    ik_seed_q = phy_i.d.qpos[phy_i.o.robot.qpos_indices].copy()
-                    ik_seed_q += rng.normal(0, 0.01, size=ik_seed_q.shape)
-                    continue
-
-                return q
 
 
 def run_bio_ik_goal_sampler(done: Event,
@@ -276,7 +224,7 @@ def position_goal_checker(phy, goal_tool_positions, pos_tol):
 def set_q_and_do_fk(phy, q):
     # do FK and check for contacts
     q_duplicated = duplicate_gripper_qs(q)
-    phy.d.qpos[phy.o.robot.qpos_indices] = q_duplicated.copy()
+    phy.d.qpos[phy.o.robot.qpos_indices] = q_duplicated #.copy()
     mujoco.mj_forward(phy.m, phy.d)
 
 
@@ -328,7 +276,7 @@ def main():
                state_checker=contact_state_checker,
                run_goal_sampler=partial(run_bio_ik_goal_sampler, mujoco2moveit=mujoco2moveit),
                goal_checker=partial(position_goal_checker, pos_tol=0.01),
-               max_time_s=10.0,
+               max_time_s=15.0,
                viz=viz)
     # path = prm(phy=phy, q0=np.zeros(18),
     #            goal=goal_tool_positions,
