@@ -382,7 +382,7 @@
         <!--  10 -->
         <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000"
                      forcelimited="true" forcerange="-15 15"/>
-        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 -0.15" kp="5000"
+        <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.15" kp="5000"
                      forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
                      forcelimited="true" forcerange="-3 3"/>

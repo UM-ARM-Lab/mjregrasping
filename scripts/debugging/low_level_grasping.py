@@ -7,7 +7,7 @@ import pysdf_tools
 import rerun as rr
 import torch
 from matplotlib import cm
-from pymanopt.manifolds import SpecialOrthogonalGroup, Euclidean, Product
+from pymanopt.manifolds import SpecialOrthogonalGroup
 from scipy.linalg import logm, block_diag
 
 from arc_utilities import ros_init
@@ -71,8 +71,8 @@ def main():
     # save_data_and_eq(phy, Path(f"states/grasp/on_surface_right.pkl"))
 
     # d = load_data_and_eq(m, path=Path("states/grasp/on_surface_left.pkl"))
-    # d = load_data_and_eq(m, path=Path("states/grasp/free_space_right.pkl"))
-    d = load_data_and_eq(m, path=Path("states/grasp/on_surface_right.pkl"))
+    d = load_data_and_eq(m, path=Path("states/grasp/free_space_right.pkl"))
+    # d = load_data_and_eq(m, path=Path("states/grasp/on_surface_right.pkl"))
     tool_idx = 1
     phy = Physics(m, d, objects)
 
@@ -98,7 +98,7 @@ def main():
     v_scale = 0.05
     max_v_norm = 0.03
     gripper_kp = 5.0
-    jnt_lim_avoidance = 0.15
+    jnt_lim_avoidance = 0.25
 
     gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
@@ -114,6 +114,7 @@ def main():
     hand_r = MjRenderer(phy.m, cam=hand_vcam)
     hand_rgbd = MjRGBD(hand_mcam, hand_r)
 
+    t = 0
     while True:
         # TODO: use learned instance segmentation here
         depth, rgb, rope_mask = mj_get_rgbd_and_rope_mask(d, hand_r, phy)
@@ -146,12 +147,15 @@ def main():
         finger_tips_in_tool = transform_points(np.eye(3), np.zeros(3), tool_site.xmat.reshape(3, 3), tool_site.xpos,
                                                finger_tips_in_world)
 
-        from time import perf_counter
-        t0 = perf_counter()
-        grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(phy, finger_tips_in_tool, tool2world_mat, tool_site_pos,
-                                                              rope_points_in_tool, sdf_np, sdf_grad_np, sdf_origin_np,
-                                                              sdf_res_np, tool_frame_name, viz=None)
-        print(f'Computing grasp took {perf_counter() - t0:.3f} seconds')
+        if t % 5 == 0:
+            from time import perf_counter
+            t0 = perf_counter()
+            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(phy, finger_tips_in_tool, tool2world_mat,
+                                                                  tool_site_pos,
+                                                                  rope_points_in_tool, sdf_np, sdf_grad_np,
+                                                                  sdf_origin_np,
+                                                                  sdf_res_np, tool_frame_name, viz=None)
+            print(f'Computing grasp took {perf_counter() - t0:.3f} seconds')
 
         radius = 0.01
         grasp_z_in_tool = grasp_mat_in_tool[:, 2]
@@ -177,7 +181,7 @@ def main():
         J_pinv = np.linalg.pinv(J_gripper)
         # use null-space projection to avoid joint limits
         current_q = get_q(phy)
-        zero_vels = (phy.o.rd.q_home- current_q) * jnt_lim_avoidance
+        zero_vels = (phy.o.rd.q_home - current_q) * jnt_lim_avoidance
 
         warn_near_joint_limits(current_q, phy)
 
@@ -186,7 +190,7 @@ def main():
         # grippers
         lin_speed = np.linalg.norm(v_in_tool)
         ang_speed = np.linalg.norm(w_in_tool)
-        gripper_q_mix = 10 * lin_speed + 0.25 * ang_speed
+        gripper_q_mix = np.clip(12 * lin_speed + 0.3 * ang_speed, 0, 1)
         desired_gripper_q = gripper_q_mix * hp['finger_q_open'] + (1 - gripper_q_mix) * hp['finger_q_closed']
         gripper_gripper_vel = gripper_kp * (desired_gripper_q - gripper_q)
         ctrl[gripper_ctrl_indices[tool_idx]] = gripper_gripper_vel
@@ -194,8 +198,8 @@ def main():
         # rescale to respect velocity limits
         ctrl = rescale_ctrl(ctrl, phy)
 
-        for _ in range(5):
-            control_step(phy, ctrl, 0.02)
+        control_step(phy, ctrl, 0.02)
+
         # send commands to the robot
         val.send_vel_command(phy.m, ctrl)
 
@@ -206,7 +210,7 @@ def main():
         viz.tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
         viz.viz(phy)
 
-        if is_grasp_complete(gripper_q):
+        if is_grasp_complete(gripper_q, desired_gripper_q):
             print("Grasp successful!")
             break
 
@@ -356,8 +360,8 @@ def get_v_in_tool(max_v_norm, skeleton, v_scale):
     return v_in_tool
 
 
-def is_grasp_complete(gripper_q):
-    return gripper_q < hp['finger_q_closed'] * 1.10
+def is_grasp_complete(gripper_q, desired_gripper_q):
+    return gripper_q < hp['finger_q_closed'] * 1.15 and desired_gripper_q < hp['finger_q_closed'] * 1.15
 
 
 def rescale_ctrl(ctrl, phy):

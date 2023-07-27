@@ -26,7 +26,7 @@ def get_nongrasping_rope_contact_cost(phy: Physics, desired_grasp_locs):
     return contact_cost
 
 
-def get_contact_cost(phy: Physics):
+def get_contact_cost(phy: Physics, verbose=False):
     # TODO: use SDF to compute near-contact cost to avoid getting too close
     # doing the contact cost calculation here means we don't need to return the entire data.contact array,
     # which makes things simpler and possibly faster, since this operation can't be easily vectorized.
@@ -38,6 +38,8 @@ def get_contact_cost(phy: Physics):
         if (geom_name1 in all_obstacle_geoms and geom_name2 in phy.o.robot_collision_geom_names) or \
                 (geom_name2 in all_obstacle_geoms and geom_name1 in phy.o.robot_collision_geom_names) or \
                 val_self_collision(geom_name1, geom_name2, phy.o):
+            if verbose:
+                print(f"Contact between {geom_name1} and {geom_name2}")
             contact_cost += 1
     contact_cost /= hp['max_expected_contacts']
     # clamp to be between 0 and 1, and more sensitive to just a few contacts

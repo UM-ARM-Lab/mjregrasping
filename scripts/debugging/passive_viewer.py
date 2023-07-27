@@ -9,23 +9,24 @@ from mjregrasping.grasping import activate_grasp
 from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
-from mjregrasping.scenarios import conq_hose, setup_conq_hose, cable_harness, setup_cable_harness
+from mjregrasping.scenarios import conq_hose, setup_conq_hose, cable_harness, setup_cable_harness, val_untangle, \
+    setup_untangle
 from mjregrasping.viz import make_viz
 from std_msgs.msg import String
 
 
 @ros_init.with_ros("viewer")
 def main():
-    scenario = cable_harness
+    scenario = val_untangle
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     d = mujoco.MjData(m)
-    state_path = Path("states/CableHarness/1689602983.pkl")
-    d = load_data_and_eq(m, state_path, True)
+    # state_path = Path("states/CableHarness/1689602983.pkl")
+    # d = load_data_and_eq(m, state_path, True)
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     viz = make_viz(scenario)
 
-    # setup_cable_harness(phy, viz)
+    setup_untangle(phy, viz)
 
     latest_cmd = ""
 

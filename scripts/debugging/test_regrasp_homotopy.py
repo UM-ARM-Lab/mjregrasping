@@ -55,6 +55,7 @@ def main():
     states_dir = Path("states/untangle")
     rr.set_time_sequence('homotopy', 0)
     states_paths = [
+        Path("states/Untangle/1690391718.pkl"),
         Path('states/untangle/debugging3.pkl'),
         Path('states/untangle/debugging2.pkl'),
         Path('states/untangle/debugging.pkl'),
