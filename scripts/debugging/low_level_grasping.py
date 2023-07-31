@@ -13,12 +13,12 @@ from scipy.linalg import logm, block_diag
 from arc_utilities import ros_init
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.mjsaver import load_data_and_eq, save_data_and_eq
-from mjregrasping.move_to_joint_config import pid_to_joint_config, get_q
+from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.movie import MjRenderer, MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw, transform_points
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_q
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.scenarios import val_untangle
@@ -150,11 +150,10 @@ def main():
         if t % 5 == 0:
             from time import perf_counter
             t0 = perf_counter()
-            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(phy, finger_tips_in_tool, tool2world_mat,
-                                                                  tool_site_pos,
+            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos,
                                                                   rope_points_in_tool, sdf_np, sdf_grad_np,
-                                                                  sdf_origin_np,
-                                                                  sdf_res_np, tool_frame_name, viz=None)
+                                                                  sdf_origin_np, sdf_res_np, tool_frame_name,
+                                                                  phy=None, viz=None)
             print(f'Computing grasp took {perf_counter() - t0:.3f} seconds')
 
         radius = 0.01
@@ -217,8 +216,8 @@ def main():
     val.stop()
 
 
-def get_best_grasp(phy, finger_tips_in_tool, tool2world_mat, tool_site_pos, rope_points_in_tool,
-                   sdf_np, sdf_grad_np, sdf_origin_np, sdf_res_np, tool_frame_name, viz=None):
+def get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos, rope_points_in_tool, sdf_np, sdf_grad_np,
+                   sdf_origin_np, sdf_res_np, tool_frame_name, phy=None, viz=None):
     # Hyperparameters
     sdf_weight = 0.02
     sdf_exp = 50
@@ -266,7 +265,7 @@ def get_best_grasp(phy, finger_tips_in_tool, tool2world_mat, tool_site_pos, rope
             x_align = -torch.abs(torch.dot(candidate_grasp_x, rope_x_in_tool)) * align_weight
 
             # visualize the candidate grasp
-            if viz and not (torch.isnan(mat).any()):
+            if viz and phy and not (torch.isnan(mat).any()):
                 q_wxyz = np.zeros(4)
                 mujoco.mju_mat2Quat(q_wxyz, mat.flatten().detach().numpy())
                 viz.tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'candidate_grasp')

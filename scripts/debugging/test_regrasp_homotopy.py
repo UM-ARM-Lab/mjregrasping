@@ -55,15 +55,15 @@ def main():
     states_dir = Path("states/untangle")
     rr.set_time_sequence('homotopy', 0)
     states_paths = [
-        Path("states/Untangle/1690391718.pkl"),
-        Path('states/untangle/debugging3.pkl'),
-        Path('states/untangle/debugging2.pkl'),
-        Path('states/untangle/debugging.pkl'),
-        Path('states/untangle/1688067719.pkl'),
-        Path('states/untangle/1688067882.pkl'),
-        Path('states/untangle/1688071991.pkl'),
-        Path('states/untangle/1688072614.pkl'),
-        Path('states/untangle/1688067686.pkl'),
+        Path("states/Untangle/1690492695.pkl"),
+        # Path('states/untangle/debugging3.pkl'),
+        # Path('states/untangle/debugging2.pkl'),
+        # Path('states/untangle/debugging.pkl'),
+        # Path('states/untangle/1688067719.pkl'),
+        # Path('states/untangle/1688067882.pkl'),
+        # Path('states/untangle/1688071991.pkl'),
+        # Path('states/untangle/1688072614.pkl'),
+        # Path('states/untangle/1688067686.pkl'),
     ]
     for state_path in states_paths:
         for seed in range(1, 3):

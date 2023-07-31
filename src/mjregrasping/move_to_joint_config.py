@@ -1,9 +1,8 @@
 import logging
-from copy import copy
 
 import numpy as np
 
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import control_step
 from mjregrasping.viz import Viz
 
@@ -44,6 +43,3 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s):
     logger.error(f"PID failed to converge. {reason}")
 
 
-def get_q(phy: Physics):
-    qpos_for_act = phy.m.actuator_trnid[:, 0]
-    return copy(phy.d.qpos[qpos_for_act])

@@ -1,20 +1,16 @@
 import itertools
-import matplotlib.pyplot as plt
 from functools import partial
 from multiprocessing import Event, Process, Queue
 from time import perf_counter, sleep
-from typing import Callable, Optional
+from typing import Callable, Optional, Dict
 
 import mujoco
 import numpy as np
 import pybio_ik
 import rerun as rr
-import transformations
-from networkx import is_connected
 from sklearn.neighbors import KDTree
 
 from arc_utilities import ros_init
-from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_contact_cost
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
@@ -22,13 +18,23 @@ from mjregrasping.rviz import make_clear_marker
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.viz import Viz, make_viz
 
+mujoco2moveit = np.array([[1., 0., 0., 0.],
+                          [0., 1., 0., 0.],
+                          [0., 0., 1., -0.145],
+                          [0., 0., 0., 1.]])
+
+
+def to_moveit(p):
+    return (mujoco2moveit @ np.concatenate([p, np.ones(1)]))[:3]
+
 
 def rrt(phy: Physics,
         q0: np.ndarray,
+        joint_ids: np.ndarray,
+        group_name,
         goal,
         rng: np.random.RandomState,
         state_checker: Callable,
-        run_goal_sampler: Callable,
         goal_checker: Callable,
         viz: Optional[Viz],
         dq_step_size=0.1,
@@ -46,8 +52,9 @@ def rrt(phy: Physics,
 
     goal_queue = Queue()
     done = Event()
-    goal_sampler_process = Process(target=run_goal_sampler, args=(done, goal_queue, phy, goal))
-    goal_sampler_process.start()
+    goal_sampler_process = Process(target=run_bio_ik_goal_sampler,
+                                   args=(done, goal_queue, phy, joint_ids, group_name, goal))
+    # goal_sampler_process.start()
     goal_samples = []
 
     def _stop_and_cleanup():
@@ -68,10 +75,10 @@ def rrt(phy: Physics,
         if sample_goal:
             q_rand = goal_samples[rng.randint(0, len(goal_samples))]
         else:
-            q_rand = uniform_rand_q(phy.m, rng)
+            q_rand = uniform_rand_q(phy, joint_ids, rng)
 
         if viz.p.viz_goal_samples and sample_goal:
-            set_q_and_do_fk(phy, q_rand)
+            set_q_and_do_fk(phy, joint_ids, q_rand)
             viz.viz(phy, is_planning=True)
 
         t0 = perf_counter()
@@ -82,7 +89,7 @@ def rrt(phy: Physics,
         q_near = qs[parent_id]
 
         if viz.p.viz_q_near:
-            set_q_and_do_fk(phy, q_near)
+            set_q_and_do_fk(phy, joint_ids, q_near)
             viz.viz(phy, is_planning=True)
 
         d_total = min(np.linalg.norm(q_rand - q_near), extension_max_dx)
@@ -93,11 +100,11 @@ def rrt(phy: Physics,
             q_tmp = q_near + d * (q_rand - q_near) / d_total
 
             t0 = perf_counter()
-            set_q_and_do_fk(phy, q_tmp)
+            set_q_and_do_fk(phy, joint_ids, q_tmp)
             fk_time += perf_counter() - t0
 
             t0 = perf_counter()
-            state_valid = state_checker(phy, q_tmp, viz)
+            state_valid = state_checker(phy, viz)
             state_checking_time += perf_counter() - t0
             if not state_valid:
                 break
@@ -134,38 +141,33 @@ def rrt(phy: Physics,
 def run_bio_ik_goal_sampler(done: Event,
                             queue: Queue,
                             phy: Physics,
-                            goal_tool_positions,
-                            mujoco2moveit):
+                            joint_ids,
+                            group_name,
+                            goal_tool_positions: Dict[str, np.ndarray],
+                            ):
     # These two objects must be initialized in the new process, you can't copy them over from the parent even though
     # they are picklable, the ros subscribers will break silently.
     ik = pybio_ik.BioIK("hdt_michigan/robot_description")
 
-    goal_tool_positions_h = np.concatenate((goal_tool_positions, np.ones([2, 1])), axis=-1).T
-    goal_tool_positions_moveit = (mujoco2moveit @ goal_tool_positions_h)[:3].T
+    goal_tool_positions_moveit = {k: to_moveit(p) for k, p in goal_tool_positions.items()}
 
-    grippers_qs = []
-    gripper_q_ids = []
-    for act_name in phy.o.rd.gripper_actuator_names:
-        act = phy.m.actuator(act_name)
-        grippers_qs.append(np.arange(*act.actrange, step=np.deg2rad(10)).tolist())
-        gripper_q_ids.append(act.trnid[0])
+    gripper_q_ids = get_gripper_qpos_indices(phy)
+    grippers_qs = [[0, 0.2, 0.4]] * len(gripper_q_ids)
 
+    rng = np.random.RandomState(0)
     while not done.is_set():
         phy_i = phy.copy_data()
 
-        rng = np.random.RandomState(0)
-        ik_seed_q = duplicate_gripper_qs(uniform_rand_q(phy_i.m, rng))
+        ik_seed_q = duplicate_gripper_qs(phy, joint_ids, uniform_rand_q(phy_i, joint_ids, rng))
 
         for _ in range(10):
             # use bio IK to find a joint configuration that satisfies the goal tool positions
-            q_duplicated = ik.ik_from(targets=dict(zip(phy_i.o.rd.tool_sites, goal_tool_positions_moveit)),
-                                      start=ik_seed_q,
-                                      group_name='whole_body')
+            q_duplicated = ik.ik_from(targets=goal_tool_positions_moveit, start=ik_seed_q, group_name=group_name)
 
             if not q_duplicated:
                 continue
 
-            q = deduplicate_gripper_qs(q_duplicated)
+            q = deduplicate_gripper_qs(phy.m, joint_ids, q_duplicated)
 
             # discretize gripper q's because they don't change the tool position,
             # but they may matter for collision checking
@@ -174,7 +176,7 @@ def run_bio_ik_goal_sampler(done: Event,
                 q[9] = gripper_qs[0]
                 q[17] = gripper_qs[1]
 
-                set_q_and_do_fk(phy_i, q)
+                set_q_and_do_fk(phy_i, joint_ids, q)
 
                 contact_cost = get_contact_cost(phy_i)
 
@@ -190,19 +192,12 @@ def run_bio_ik_goal_sampler(done: Event,
     queue.close()
 
 
-def contact_state_checker(phy: Physics, q, viz: Optional[Viz]):
+def contact_state_checker(phy: Physics, viz: Optional[Viz]):
     if viz.p.viz_state_checker:
         viz.viz(phy, is_planning=True)
     contact_cost = get_contact_cost(phy)
 
     return contact_cost == 0
-
-
-def uniform_rand_q(m, rng):
-    q_low = m.actuator_actrange[:, 0]
-    q_high = m.actuator_actrange[:, 1]
-    q_rand = rng.uniform(q_low, q_high)
-    return q_rand
 
 
 def position_goal_checker(phy, goal_tool_positions, pos_tol):
@@ -211,7 +206,7 @@ def position_goal_checker(phy, goal_tool_positions, pos_tol):
         return False
 
     goal_satisfied = True
-    for tool_site_name, goal_pos in zip(phy.o.rd.tool_sites, goal_tool_positions):
+    for tool_site_name, goal_pos in goal_tool_positions.items():
         tool_site_xpos = phy.d.site(tool_site_name).xpos
         d = np.linalg.norm(goal_pos - tool_site_xpos)
         if d > pos_tol:
@@ -221,23 +216,43 @@ def position_goal_checker(phy, goal_tool_positions, pos_tol):
     return goal_satisfied
 
 
-def set_q_and_do_fk(phy, q):
+def set_q_and_do_fk(phy, joint_ids, q):
     # do FK and check for contacts
-    q_duplicated = duplicate_gripper_qs(q)
-    phy.d.qpos[phy.o.robot.qpos_indices] = q_duplicated #.copy()
+    q_duplicated = duplicate_gripper_qs(phy, joint_ids, q)
+    phy.d.qpos[phy.o.robot.qpos_indices] = q_duplicated  # .copy()
     mujoco.mj_forward(phy.m, phy.d)
 
 
-def duplicate_gripper_qs(q):
-    q_duplicated = np.insert(q, 9, q[9])
-    q_duplicated = np.insert(q_duplicated, 18, q[17])
-    return q_duplicated
+def uniform_rand_q(phy, joint_ids, rng):
+    q_low = phy.m.actuator_actrange[:, 0]
+    q_high = phy.m.actuator_actrange[:, 1]
+    q_rand = rng.uniform(q_low, q_high)
+    q_rand = duplicate_gripper_qs(phy, joint_ids, q_rand)
+    q_rand = q_rand[joint_ids]
+    return q_rand
 
 
-def deduplicate_gripper_qs(q_duplicated):
+def duplicate_gripper_qs(phy, joint_ids, q):
+    gripper_q_ids = get_gripper_qpos_indices(phy)
+    for gripper_q_id in gripper_q_ids:
+        if gripper_q_id in joint_ids:
+            j = np.where(joint_ids == gripper_q_id)[0][0]
+            q = np.insert(q, j + 1, q[j])
+    return q
+
+
+def deduplicate_gripper_qs(m, joint_ids, q_duplicated):
     q = np.delete(q_duplicated, 18)
     q = np.delete(q, 9)
     return q
+
+
+def get_gripper_qpos_indices(phy):
+    gripper_q_ids = []
+    for act_name in phy.o.rd.gripper_actuator_names:
+        act = phy.m.actuator(act_name)
+        gripper_q_ids.append(act.trnid[0])
+    return gripper_q_ids
 
 
 @ros_init.with_ros("test_rrt")
@@ -257,33 +272,32 @@ def main():
 
     rng = np.random.RandomState(0)
 
-    # these are in mujoco world frame
-    goal_tool_positions = np.array([
-        [0.75, -0.20, 0.75],
-        [0.75, -0.20, 0.33],
-    ])
+    group_name = "whole_body"
 
-    mujoco2moveit = transformations.compose_matrix(angles=[0, 0, 0], translate=-phy.m.body("val_base").pos)
+    # these are in mujoco world frame
+    goal_tool_positions = {
+        'left_tool':  np.array([0.75, -0.20, 0.75]),
+        'right_tool': np.array([0.75, -0.20, 0.33]),
+    }
 
     clear_all_marker = make_clear_marker()
     for _ in range(5):
         viz.markers_pub.publish(clear_all_marker)
         sleep(0.01)
 
-    path = rrt(phy=phy, q0=np.zeros(18),
-               goal=goal_tool_positions,
-               rng=rng,
-               state_checker=contact_state_checker,
-               run_goal_sampler=partial(run_bio_ik_goal_sampler, mujoco2moveit=mujoco2moveit),
-               goal_checker=partial(position_goal_checker, pos_tol=0.01),
-               max_time_s=15.0,
-               viz=viz)
-    # path = prm(phy=phy, q0=np.zeros(18),
+    # group = MoveGroupCommander(group_name, robot_description="hdt_michigan/robot_description", ns="hdt_michigan")
+    # mj_group_joint_ids = np.array([phy.o.robot.joint_names.index(n) for n in group.get_active_joints()])
+    # dq_step_size = 0.1
+    # # TODO: use the move group
+    # path = rrt(phy=phy,
+    #            q0=np.zeros(len(mj_group_joint_ids)),
+    #            joint_ids=mj_group_joint_ids,
+    #            group_name=group_name,
     #            goal=goal_tool_positions,
     #            rng=rng,
     #            state_checker=contact_state_checker,
-    #            goal_sampler=partial(bio_ik_goal_sampler, mujoco2moveit=mujoco2moveit),
-    #            goal_checker=position_goal_checker,
+    #            goal_checker=partial(position_goal_checker, pos_tol=0.02),
+    #            dq_step_size=dq_step_size,
     #            max_time_s=30.0,
     #            viz=viz)
 
@@ -292,11 +306,19 @@ def main():
         return
 
     # should up-sample the path for visualization purposes
+    dense_path = []
+    for i in range(len(path) - 1):
+        q0 = path[i]
+        q1 = path[i + 1]
+        d = np.linalg.norm(q1 - q0)
+        n_step = max(int(d / dq_step_size), 1)
+        for j in range(n_step):
+            dense_path.append(q0 + j * (q1 - q0) / n_step)
+    dense_path.append(path[-1])
 
-    for point in path:
-        set_q_and_do_fk(phy, point)
-        viz.viz(phy, is_planning=True, detailed=True)
-        sleep(0.1)
+    for point in dense_path:
+        set_q_and_do_fk(phy, mj_group_joint_ids, point)
+        viz.viz(phy, is_planning=True)
 
 
 if __name__ == '__main__':

@@ -4,7 +4,7 @@
         <geom friction="0.01"/>
     </default>
     <include file="materials.xml"/>
-    <include file="val_husky.xml"/>
+    <include file="val.xml"/>
     <include file="computer_rack.xml"/>
     <include file="floor.xml"/>
     <include file="rope.xml"/>

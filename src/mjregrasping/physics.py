@@ -3,6 +3,7 @@ from typing import Optional
 
 import mujoco
 import numpy as np
+from mujoco import mj_id2name, mju_str2Type
 
 from mjregrasping.mujoco_objects import MjObjects
 
@@ -46,3 +47,27 @@ def get_contact_forces(phy: Physics):
 
 def get_total_contact_force(phy: Physics):
     return np.sum(np.linalg.norm(get_contact_forces(phy), axis=-1))
+
+
+def get_q(phy: Physics):
+    """ only gets the q for actuated joints"""
+    qpos_for_act = phy.m.actuator_trnid[:, 0]
+    return copy(phy.d.qpos[qpos_for_act])
+
+
+def get_full_q(phy: Physics):
+    return copy(phy.d.qpos[phy.o.robot.qpos_indices])
+
+
+def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
+    parent_bodyid = geom_bodyid
+    body_name = mj_id2name(m, mju_str2Type("body"), geom_bodyid)
+    child_name = body_name.split("/")[0]
+    parent_name = child_name
+    while True:
+        parent_bodyid = m.body_parentid[parent_bodyid]
+        _parent_name = mj_id2name(m, mju_str2Type("body"), parent_bodyid)
+        if parent_bodyid == 0:
+            break
+        parent_name = _parent_name
+    return parent_name, child_name

@@ -14,24 +14,11 @@ from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
 from mjregrasping.goal_funcs import is_valid_contact
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_parent_child_names
 from mjregrasping.homotopy_utils import make_ring_mat
+from moveit_msgs.msg import PlanningScene
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
-
-
-def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
-    parent_bodyid = geom_bodyid
-    body_name = mj_id2name(m, mju_str2Type("body"), geom_bodyid)
-    child_name = body_name.split("/")[0]
-    parent_name = child_name
-    while True:
-        parent_bodyid = m.body_parentid[parent_bodyid]
-        _parent_name = mj_id2name(m, mju_str2Type("body"), parent_bodyid)
-        if parent_bodyid == 0:
-            break
-        parent_name = _parent_name
-    return parent_name, child_name
 
 
 def make_clear_marker():
@@ -50,6 +37,7 @@ class MjRViz:
         self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=10)
         self.planning_markers_pub = rospy.Publisher('planning', MarkerArray, queue_size=10)
+        self.scene_pub = rospy.Publisher("scene_viz", PlanningScene, queue_size=10)
 
     def viz(self, phy: Physics, is_planning: bool, alpha=1):
         # 3D viz in rviz
@@ -62,7 +50,6 @@ class MjRViz:
             geom_marker_msg = Marker()
             geom_marker_msg.action = Marker.ADD
             geom_marker_msg.header.frame_id = "world"
-            # FIXME: parent name is unhelpful, it's always 'world'
             geom_marker_msg.ns = f"{parent_name}/{child_name}/{geom_name}"
             geom_marker_msg.id = geom_id
 
@@ -299,6 +286,9 @@ class MjRViz:
 
         self.eq_constraints_pub.publish(clear_all_marker)
         self.eq_constraints_pub.publish(eqs_markers)
+
+    def viz_scene(self, scene_msg: PlanningScene):
+        self.scene_pub.publish(scene_msg)
 
 
 def plot_spheres_rviz(

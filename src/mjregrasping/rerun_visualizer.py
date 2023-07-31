@@ -10,8 +10,8 @@ from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
 from trimesh.creation import box, cylinder
 
-from mjregrasping.physics import Physics, get_total_contact_force
-from mjregrasping.rviz import get_parent_child_names, MujocoXmlMeshParser
+from mjregrasping.physics import Physics, get_total_contact_force, get_parent_child_names
+from mjregrasping.rviz import MujocoXmlMeshParser
 
 logger = logging.getLogger(f'rosout.{__name__}')
 

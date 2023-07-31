@@ -8,21 +8,23 @@ import numpy as np
 import rerun as rr
 from bayes_opt import BayesianOptimization
 from matplotlib import cm
-from pymjregrasping_cpp import get_first_order_homotopy_points
+from pymjregrasping_cpp import get_first_order_homotopy_points, RRTPlanner
 
+import rospy
 from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
 from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration, get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY, get_reachability_cost, eq_sim_ik
+from mjregrasping.moveit_planning import make_planning_scene
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_total_contact_force
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
-from mjregrasping.rrt import rrt
 from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
+from moveit_msgs.msg import PlanningScene, MotionPlanResponse
 
 GLOBAL_ITERS = 0
 
@@ -80,6 +82,7 @@ class HomotopyRegraspPlanner:
         self.first_order_blacklist = []
 
         self.rrt_rng = np.random.RandomState(seed)
+        self.rrt = RRTPlanner()
 
     def generate(self, phy: Physics, viz=None):
         params, strategy = self.generate_params(phy, viz)
@@ -213,13 +216,28 @@ class HomotopyRegraspPlanner:
         # Run RRT to find a collision free path from the current q to candidate_pos
         # Then in theory we should do it for the subgoals too
         q0 = phy_plan.d.qpos[phy_plan.o.robot.qpos_indices]
-        strategy_strs = [s.name for s in strategy]
+        goals = {}
         is_grasping0 = get_is_grasping(phy_plan)
-        # candidate_pos, strategy_strs, is_grasping0
-        state_checker
-        goal_sampler
-        goal_checker
-        path = rrt(phy_plan, q0, self.rrt_rng, state_checker, goal_sampler, goal_checker, viz)
+        is_moving = []
+        for tool_name, s, is_grasping0_i, p in zip(phy_plan.o.rd.tool_sites, strategy, is_grasping0, candidate_pos):
+            if s in [Strategies.NEW_GRASP, Strategies.MOVE]:
+                goals[tool_name] = p
+                is_moving.append(True)
+            else:
+                is_moving.append(False)
+        if all(is_moving):
+            group_name = "both_arms"
+        elif is_moving[0]:
+            group_name = 'left_arm'
+        elif is_moving[1]:
+            group_name = 'right_arm'
+        else:
+            raise ValueError('No arms are moving!')
+
+        scene_msg = make_planning_scene(phy_plan)
+        viz.rviz.viz_scene(scene_msg)
+        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals)
+        self.rrt.display_result(res)
         q_final = path[-1]
 
         reachability_cost = BIG_PENALTY if path is None else 0
