@@ -6,10 +6,12 @@ from typing import Dict
 import mujoco
 import numpy as np
 import rerun as rr
+from matplotlib.colors import to_rgba
 from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
 from trimesh.creation import box, cylinder
 
+from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics, get_total_contact_force, get_parent_child_names
 from mjregrasping.rviz import MujocoXmlMeshParser
 
@@ -141,18 +143,10 @@ class MjReRun:
         for eq_constraint_idx in range(phy.m.neq):
             eq = phy.m.eq(eq_constraint_idx)
             if eq.active and eq.type == mujoco.mjtEq.mjEQ_CONNECT:
-                eq_marker.header.frame_id = "world"
-                eq_marker.scale.x = 0.005
-                eq_marker.pose.orientation.w = 1
-                eq_marker.color = ColorRGBA(*to_rgba("y"))
-                eq_marker.color.a = 0.4
-                eq_marker.ns = f"eq_{eq.name}"
-                eq_marker.points.append(Point(*phy.d.xpos[eq.obj1id][0]))
-                eq_marker.points.append(Point(*phy.d.xpos[eq.obj2id][0]))
-                eqs_markers.markers.append(eq_marker)
-
-        self.eq_constraints_pub.publish(clear_all_marker)
-        self.eq_constraints_pub.publish(eqs_markers)
+                color = list(to_rgba("y"))
+                color[-1] = 0.4
+                points = [phy.d.xpos[eq.obj1id][0], phy.d.xpos[eq.obj2id][0]]
+                rr.log_line_strip(f"{entity_prefix}/eq_{eq.name}", points, color=color)
 
     def sdf(self, sdf, frame_id, idx):
         points = []
@@ -265,6 +259,7 @@ def log_box_from_geom(body_name, model: _MjModelGeomViews, data: _MjDataGeomView
 def log_bbox_from_geom(body_name, model: _MjModelGeomViews, data: _MjDataGeomViews):
     xquat = np.zeros(4)
     mujoco.mju_mat2Quat(xquat, data.xmat)
+    xquat = np_wxyz_to_xyzw(xquat)
     entity_path = make_entity_path(body_name, model.name)
     rr.log_obb(entity_path=entity_path,
                half_size=model.size,

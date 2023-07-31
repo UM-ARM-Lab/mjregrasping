@@ -1,4 +1,5 @@
 import time
+import rerun as rr
 from pathlib import Path
 
 import mujoco.viewer
@@ -9,6 +10,7 @@ from mjregrasping.grasping import activate_grasp
 from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
+from mjregrasping.rollout import limit_actuator_windup, slow_when_eqs_bad
 from mjregrasping.scenarios import conq_hose, setup_conq_hose, cable_harness, setup_cable_harness, val_untangle, \
     setup_untangle
 from mjregrasping.viz import make_viz
@@ -19,6 +21,9 @@ from std_msgs.msg import String
 def main():
     scenario = val_untangle
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+
+    rr.init("viewer")
+    rr.connect()
 
     d = mujoco.MjData(m)
     # state_path = Path("states/CableHarness/1689602983.pkl")
@@ -39,11 +44,15 @@ def main():
     root.mkdir(exist_ok=True, parents=True)
 
     with mujoco.viewer.launch_passive(m, d) as viewer:
+        with viewer.lock():
+            viewer.scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
         while viewer.is_running():
             step_start = time.time()
 
             viewer.sync()
 
+            slow_when_eqs_bad(phy)
+            limit_actuator_windup(phy)
             mujoco.mj_step(m, d)
 
             # Rudimentary time keeping, will drift relative to wall clock.

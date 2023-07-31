@@ -28,10 +28,10 @@
     <worldbody>
         <body pos="0 0 0" name="val_base">
             <body pos="0 0 -0.25" euler="0 0 0" name="stand">
-                <geom type="box" name="stand" size="0.16 0.16 0.19" rgba="0.3 0.3 0.1 1"/>
+                <geom type="box" name="stand" size="0.25 0.25 0.19" rgba="0.3 0.3 0.1 1"/>
             </body>
             <body name="pedestal" pos="0 0 0" euler="-1.5707 0 0">
-                <geom type="mesh" mesh="PEDESTAL_ASSEMBLY" name="PEDESTAL_ASSEMBLY_mesh" rgba="0.2 0.2 0.2 1"/>
+<!--                <geom type="mesh" mesh="PEDESTAL_ASSEMBLY" name="PEDESTAL_ASSEMBLY_mesh" rgba="0.2 0.2 0.2 1"/>-->
                 <body pos="0 0 0.0891" euler="-1.5707 0 0" name="drive56">
                     <geom type="mesh" mesh="Drive56" name="Drive56_mesh" rgba="0.2 0.2 0.2 1"/>
                     <body name="drive57" pos="0 0 -0.082642" euler="1.5707 1.5707 0">

@@ -67,6 +67,15 @@ cable_harness = Scenario(
 
 
 def setup_untangle(phy, viz):
+    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
+    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
+    mujoco.mj_forward(phy.m, phy.d)
+    phy.d.qpos[rope_xyz_q_indices] = phy.d.body("attach").xpos
+    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0, 0)
+    # update the attach constraint
+    phy.m.eq("attach").data[3:6] = 0
+    mujoco.mj_forward(phy.m, phy.d)
+
     robot_q1 = np.array([
         -0.7, 0.1,  # torso
         -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
@@ -83,7 +92,7 @@ def setup_untangle(phy, viz):
         0.3,  # right gripper
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-    rope_body_indices = np.array(phy.o.rope.body_indices)
+
     activate_grasp(phy, 'right', 1.0)
     robot_q2[-1] = 0.05  # close right gripper
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
@@ -108,7 +117,6 @@ def setup_pull(phy, viz):
         0.1,  # right gripper
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-    rope_body_indices = np.array(phy.o.rope.body_indices)
     activate_grasp(phy, 'left', 0.0)
     robot_q2[9] = 0.1
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)

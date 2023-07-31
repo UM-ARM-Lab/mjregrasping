@@ -34,16 +34,15 @@ def make_planning_scene(phy: Physics):
         geom_xmat = phy.d.geom_xmat[geom_id]
         geom_xquat = np.zeros(4)
         mju_mat2Quat(geom_xquat, geom_xmat)
-        geom_xquat = np_wxyz_to_xyzw(geom_xquat)
         geom_size = phy.m.geom_size[geom_id]
 
         co.pose.position.x = geom_pos[0]
         co.pose.position.y = geom_pos[1]
         co.pose.position.z = geom_pos[2]
-        co.pose.orientation.w = geom_xquat[0]
         co.pose.orientation.x = geom_xquat[1]
         co.pose.orientation.y = geom_xquat[2]
         co.pose.orientation.z = geom_xquat[3]
+        co.pose.orientation.w = geom_xquat[0]
 
         prim = SolidPrimitive()
         prim_pose = Pose()

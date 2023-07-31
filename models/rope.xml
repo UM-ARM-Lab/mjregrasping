@@ -1,6 +1,6 @@
 <mujoco model="rope">
     <worldbody>
-        <body pos="1.1 0.25 0.55" euler="0 0 -1.5707" name="rope">
+        <body pos="0 0 0" euler="0 0 0" name="rope">
             <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
             <composite type="cable" curve="s" count="12 1 1" size="1 0.22 1">
                 <joint kind="main" damping=".015"/>

@@ -25,6 +25,7 @@ from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
 from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import PlanningScene, MotionPlanResponse
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 GLOBAL_ITERS = 0
 
@@ -185,7 +186,6 @@ class HomotopyRegraspPlanner:
         phy_plan = phy.copy_all()
 
         candidate_locs, candidate_subgoals, candidate_pos = params_to_locs_and_subgoals(phy_plan, strategy, params)
-        candidate_is_grasping = (candidate_locs != -1)
 
         # NOTE: Find a path / simulation going from the current state to the candidate_locs,
         #  then bringing those to the candidate_subgoals.
@@ -236,9 +236,11 @@ class HomotopyRegraspPlanner:
 
         scene_msg = make_planning_scene(phy_plan)
         viz.rviz.viz_scene(scene_msg)
+        for k, v in goals.items():
+            viz.sphere(f'goal_positions/{k}', v, 0.05, [0, 1, 0, 0.2])
         res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals)
         self.rrt.display_result(res)
-        q_final = path[-1]
+        final_point: JointTrajectoryPoint = res.trajectory.joint_trajectory.points[-1]
 
         reachability_cost = BIG_PENALTY if path is None else 0
 

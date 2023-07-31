@@ -1,4 +1,4 @@
-<mujoco model="floor">
+<mujoco model="cc_sphere">
     <worldbody>
         <body pos="0 0 0" name="cc_sphere">
             <!-- To get the most precise results, the size here should be half of the resolution of the voxelgrid -->

@@ -2,4 +2,7 @@
     <include file="materials.xml"/>
     <include file="cc_sphere.xml"/>
     <include file="computer_rack.xml"/>
+    <worldbody>
+        <light name="top" pos="0 -1 15" mode="trackcom"/>
+    </worldbody>
 </mujoco>
