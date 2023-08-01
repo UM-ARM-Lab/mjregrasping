@@ -58,7 +58,7 @@ def main():
         Path("states/Untangle/1690834987.pkl"),
     ]
     for state_path in states_paths:
-        for seed in range(2, 4):
+        for seed in range(1, 4):
             h = HomotopyRegraspPlanner(goal, skeletons, cc, seed=seed)
             d = load_data_and_eq(m, state_path, True)
             phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
