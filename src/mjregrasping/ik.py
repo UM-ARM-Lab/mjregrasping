@@ -7,7 +7,7 @@ from numpy.linalg import norm
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_contact_cost
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_gripper_ctrl_indices
 from mjregrasping.rollout import control_step, no_results
 from mjregrasping.viz import Viz
 
@@ -33,7 +33,7 @@ def position_jacobian(phy, body_idx, target_position):
     ee_vel = np.concatenate((ee_vel_p, np.zeros(3)), axis=0)
     eps = 1e-3
     ctrl = J_T @ np.linalg.solve(J @ J_T + eps * np.eye(6), ee_vel)
-    gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
+    gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
     ctrl[gripper_ctrl_indices] = 0  # ignore the grippers
     # TODO: use nullspace to respect joint limits by trying to move towards the home configuration
 

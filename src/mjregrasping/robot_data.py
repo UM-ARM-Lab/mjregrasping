@@ -92,3 +92,5 @@ conq = RobotData(
     ]),
     q_home=np.array([])
 )
+
+

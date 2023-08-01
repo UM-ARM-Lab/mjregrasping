@@ -38,6 +38,12 @@ def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_location
     return grasp_indices, offsets, xpos
 
 
+def grasp_locations_to_xpos(phy: Physics, grasp_locations):
+    grasp_indices, offsets = grasp_locations_to_indices_and_offsets(grasp_locations, phy)
+    xpos = body_plus_offset(phy, grasp_indices, offsets)
+    return xpos
+
+
 def body_plus_offset(phy, body_indices, offsets):
     body_xpos = phy.d.xpos[body_indices]
     body_xmat = phy.d.xmat[body_indices].reshape(-1, 3, 3)

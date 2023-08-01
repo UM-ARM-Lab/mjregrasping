@@ -7,7 +7,7 @@ from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_key
     get_nongrasping_rope_contact_cost
 from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
-    grasp_locations_to_indices_and_offsets_and_xpos
+    grasp_locations_to_xpos
 from mjregrasping.grasping import get_is_grasping, get_finger_qs, get_grasp_locs
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.params import hp
@@ -52,7 +52,7 @@ class RegraspGoal(MPPIGoal):
 
         nongrasping_rope_contact_cost = get_nongrasping_rope_contact_cost(phy, grasp_locs)
 
-        _, _, grasp_xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, grasp_locs)
+        grasp_xpos = grasp_locations_to_xpos(phy, grasp_locs)
 
         return result(tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint,
                       finger_qs, grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost)
@@ -126,4 +126,3 @@ class RegraspGoal(MPPIGoal):
 
         needs_warmstart = self.fsm.update_state(phy, is_stuck, current_locs, planner)
         return needs_warmstart
-

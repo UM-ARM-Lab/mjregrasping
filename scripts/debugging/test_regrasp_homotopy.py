@@ -11,7 +11,7 @@ from PIL import Image
 from arc_utilities import ros_init
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.homotopy_utils import load_skeletons
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
+from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, params_to_locs_and_subgoals
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
@@ -58,7 +58,7 @@ def main():
         Path("states/Untangle/1690834987.pkl"),
     ]
     for state_path in states_paths:
-        for seed in range(1, 3):
+        for seed in range(2, 4):
             h = HomotopyRegraspPlanner(goal, skeletons, cc, seed=seed)
             d = load_data_and_eq(m, state_path, True)
             phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
@@ -76,7 +76,7 @@ def main():
             t1 = perf_counter()
 
             locs, subgoals, _ = params_to_locs_and_subgoals(phy, strategy, params)
-            _, _, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
+            xpos = grasp_locations_to_xpos(phy, locs)
 
             tool_paths = np.concatenate((xpos[:, None], subgoals), axis=1)
             for tool_name, path in zip(phy.o.rd.tool_sites, tool_paths):

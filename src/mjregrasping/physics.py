@@ -71,3 +71,7 @@ def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
             break
         parent_name = _parent_name
     return parent_name, child_name
+
+
+def get_gripper_ctrl_indices(phy):
+    return [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
