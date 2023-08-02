@@ -42,7 +42,7 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
         now = int(time.time())
         mov_path = root / f'seed_{seed}_{now}.mp4'
         print(f"Saving movie to {mov_path}")
-        mov.start(mov_path, fps=12)
+        mov.start(mov_path, fps=6)
 
         goal = make_goal(viz)
 

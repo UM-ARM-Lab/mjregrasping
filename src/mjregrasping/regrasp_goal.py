@@ -1,5 +1,3 @@
-from typing import List
-
 import numpy as np
 from numpy.linalg import norm
 
@@ -9,25 +7,30 @@ from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
     grasp_locations_to_xpos
 from mjregrasping.grasping import get_is_grasping, get_finger_qs, get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_fsm import Modes, RegraspFSM
-from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
+
+
+class GraspGoal:
+
+    def __init__(self, current_locs):
+        self.locs = current_locs
+
+    def get_grasp_locs(self):
+        return self.locs
+
+    def set_grasp_locs(self, grasp_locs):
+        self.locs = grasp_locs
 
 
 class RegraspGoal(MPPIGoal):
 
-    def __init__(self, op_goal, grasp_rrt, skeletons, grasp_goal_radius, viz: Viz, phy: Physics):
+    def __init__(self, op_goal, grasp_goal, grasp_goal_radius, viz: Viz):
         super().__init__(viz)
         self.op_goal = op_goal
-        self.skeletons = skeletons
         self.grasp_goal_radius = grasp_goal_radius
-        self.maintain_locs = None
-        current_locs = get_grasp_locs(phy)
-        gripper_names = phy.o.rd.rope_grasp_eqs
-        self.fsm = RegraspFSM(grasp_rrt, gripper_names, current_locs, None, viz)
+        self.grasp_goal = grasp_goal
 
     def satisfied(self, phy: Physics):
         return self.op_goal.satisfied(phy)
@@ -49,7 +52,7 @@ class RegraspGoal(MPPIGoal):
 
         current_locs = get_grasp_locs(phy)
 
-        grasp_locs = self.fsm.locs
+        grasp_locs = self.grasp_goal.get_grasp_locs()
 
         nongrasping_rope_contact_cost = get_nongrasping_rope_contact_cost(phy, grasp_locs)
 
@@ -74,19 +77,13 @@ class RegraspGoal(MPPIGoal):
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
-        if self.fsm.mode == Modes.REGRASPING:
-            desired_q = None  # get the nearest waypoint in the plan produced by RRT
-            w_goal = 0
-        else:
-            desired_q = np.zeros_like(joint_positions)
-            w_goal = 1
-
+        desired_q = np.zeros_like(joint_positions)
         desired_q_cost = np.sum(np.abs(joint_positions - desired_q)) * hp['home_weight']
 
         return (
             contact_cost,
             unstable_cost,
-            w_goal * goal_cost,
+            goal_cost,
             # split up grasp costs by gripper?
             grasp_finger_cost,
             grasp_pos_cost,
@@ -119,12 +116,3 @@ class RegraspGoal(MPPIGoal):
         for name, xpos in zip(phy.o.rd.rope_grasp_eqs, grasp_xpos):
             self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), idx=0,
                             frame_id='world')
-
-    def update_fsms(self, phy: Physics, is_stuck: List[bool], planner: HomotopyRegraspPlanner):
-        if self.maintain_locs is None:
-            self.maintain_locs = get_grasp_locs(phy)
-
-        current_locs = get_grasp_locs(phy)
-
-        needs_warmstart = self.fsm.update_state(phy, is_stuck, current_locs, planner)
-        return needs_warmstart

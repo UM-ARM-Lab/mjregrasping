@@ -11,11 +11,11 @@ hp = {
     "regrasp_temp":                    0.15,
     "goal_weight":                     1.0,
     "grasp_pos_weight":                1.0,
-    "grasp_near_weight":               50.0,
+    "grasp_near_weight":               1.0,
     "grasp_finger_weight":             0.5,
     "grasp_loc_diff_thresh":           0.07,  # A percentage of rope length
     "smoothness_weight":               0.02,
-    "home_weight":                     0.005,
+    "home_weight":                     0.002,
     "nearby_locs_weight":              10,
     "unstable_weight":                 100,
     "ever_not_grasping_weight":        5.0,
@@ -28,7 +28,7 @@ hp = {
     "thread_orient_weight":            0.0,  # for threading
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
-    "robot_dq_weight":                 0.5,
+    "robot_dq_weight":                 0.2,
     "max_contact_cost":                1,
     "max_expected_contacts":           6,
     "contact_cost":                    3.0,
@@ -37,7 +37,7 @@ hp = {
     "eq_err_weight":                   400.0,
     "frac_max_dq":                     0.5,
     "q_joint_weight":                  0.5,
-    "frac_dq_threshold":               0.4,  # FIXME: reduce this
+    "frac_dq_threshold":               0.3,  # FIXME: reduce this to 0.2?
     "grasp_goal_radius":               0.045,
     "sub_time_s":                      0.15,
     "min_sub_time_s":                  0.05,
@@ -49,8 +49,10 @@ hp = {
     "sim_ik_solref_decay":             0.8,
     "sim_ik_min_solref":               0.02,
     "attach_loop_size":                0.02,
+    "joint_kp":                        5.0,
+    "act_windup_limit":                0.02,
     "bayes_opt":                       {
-        "n_iter": 12,
+        "n_iter": 14,
         "n_init": 6,
     }
 }

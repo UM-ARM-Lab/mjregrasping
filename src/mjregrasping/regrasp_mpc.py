@@ -7,11 +7,14 @@ from matplotlib import cm
 
 import rospy
 from mjregrasping.buffer import Buffer
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.grasping import get_grasp_locs
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, release_and_settle, grasp_and_settle, \
+    get_geodesic_dist
+from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_goal import RegraspGoal
+from mjregrasping.regrasp_goal import RegraspGoal, GraspGoal
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, rollout
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
@@ -50,7 +53,9 @@ class RegraspMPC:
         cc = SDFCollisionChecker(self.sdf)
         planner = HomotopyRegraspPlanner(self.op_goal, grasp_rrt, self.skeletons, cc)
 
-        regrasp_goal = RegraspGoal(self.op_goal, grasp_rrt, self.skeletons, hp['grasp_goal_radius'], self.viz, phy)
+        grasp_goal = GraspGoal(get_grasp_locs(phy))
+
+        regrasp_goal = RegraspGoal(self.op_goal, grasp_goal, hp['grasp_goal_radius'], self.viz)
         regrasp_goal.viz_goal(phy)
 
         self.mppi.reset()
@@ -63,6 +68,7 @@ class RegraspMPC:
         self.viz.viz(phy)
         while True:
             if rospy.is_shutdown():
+                self.mov.close()
                 raise RuntimeError("ROS shutdown")
 
             if itr > max_iters:
@@ -75,8 +81,31 @@ class RegraspMPC:
 
             stuck_frac = self.check_is_stuck(phy)
             is_stuck_vec = np.array([stuck_frac, stuck_frac]) < hp['frac_dq_threshold']
+            needs_reset = False
+            if np.any(is_stuck_vec):
+                print("Stuck! Replanning...")
+                initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), self.op_goal)
+                needs_reset = True
+                new_locs, _, strategy = planner.generate(phy, self.viz)
+                new_geodesic_cost = get_geodesic_dist(new_locs, self.op_goal)
 
-            needs_reset = regrasp_goal.update_fsms(phy, is_stuck_vec, planner)
+                # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
+                if new_geodesic_cost >= initial_geodesic_cost:
+                    print("Unable to improve by grasping closer to the keypoint. Updating blacklist and replanning...")
+                    planner.update_blacklists(phy)
+                    new_locs, _, strategy = planner.generate(phy, self.viz)
+
+                # now execute the plan
+                release_and_settle(phy, strategy, self.viz, is_planning=False)
+                # Since it's a pain to get the previously computed plan out of the bayes-opt planner, just recompute it
+                sln = planner.get_sln(new_locs, strategy)
+                res = sln.res
+                qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
+                execute_grasp_plan(phy, qs, self.viz, is_planning=False)
+                grasp_and_settle(phy, new_locs, self.viz, is_planning=False)
+
+                grasp_goal.set_grasp_locs(new_locs)
+                # save_data_and_eq(phy, Path(f'states/on_stuck/{int(time.time())}.pkl'))
 
             n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
 

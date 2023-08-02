@@ -2,6 +2,7 @@ import mujoco
 import numpy as np
 
 from mjregrasping.eq_errors import compute_eq_errors
+from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 
 DEFAULT_SUB_TIME_S = 0.1
@@ -38,4 +39,4 @@ def slow_when_eqs_bad(phy):
 def limit_actuator_windup(phy):
     qpos_for_act_indices = phy.o.robot.qpos_indices[0] + phy.m.actuator_trnid[:, 0]
     qpos_for_act = phy.d.qpos[qpos_for_act_indices]
-    phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -0.01, 0.01)
+    phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -hp['act_windup_limit'], hp['act_windup_limit'])

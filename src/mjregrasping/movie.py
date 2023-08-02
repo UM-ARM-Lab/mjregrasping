@@ -41,7 +41,7 @@ class MjRenderer:
         if cam is None:
             cam = mujoco.MjvCamera()
             cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
-            cam.fixedcamid = 0
+            cam.fixedcamid = m.cam("mycamera").id
         self.cam = cam
         self.rgb = np.zeros([h, w, 3], dtype=np.uint8)
         self.depth = np.zeros([h, w], dtype=np.float32)

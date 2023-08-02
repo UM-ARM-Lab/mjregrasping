@@ -3,7 +3,6 @@ import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.geometry import point_to_line_segment, pairwise_squared_distances
-from mjregrasping.grasping import get_is_grasping
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -147,7 +146,7 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
     regrasp_dists = norm(regrasp_xpos - tools_pos, axis=-1)
     regrasp_pos_cost = np.sum(regrasp_dists * desired_is_grasping, -1) * hp['grasp_pos_weight']
 
-    dists = pairwise_squared_distances(regrasp_xpos, rope_points)
+    dists = pairwise_squared_distances(tools_pos, rope_points)
     min_dist = np.min(dists)
     regrasp_near_cost = min_dist * hp['grasp_near_weight']
 
