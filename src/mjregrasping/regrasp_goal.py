@@ -13,12 +13,13 @@ from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_fsm import Modes, RegraspFSM
+from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
 
 
 class RegraspGoal(MPPIGoal):
 
-    def __init__(self, op_goal, skeletons, grasp_goal_radius, viz: Viz, phy: Physics):
+    def __init__(self, op_goal, grasp_rrt, skeletons, grasp_goal_radius, viz: Viz, phy: Physics):
         super().__init__(viz)
         self.op_goal = op_goal
         self.skeletons = skeletons
@@ -26,7 +27,7 @@ class RegraspGoal(MPPIGoal):
         self.maintain_locs = None
         current_locs = get_grasp_locs(phy)
         gripper_names = phy.o.rd.rope_grasp_eqs
-        self.fsm = RegraspFSM(gripper_names, current_locs, None, viz)
+        self.fsm = RegraspFSM(grasp_rrt, gripper_names, current_locs, None, viz)
 
     def satisfied(self, phy: Physics):
         return self.op_goal.satisfied(phy)
@@ -73,14 +74,15 @@ class RegraspGoal(MPPIGoal):
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
-        # penalize distance of q's from 0
-        # TODO: only do this for joints which are not participating in any grasps
-        home_cost = np.sum(np.abs(joint_positions)) * hp['home_weight']
-
         if self.fsm.mode == Modes.REGRASPING:
+            desired_q = None  # get the nearest waypoint in the plan produced by RRT
             w_goal = 0
         else:
+            desired_q = np.zeros_like(joint_positions)
             w_goal = 1
+
+        desired_q_cost = np.sum(np.abs(joint_positions - desired_q)) * hp['home_weight']
+
         return (
             contact_cost,
             unstable_cost,
@@ -89,7 +91,7 @@ class RegraspGoal(MPPIGoal):
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,
-            home_cost,
+            desired_q_cost,
             nongrasping_rope_contact_cost,
         )
 
@@ -102,7 +104,7 @@ class RegraspGoal(MPPIGoal):
             "grasp_finger",
             "grasp_pos",
             "grasp_near",
-            "home",
+            "desired_q",
             "nongrasping_rope_contact",
         ]
 

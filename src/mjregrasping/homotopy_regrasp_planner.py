@@ -1,41 +1,94 @@
 import itertools
-from enum import auto, Enum
 from functools import partial
 from time import perf_counter
 from typing import Dict, Optional, List
 
+import mujoco
 import numpy as np
 import rerun as rr
 from bayes_opt import BayesianOptimization
 from matplotlib import cm
-from pymjregrasping_cpp import get_first_order_homotopy_points, RRTPlanner, seedOmpl
+from pymjregrasping_cpp import get_first_order_homotopy_points, seedOmpl
 
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
+from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
 from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration, get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY
-from mjregrasping.moveit_planning import make_planning_scene
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_full_q, get_gripper_ctrl_indices
+from mjregrasping.physics import Physics, get_gripper_ctrl_indices, get_q, rescale_ctrl
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
+from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
-from moveit_msgs.msg import MotionPlanResponse, MoveItErrorCodes
+from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
 
 GLOBAL_ITERS = 0
 
 
-class Strategies(Enum):
-    NEW_GRASP = auto()
-    RELEASE = auto()
-    MOVE = auto()
-    STAY = auto()
+def _timeit(f):
+    def __timeit(*args, **kwargs):
+        t0 = perf_counter()
+        ret = f(*args, **kwargs)
+        t1 = perf_counter()
+        print(f'evaluating regrasp cost: {t1 - t0:.2f}s')
+        return ret
+    return __timeit
+
+
+def execute_grasp_plan(phy_plan: Physics, res: MotionPlanResponse, viz: Viz, is_planning):
+    kp = 1.0
+    prev_t = 0
+    for point in res.trajectory.joint_trajectory.points:
+        planned_q = np.array(point.positions)  # The position we should be at after time_from_start
+        planend_qdot = np.array(point.velocities)
+        current_q = get_q(phy_plan)
+        next_t = point.time_from_start.to_sec()
+        dt = next_t - prev_t
+        pred_q = current_q + dt * planend_qdot
+        print(np.rad2deg(pred_q - planned_q))
+        ctrl = point.velocities + kp * (planned_q - pred_q)
+        ctrl = rescale_ctrl(phy_plan, ctrl)
+
+        control_step(phy_plan, ctrl, dt)
+        if viz:
+            viz.viz(phy_plan, is_planning=is_planning)
+        prev_t = next_t
+
+
+def release_and_settle(phy_plan, strategy, viz: Optional[Viz], is_planning: bool):
+    needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
+
+    rope_grasp_eqs = phy_plan.o.rd.rope_grasp_eqs
+    ctrl = np.zeros(phy_plan.m.nu)
+    gripper_ctrl_indices = get_gripper_ctrl_indices(phy_plan)
+    for eq_name, release_i, ctrl_i in zip(rope_grasp_eqs, needs_release, gripper_ctrl_indices):
+        eq = phy_plan.m.eq(eq_name)
+        if release_i:
+            eq.active = 0
+            ctrl[ctrl_i] = 0.5
+
+    settle_rope(ctrl, phy_plan, viz, is_planning)
+
+
+def rr_log_costs(entity_path, entity_paths, values, colors, strategy, locs):
+    for path_i, v_i, color_i in zip(entity_paths, values, colors):
+        rr.log_scalar(f'{entity_path}/{path_i}', v_i, color=color_i)
+    rr.log_scalar(f'{entity_path}/total', sum(values), color=[1, 1, 1, 1.0])
+    rr.log_tensor(f'{entity_path}_bars', values, ext={'locs': locs, 'strategy': strategy})
+
+
+def get_tool_paths_from_params(phy, strategy, candidate_pos, params):
+    candidate_offsets = params_to_offsets(phy, strategy, params)
+    candidate_subgoals = candidate_pos[:, None] + candidate_offsets
+    tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
+    return tool_paths
 
 
 class HomotopyRegraspPlanner:
 
-    def __init__(self, op_goal, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
+    def __init__(self, op_goal, grasp_rrt: GraspRRT, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
         self.op_goal = op_goal
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
@@ -44,15 +97,13 @@ class HomotopyRegraspPlanner:
         self.first_order_blacklist = []
 
         self.rrt_rng = np.random.RandomState(seed)
-        self.rrt = RRTPlanner()
+        self.grasp_rrt = grasp_rrt
         seedOmpl(seed)
 
     def generate(self, phy: Physics, viz=None):
         params, strategy = self.generate_params(phy, viz)
-        locs, subgoals, _ = params_to_locs_and_subgoals(phy, strategy, params)
-        xpos = grasp_locations_to_xpos(phy, locs)
-
-        return locs, subgoals
+        locs, offsets, _ = params_to_locs_and_offsets(phy, strategy, params)
+        return locs, offsets, strategy
 
     def generate_params(self, phy: Physics, viz=None, log_loops=False, viz_ik=False):
         self.update_blacklists(phy)
@@ -81,7 +132,7 @@ class HomotopyRegraspPlanner:
                     pass  # no decision to make here
                 elif s_i == Strategies.STAY:
                     pass  # Currently testing what happens if we do not plan a delta motion?
-            opt = BayesianOptimization(f=partial(self.cost, strategy, phy, viz, log_loops, viz_ik),
+            opt = BayesianOptimization(f=partial(_timeit(self.cost), strategy, phy, viz, log_loops, viz_ik),
                                        pbounds=bounds,
                                        verbose=0,
                                        random_state=self.rng.randint(0, 1000),
@@ -124,7 +175,7 @@ class HomotopyRegraspPlanner:
             self.first_order_blacklist.append(current_path)
 
     def cost(self, strategy: List[Strategies], phy: Physics, viz: Optional[Viz],
-             log_loops=False, viz_ik=False, **params):
+             log_loops=False, viz_execution=False, **params):
         """
 
         Args:
@@ -132,7 +183,7 @@ class HomotopyRegraspPlanner:
             phy: Not modified
             viz: The viz object, or None if you don't want to visualize anything
             log_loops: Whether to log the loops
-            viz_ik: Whether to visualize the simulation/ik
+            viz_execution: Whether to visualize the simulation/ik
             **params: The parameters to optimize over
 
         Returns:
@@ -143,23 +194,16 @@ class HomotopyRegraspPlanner:
         rr.set_time_sequence('homotopy', GLOBAL_ITERS)
         GLOBAL_ITERS += 1
 
-        t0 = perf_counter()
-
         phy_plan = phy.copy_all()
 
-        candidate_locs, candidate_subgoals, candidate_pos = params_to_locs_and_subgoals(phy_plan, strategy, params)
+        candidate_locs, _, candidate_pos = params_to_locs_and_offsets(phy_plan, strategy, params)
+
+        viz = viz if viz_execution else None
 
         # NOTE: Find a path / simulation going from the current state to the candidate_locs,
-        #  then bringing those to the candidate_subgoals.
+        #  then bringing those to the candidate_offsets.
         #  If we do this with the RegraspMPPI controller it will be very slow,
         #  so instead we use mujoco EQ constraints to approximate the behavior of the controller
-
-        tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
-
-        # First check if the subgoal is straight-line collision free, because if it isn't,
-        #  we waste a lot of time evaluating everything else
-        if not self.collision_free(tool_paths):
-            return -BIG_PENALTY
 
         # If there is no significant change in the grasp, we can again skip the rest of the checks
         wrong_loc = abs(get_grasp_locs(phy_plan) - candidate_locs) > hp['grasp_loc_diff_thresh']
@@ -167,79 +211,39 @@ class HomotopyRegraspPlanner:
         if not np.any(wrong_loc & should_change):
             return -BIG_PENALTY
 
-        if viz:
-            rr.log_cleared(f'homotopy', recursive=True)
-            for tool_name, path in zip(phy_plan.o.rd.tool_sites, tool_paths):
-                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=[0, 0, 1, 0.5])
-                rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
-
         # release and settle for any moving grippers
-        needs_move = strategy == Strategies.MOVE
-        release_and_settle(phy_plan, needs_move, viz)
+        release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
 
-        candidate_pos = grasp_locations_to_xpos(phy_plan, candidate_locs)
-
-        # Run RRT to find a collision free path from the current q to candidate_pos
-        # Then in theory we should do it for the subgoals too
-        q0 = phy_plan.d.qpos[phy_plan.o.robot.qpos_indices]
-        goals = {}
-        is_grasping0 = get_is_grasping(phy_plan)
-        in_planning = []
-        for tool_name, s, is_grasping0_i, p in zip(phy_plan.o.rd.tool_sites, strategy, is_grasping0, candidate_pos):
-            if s in [Strategies.NEW_GRASP, Strategies.MOVE]:
-                goals[tool_name] = p
-                in_planning.append(True)
-            else:
-                in_planning.append(False)
-        if all(in_planning):
-            group_name = "both_arms"
-        elif in_planning[0]:
-            group_name = 'left_arm'
-        elif in_planning[1]:
-            group_name = 'right_arm'
-        else:
-            raise ValueError('No arms are moving!')
-
-        # Visualize the goals
-        for i, v in enumerate(goals.values()):
-            viz.sphere(f'goal_positions/{i}', v, 0.05, [0, 1, 0, 0.2])
-
-        scene_msg = make_planning_scene(phy_plan)
-        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, False)
+        res = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, viz_execution)
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
             return -BIG_PENALTY
 
-        self.rrt.display_result(res)
+        self.grasp_rrt.display_result(res)
 
-        # Execute the result
-        full_ctrl = np.zeros(phy_plan.m.nu)
-        group_ctrl_indices = [phy_plan.m.actuator(f'{n}_vel').id for n in res.trajectory.joint_trajectory.joint_names]
-        prev_t = 0
-        for point in res.trajectory.joint_trajectory.points:
-            full_ctrl[group_ctrl_indices] = point.velocities
-            next_t = point.time_from_start.to_sec()
-            dt = next_t - prev_t
-            control_step(phy_plan, full_ctrl, dt)
-            if viz:
-                viz.viz(phy_plan, is_planning=True)
-            prev_t = next_t
+        plan_final_q = np.array(res.trajectory.joint_trajectory.points[-1].positions)
+
+        # Essentially teleport the robot to the final planned joint configuration
+        qpos_for_act = phy.m.actuator_trnid[:, 0]
+        phy_plan.d.qpos[qpos_for_act] = plan_final_q
+        phy_plan.d.act = plan_final_q
+        mujoco.mj_forward(phy_plan.m, phy_plan.d)
+        if viz_execution:
+            viz.viz(phy_plan, is_planning=True)
 
         # Activate grasps
-        grasp_and_settle(phy_plan, candidate_locs, viz)
+        grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
 
-        # Now release any grippers that need to be released?
-        needs_release = strategy == Strategies.RELEASE
-        release_and_settle(phy_plan, needs_release, viz)
-
-        q_final = get_full_q(phy_plan)
+        # TODO: also plan the offset motions
+        tool_paths = get_tool_paths_from_params(phy, strategy, candidate_pos, params)
 
         homotopy_cost = 0
         h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
         rope_points_plan = get_rope_points(phy_plan)
         for blacklisted_h in self.true_h_blacklist:
             if h_plan == blacklisted_h:
-                homotopy_cost += BIG_PENALTY / len(self.true_h_blacklist)
+                homotopy_cost = BIG_PENALTY
+                break
 
         first_order_cost = 0
         for blacklisted_rope_points in self.first_order_blacklist:
@@ -249,16 +253,22 @@ class HomotopyRegraspPlanner:
                 first_order_cost += hp['first_order_weight']  # FIXME: separate this cost term for easier debugging
 
         geodesics_cost = np.min(np.square(candidate_locs - self.op_goal.loc)) * hp['geodesic_weight']
-        dq_cost = np.sum(np.linalg.norm(q0 - q_final, axis=-1)) * hp['robot_dq_weight']
+
+        prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
+        dq = 0
+        for point in res.trajectory.joint_trajectory.points[1:]:
+            plan_pos = point.positions
+            dq += np.linalg.norm(np.array(plan_pos) - np.array(prev_plan_pos))
+        dq_cost = np.clip(dq, 0, BIG_PENALTY) * hp['robot_dq_weight']
 
         cost = sum([
             dq_cost,
             homotopy_cost,
-            # first_order_cost,
             geodesics_cost,
+            # first_order_cost,
         ])
 
-        # Visualize the path the tools should take for the candidate_locs and candidate_subgoals
+        # Visualize the path the tools should take for the candidate_locs and candidate_offsets
         if log_loops:
             rr.log_cleared(f'loops_plan', recursive=True)
         for i, l in enumerate(loops_plan):
@@ -270,21 +280,31 @@ class HomotopyRegraspPlanner:
                 color = cm.Greens(1 - min(cost, 1000) / 1000)
                 viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=color)
                 rr.log_extension_components(f'homotopy/{tool_name}_path', ext=params)
-        rr.log_scalar('homotopy_costs/dq_cost', dq_cost, color=[0.5, 0.5, 0, 1.0])
-        rr.log_scalar('homotopy_costs/homotopy_cost', homotopy_cost, color=[0, 1, 0, 1.0])
-        rr.log_scalar('homotopy_costs/geodesics_cost', geodesics_cost, color=[1, 0, 0, 1.0])
-        rr.log_scalar('homotopy_costs/total_cost', cost, color=[1, 1, 1, 1.0])
+        rr_log_costs(
+            entity_path='homotopy_costs',
+            entity_paths=[
+                'homotopy_costs/dq_cost',
+                'homotopy_costs/homotopy_cost',
+                'homotopy_costs/geodesics_cost',
+            ],
+            values=[
+                dq_cost,
+                homotopy_cost,
+                geodesics_cost,
+            ],
+            colors=[
+                [0.5, 0.5, 0, 1.0],
+                [0, 1, 0, 1.0],
+                [1, 0, 0, 1.0],
+            ], strategy=strategy, locs=candidate_locs)
         print(candidate_locs, cost)
-
-        t1 = perf_counter()
-        print(f'evaluating regrasp cost: {t1 - t0:.2f}s')
 
         # BayesOpt uses maximization, so we need to negate the cost
         return -cost
 
     def collision_free(self, tools_paths):
-        # subgoals has shape [n_g, T, 3]
-        # and we want to figure out if the straight line path between each subgoal is collision free
+        # offsets has shape [n_g, T, 3]
+        # and we want to figure out if the straight line path between each offset is collision free
         lengths = np.linalg.norm(tools_paths[:, 1:] - tools_paths[:, :-1], axis=-1)
         for i, lengths_i in enumerate(lengths):
             for t in range(tools_paths.shape[1] - 1):
@@ -306,7 +326,7 @@ def get_will_be_grasping(s: Strategies, is_grasping: bool):
         return s in [Strategies.NEW_GRASP]
 
 
-def grasp_and_settle(phy, grasp_locs, viz):
+def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
     for eq_name, grasp_loc_i, ctrl_i in zip(rope_grasp_eqs, grasp_locs, gripper_ctrl_indices):
@@ -315,52 +335,42 @@ def grasp_and_settle(phy, grasp_locs, viz):
         activate_grasp(phy, eq_name, grasp_loc_i)
 
     ctrl = np.zeros(phy.m.nu)
-    settle_rope(ctrl, phy, viz)
+    settle_rope(ctrl, phy, viz, is_planning)
 
 
-def release_and_settle(phy, release, viz):
-    rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
-    ctrl = np.zeros(phy.m.nu)
-    gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
-    for eq_name, release_i, ctrl_i in zip(rope_grasp_eqs, release, gripper_ctrl_indices):
-        eq = phy.m.eq(eq_name)
-        if release_i:
-            eq.active = 0
-            ctrl[ctrl_i] = 0.5
-
-    settle_rope(ctrl, phy, viz)
-
-
-def settle_rope(ctrl, phy, viz):
+def settle_rope(ctrl, phy, viz: Optional[Viz], is_planning: bool):
     last_rope_points = get_rope_points(phy)
     while True:
         control_step(phy, ctrl, sub_time_s=5 * DEFAULT_SUB_TIME_S)
         rope_points = get_rope_points(phy)
         if viz:
-            viz.viz(phy, is_planning=True)
+            viz.viz(phy, is_planning=is_planning)
         rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
         if np.mean(rope_displacements) < 0.01:
             break
         last_rope_points = rope_points
 
 
-def params_to_locs_and_subgoals(phy: Physics, strategy, params: Dict):
+def params_to_locs_and_offsets(phy: Physics, strategy, params: Dict):
+    locs = params_to_locs(phy, strategy, params)
+    xpos = grasp_locations_to_xpos(phy, locs)
+    offsets = params_to_offsets(phy, strategy, params)
+    return locs, offsets, xpos
+
+
+def params_to_offsets(phy, strategy, params):
     is_grasping = get_is_grasping(phy)
-    candidate_locs = params_to_locs(phy, strategy, params)
-
-    candidate_pos = grasp_locations_to_xpos(phy, candidate_locs)
-
-    candidate_subgoals = []
-    for tool_name, pos_i, s_i, is_grasping_i in zip(phy.o.rd.tool_sites, candidate_pos, strategy, is_grasping):
+    offsets = []
+    for tool_name, s_i, is_grasping_i in zip(phy.o.rd.tool_sites, strategy, is_grasping):
         if s_i in [Strategies.MOVE, Strategies.NEW_GRASP]:
             offset1 = np.array([params[tool_name + '_dx_1'], params[tool_name + '_dy_1'], params[tool_name + '_dz_1']])
             offset2 = np.array([params[tool_name + '_dx_2'], params[tool_name + '_dy_2'], params[tool_name + '_dz_2']])
         else:
             offset1 = np.zeros(3)
             offset2 = np.zeros(3)
-        candidate_subgoals.append([pos_i + offset1, pos_i + offset1 + offset2])
-    candidate_subgoals = np.array(candidate_subgoals)
-    return candidate_locs, candidate_subgoals, candidate_pos
+        offsets.append([offset1, offset1 + offset2])
+    offsets = np.array(offsets)
+    return offsets
 
 
 def params_to_locs(phy: Physics, strategy, params: Dict):
@@ -430,6 +440,24 @@ def is_valid_strategy(s, is_grasping):
         return False
     if sum([s_i in [Strategies.MOVE, Strategies.NEW_GRASP] for s_i in s]) > 1:
         return False
-    if len(s) > 1 and any([s_i == Strategies.NEW_GRASP for s_i in s]) and any([s_i == Strategies.RELEASE for s_i in s]):
-        return False
+    # NOTE: the below condition prevents strategies such as [NEW_GRASP, RELEASE]
+    # if len(s) > 1 and any([s_i == Strategies.NEW_GRASP for s_i in s]) and any([s_i == Strategies.RELEASE for s_i in s]):
+    #     return False
     return True
+
+
+def duplicate_gripper_qs(phy: Physics, joint_ids, q):
+    phy.o.robot.joint_names
+    gripper_q_ids = get_gripper_qpos_indices(phy)
+    for gripper_q_id in gripper_q_ids:
+        if gripper_q_id in joint_ids:
+            j = np.where(joint_ids == gripper_q_id)[0][0]
+            q = np.insert(q, j + 1, q[j])
+    return q
+
+def get_gripper_qpos_indices(phy):
+    gripper_q_ids = []
+    for act_name in phy.o.rd.gripper_actuator_names:
+        act = phy.m.actuator(act_name)
+        gripper_q_ids.append(act.name)
+    return gripper_q_ids

@@ -98,7 +98,7 @@ class MjReRun:
                     # We use body pos/quat here under the assumption that in the XML, the <geom type="mesh" ... />
                     # has NO POS OR QUAT, but instead that info goes in the <body> tag
                     if m_parent_body.name != 'val_base':
-                        log_robot_skeleton(entity_name, m_body, d_body, d_parent_body, color=[0.2, 0.2, 0.2, 1.0])
+                        log_robot_skeleton(entity_name, m_body, d_body, d_parent_body, color=[0.8, 0.8, 0.8, 1.0])
             else:
                 logger.debug(f"Unsupported geom type {geom_type}")
                 continue

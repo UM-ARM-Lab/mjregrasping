@@ -28,7 +28,7 @@ hp = {
     "thread_orient_weight":            0.0,  # for threading
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
-    "robot_dq_weight":                 3.0,
+    "robot_dq_weight":                 0.5,
     "max_contact_cost":                1,
     "max_expected_contacts":           6,
     "contact_cost":                    3.0,
@@ -37,7 +37,7 @@ hp = {
     "eq_err_weight":                   400.0,
     "frac_max_dq":                     0.5,
     "q_joint_weight":                  0.5,
-    "frac_dq_threshold":               0.2,
+    "frac_dq_threshold":               0.4,  # FIXME: reduce this
     "grasp_goal_radius":               0.045,
     "sub_time_s":                      0.15,
     "min_sub_time_s":                  0.05,

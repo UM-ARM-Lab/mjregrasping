@@ -12,15 +12,14 @@ from scipy.linalg import logm, block_diag
 
 from arc_utilities import ros_init
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
-from mjregrasping.mjsaver import load_data_and_eq, save_data_and_eq
-from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer, MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw, transform_points
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_q
+from mjregrasping.physics import Physics, get_q, rescale_ctrl
 from mjregrasping.real_val import RealValCommander
-from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
+from mjregrasping.rollout import control_step
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.sdf_autograd import sdf_lookup
 from mjregrasping.sdf_autograd import point_to_idx as point_to_idx_torch
@@ -195,7 +194,7 @@ def main():
         ctrl[gripper_ctrl_indices[tool_idx]] = gripper_gripper_vel
 
         # rescale to respect velocity limits
-        ctrl = rescale_ctrl(ctrl, phy)
+        ctrl = rescale_ctrl(phy, ctrl)
 
         control_step(phy, ctrl, 0.02)
 
@@ -361,18 +360,6 @@ def get_v_in_tool(max_v_norm, skeleton, v_scale):
 
 def is_grasp_complete(gripper_q, desired_gripper_q):
     return gripper_q < hp['finger_q_closed'] * 1.15 and desired_gripper_q < hp['finger_q_closed'] * 1.15
-
-
-def rescale_ctrl(ctrl, phy):
-    vmin = phy.m.actuator_ctrlrange[:, 0]
-    vmax = phy.m.actuator_ctrlrange[:, 1]
-    if np.any(ctrl > vmax):
-        offending_joint = np.argmax(ctrl)
-        ctrl = ctrl / np.max(ctrl) * vmax[offending_joint]
-    if np.any(ctrl < vmin):
-        offending_joint = np.argmin(ctrl)
-        ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
-    return ctrl
 
 
 def get_masked_points(rgbd: MjRGBD, depth: np.ndarray, mask: np.ndarray):

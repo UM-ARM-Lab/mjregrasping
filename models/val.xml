@@ -31,7 +31,6 @@
                 <geom type="box" name="stand" size="0.25 0.25 0.19" rgba="0.3 0.3 0.1 1"/>
             </body>
             <body name="pedestal" pos="0 0 0" euler="-1.5707 0 0">
-<!--                <geom type="mesh" mesh="PEDESTAL_ASSEMBLY" name="PEDESTAL_ASSEMBLY_mesh" rgba="0.2 0.2 0.2 1"/>-->
                 <body pos="0 0 0.0891" euler="-1.5707 0 0" name="drive56">
                     <geom type="mesh" mesh="Drive56" name="Drive56_mesh" rgba="0.2 0.2 0.2 1"/>
                     <body name="drive57" pos="0 0 -0.082642" euler="1.5707 1.5707 0">
@@ -256,7 +255,7 @@
     </worldbody>
     <actuator>
         <!--  0 -->
-        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="2000"
+        <intvelocity name="joint56_vel" joint="joint56" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
                      forcelimited="true" forcerange="-50 50"/>
         <intvelocity name="joint57_vel" joint="joint57" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-1.5708 1.5708" kp="20000"
                      forcelimited="true" forcerange="-55 55"/>
@@ -267,7 +266,7 @@
         <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-0.15 3.14159" kp="5000"
                      forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
-                     forcelimited="true" forcerange="-3 3"/>
+                     forcelimited="true" forcerange="-10 10"/>
         <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
                      forcelimited="true" forcerange="-8 8"/>
         <!--  6 -->
@@ -286,7 +285,7 @@
         <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.15" kp="5000"
                      forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
-                     forcelimited="true" forcerange="-3 3"/>
+                     forcelimited="true" forcerange="-10 10"/>
         <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000"
                      forcelimited="true" forcerange="-8 8"/>
         <!--  14 -->

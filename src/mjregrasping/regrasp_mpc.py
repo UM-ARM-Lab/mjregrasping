@@ -15,6 +15,7 @@ from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, rollout
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
+from mjregrasping.rrt import GraspRRT
 from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import Viz
 
@@ -44,11 +45,12 @@ class RegraspMPC:
 
     def run(self, phy: Physics):
         num_samples = hp['regrasp_n_samples']
+        grasp_rrt = GraspRRT()
 
         cc = SDFCollisionChecker(self.sdf)
-        planner = HomotopyRegraspPlanner(self.op_goal, self.skeletons, cc)
+        planner = HomotopyRegraspPlanner(self.op_goal, grasp_rrt, self.skeletons, cc)
 
-        regrasp_goal = RegraspGoal(self.op_goal, self.skeletons, hp['grasp_goal_radius'], self.viz, phy)
+        regrasp_goal = RegraspGoal(self.op_goal, grasp_rrt, self.skeletons, hp['grasp_goal_radius'], self.viz, phy)
         regrasp_goal.viz_goal(phy)
 
         self.mppi.reset()
