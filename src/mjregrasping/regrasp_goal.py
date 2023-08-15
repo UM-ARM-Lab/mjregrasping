@@ -77,6 +77,9 @@ class RegraspGoal(MPPIGoal):
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
+        gripper_to_goal_cost = np.sum(norm(tools_pos - self.op_goal.goal_point, axis=-1) * is_grasping)
+        gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
+
         desired_q = np.zeros_like(joint_positions)
         desired_q_cost = np.sum(np.abs(joint_positions - desired_q)) * hp['home_weight']
 
@@ -90,6 +93,7 @@ class RegraspGoal(MPPIGoal):
             grasp_near_cost,
             desired_q_cost,
             nongrasping_rope_contact_cost,
+            gripper_to_goal_cost,
         )
 
     @staticmethod
@@ -103,6 +107,7 @@ class RegraspGoal(MPPIGoal):
             "grasp_near",
             "desired_q",
             "nongrasping_rope_contact",
+            "gripper_to_goal",
         ]
 
     def viz_result(self, phy: Physics, result, idx: int, scale, color):

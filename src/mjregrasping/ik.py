@@ -11,6 +11,8 @@ from mjregrasping.physics import Physics, get_gripper_ctrl_indices
 from mjregrasping.rollout import control_step, no_results
 from mjregrasping.viz import Viz
 
+BIG_PENALTY = 100
+
 
 def jacobian_ik_is_reachable(phy, body_idx, target_point, n_steps=100, pos_tol=0.005):
     for i in range(n_steps):
@@ -107,10 +109,6 @@ def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
     valid_grasp_dists = np.triu(dists * is_pair_grasping, k=1)
     nearby_locs_cost = np.sum(valid_grasp_dists) * hp['nearby_locs_weight']
     return new_contact_cost + nearby_locs_cost if reached else BIG_PENALTY
-
-
-BIG_PENALTY = 1e2
-IK_OFFSET = np.array([0, 0, 0.145])
 
 
 def ray_based_reachability(candidates_xpos, phy, tools_pos, max_d=0.7):

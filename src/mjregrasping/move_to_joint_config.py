@@ -1,7 +1,9 @@
 import logging
+from typing import Optional
 
 import numpy as np
 
+from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
@@ -10,12 +12,13 @@ from mjregrasping.viz import Viz
 logger = logging.getLogger(f'rosout.{__name__}')
 
 
-def execute_grasp_plan(phy: Physics, qs, viz: Viz, is_planning: bool):
+def execute_grasp_plan(phy: Physics, qs, viz: Viz, is_planning: bool, mov: Optional[MjMovieMaker] = None):
     for q in qs:
-        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning)
+        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov)
 
 
-def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_planning: bool = False):
+def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_planning: bool = False,
+                        mov: Optional[MjMovieMaker] = None):
     q_prev = get_q(phy)
     for i in range(100):
         viz.viz(phy, is_planning)
@@ -23,6 +26,8 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_plannin
         command = hp['joint_kp'] * (q_target - q_current)
 
         control_step(phy, command, sub_time_s=sub_time_s)
+        if mov:
+            mov.render(phy.d)
 
         # get the new current q
         q_current = get_q(phy)

@@ -3,6 +3,7 @@ from typing import Optional
 
 import numpy as np
 import rerun as rr
+from colorama import Fore
 from matplotlib import cm
 
 import rospy
@@ -21,6 +22,13 @@ from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import Viz
+
+
+class UnsolvableException(Exception):
+    """
+    This exception is thrown when a state is reached in which we know the method will not be able to complete the task.
+    """
+    pass
 
 
 class RegraspMPC:
@@ -76,35 +84,34 @@ class RegraspMPC:
 
             regrasp_goal.viz_goal(phy)
             if regrasp_goal.satisfied(phy):
-                print("Goal reached!")
+                print(Fore.GREEN + "Goal reached!" + Fore.RESET)
                 return True
 
             stuck_frac = self.check_is_stuck(phy)
             is_stuck_vec = np.array([stuck_frac, stuck_frac]) < hp['frac_dq_threshold']
             needs_reset = False
             if np.any(is_stuck_vec):
-                print("Stuck! Replanning...")
+                print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
                 initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), self.op_goal)
                 needs_reset = True
-                new_locs, _, strategy = planner.generate(phy, self.viz)
-                new_geodesic_cost = get_geodesic_dist(new_locs, self.op_goal)
+                sim_grasps = planner.simulate_sampled_grasps(phy, self.viz, viz_execution=False)
+                best_grasp = planner.get_best(sim_grasps, self.viz)
+                new_geodesic_cost = get_geodesic_dist(best_grasp.locs, self.op_goal)
 
                 # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
                 if new_geodesic_cost >= initial_geodesic_cost:
-                    print("Unable to improve by grasping closer to the keypoint. Updating blacklist and replanning...")
+                    print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
+                    print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
                     planner.update_blacklists(phy)
-                    new_locs, _, strategy = planner.generate(phy, self.viz)
+                    best_grasp = planner.get_best(sim_grasps, self.viz)
 
                 # now execute the plan
-                release_and_settle(phy, strategy, self.viz, is_planning=False)
-                # Since it's a pain to get the previously computed plan out of the bayes-opt planner, just recompute it
-                sln = planner.get_sln(new_locs, strategy)
-                res = sln.res
-                qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
-                execute_grasp_plan(phy, qs, self.viz, is_planning=False)
-                grasp_and_settle(phy, new_locs, self.viz, is_planning=False)
+                release_and_settle(phy, best_grasp.strategy, self.viz, is_planning=False, mov=self.mov)
+                qs = np.array([p.positions for p in best_grasp.res.trajectory.joint_trajectory.points])
+                execute_grasp_plan(phy, qs, self.viz, is_planning=False, mov=self.mov)
+                grasp_and_settle(phy, best_grasp.locs, self.viz, is_planning=False, mov=self.mov)
 
-                grasp_goal.set_grasp_locs(new_locs)
+                grasp_goal.set_grasp_locs(best_grasp.locs)
                 # save_data_and_eq(phy, Path(f'states/on_stuck/{int(time.time())}.pkl'))
 
             n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
@@ -140,7 +147,9 @@ class RegraspMPC:
             # distance between the newest and oldest q in the buffer
             # the mean takes the average across joints.
             dq = (np.abs(qs[-1] - qs[0]) / len(self.state_history)).mean()
-            self.max_dq = max(self.max_dq, dq)
+            # taking min with max_max_dq means if we moved a really large amount, we cap it so that our
+            # trap detection isn't thrown off.
+            self.max_dq = min(max(self.max_dq, dq), hp['max_max_dq'])
             frac_dq = dq / self.max_dq
             rr.log_scalar('mab/frac_dq', frac_dq, color=[255, 0, 255])
             return frac_dq

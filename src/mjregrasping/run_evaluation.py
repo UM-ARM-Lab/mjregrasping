@@ -7,11 +7,12 @@ from typing import Callable
 import mujoco
 import pysdf_tools
 import rerun as rr
+from colorama import Fore
 
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_mpc import RegraspMPC
+from mjregrasping.regrasp_mpc import RegraspMPC, UnsolvableException
 from mjregrasping.scenarios import Scenario
 from mjregrasping.viz import make_viz
 
@@ -48,5 +49,8 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
 
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
             mpc = RegraspMPC(pool, phy.m.nu, skeletons, sdf, goal, seed, viz, mov)
-            mpc.run(phy)
+            try:
+                mpc.run(phy)
+            except UnsolvableException:
+                print(f"{Fore.RED}Unsolvable{Fore.RESET}")
             mpc.close()
