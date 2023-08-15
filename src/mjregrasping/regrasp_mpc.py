@@ -105,6 +105,8 @@ class RegraspMPC:
                     planner.update_blacklists(phy)
                     best_grasp = planner.get_best(sim_grasps, self.viz)
 
+                self.viz.viz(best_grasp.phy, is_planning=True)
+
                 # now execute the plan
                 release_and_settle(phy, best_grasp.strategy, self.viz, is_planning=False, mov=self.mov)
                 qs = np.array([p.positions for p in best_grasp.res.trajectory.joint_trajectory.points])

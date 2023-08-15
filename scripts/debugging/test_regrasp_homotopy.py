@@ -76,11 +76,16 @@ def main():
 
             initial_geodesic_cost = get_geodesic_dist(get_grasp_locs(phy), goal)
 
+            grasps_inputs = planner.sample_grasp_inputs(phy)
+            # t0 = perf_counter()
+            # sim_grasps = planner.simulate_grasps_parallel(grasps_inputs, phy)
+            # t1 = perf_counter()
+            # print(f'parallel: {t1 - t0:.3f}s')
             t0 = perf_counter()
-            grasps_inputs = planner.get_grasp_inputs(phy)
             sim_grasps = planner.simulate_grasps(grasps_inputs, phy, viz=None, viz_execution=False)
-            best_grasp = planner.get_best(sim_grasps, viz=None)
             t1 = perf_counter()
+            print(f'serial: {t1 - t0:.3f}s')
+            best_grasp = planner.get_best(sim_grasps, viz=None)
 
             costs = [planner.cost(g, None) for g in sim_grasps]
             print(f'grasp planning: {t1 - t0:.3f}s {best_grasp.locs=:}')
@@ -104,7 +109,7 @@ def main():
             planner.update_blacklists(phy)
             best_grasp = planner.get_best(sim_grasps, viz=None)
             costs = [planner.cost(g, None) for g in sim_grasps]
-            print(f'grasp planning: {t1 - t0:.3f}s {best_grasp.locs=:}')
+            print(f'after blacklisting: {best_grasp.locs=:}')
 
             sorted_i = np.argsort(costs)[::-1]
             for i in sorted_i:

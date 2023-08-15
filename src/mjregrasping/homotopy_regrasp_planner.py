@@ -1,5 +1,7 @@
 import itertools
 from dataclasses import dataclass
+import multiprocessing as mp
+from functools import partial
 from time import perf_counter
 from typing import Dict, Optional, List
 
@@ -10,6 +12,7 @@ from matplotlib import cm
 from pymjregrasping_cpp import get_first_order_homotopy_points, seedOmpl
 
 from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
@@ -18,6 +21,7 @@ from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_gripper_ctrl_indices, get_q
+from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
 from mjregrasping.rrt import GraspRRT
@@ -64,7 +68,7 @@ def release_and_settle(phy_plan, strategy, viz: Optional[Viz], is_planning: bool
         eq = phy_plan.m.eq(eq_name)
         if release_i:
             eq.active = 0
-            ctrl[ctrl_i] = 0.5
+            ctrl[ctrl_i] = 0.2
 
     settle_with_checks(ctrl, phy_plan, viz, is_planning, mov)
 
@@ -77,7 +81,7 @@ def rr_log_costs(entity_path, entity_paths, values, colors, strategy, locs):
 
 class HomotopyRegraspPlanner:
 
-    def __init__(self, op_goal, grasp_rrt: GraspRRT, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
+    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
         self.op_goal = op_goal
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
@@ -110,7 +114,7 @@ class HomotopyRegraspPlanner:
             self.first_order_blacklist.append(current_path)
 
     def simulate_sampled_grasps(self, phy, viz, viz_execution=False):
-        grasps_inputs = self.get_grasp_inputs(phy)
+        grasps_inputs = self.sample_grasp_inputs(phy)
         sim_grasps = self.simulate_grasps(grasps_inputs, phy, viz, viz_execution)
         return sim_grasps
 
@@ -118,20 +122,30 @@ class HomotopyRegraspPlanner:
         # TODO: Parallelize this
         sim_grasps = []
         for grasp_input in grasps_inputs:
-            sim_grasp = self.simulate_grasp(phy, viz, grasp_input, viz_execution)
+            sim_grasp = simulate_grasp(self.grasp_rrt, phy, viz, grasp_input, viz_execution)
             sim_grasps.append(sim_grasp)
         return sim_grasps
 
-    def get_grasp_inputs(self, phy):
+    def simulate_grasps_parallel(self, grasps_inputs, phy):
+        _target = partial(simulate_grasp_parallel, phy)
+        with mp.Pool(mp.cpu_count()) as p:
+            sim_grasps = p.map(_target, grasps_inputs)
+            return sim_grasps
+
+    def sample_grasp_inputs(self, phy):
         grasps_inputs = []
         is_grasping = get_is_grasping(phy)
         for strategy in get_all_strategies_from_phy(phy):
-            for _ in range(20):
+            for i in range(15):
+                if i == 0:
+                    sample_loc = self.op_goal.loc
+                else:
+                    sample_loc = self.rng.uniform(0, 1)
                 candidate_locs = []
                 candidate_dxpos = []
                 for tool_name, s_i, is_grasping_i in zip(phy.o.rd.tool_sites, strategy, is_grasping):
                     if s_i in [Strategies.NEW_GRASP, Strategies.MOVE]:
-                        candidate_locs.append(self.rng.uniform(0, 1))
+                        candidate_locs.append(sample_loc)
                         candidate_dxpos.append(self.rng.uniform(-0.15, 0.15, size=3))  # TODO: add waypoint
                     elif s_i in [Strategies.RELEASE, Strategies.STAY]:
                         candidate_locs.append(-1)
@@ -142,46 +156,6 @@ class HomotopyRegraspPlanner:
 
                 grasps_inputs.append(SimGraspInput(strategy, candidate_locs, candidate_dxpos))
         return grasps_inputs
-
-    def simulate_grasp(self, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, viz_execution=False):
-        strategy = grasp_input.strategy
-        candidate_locs = grasp_input.candidate_locs
-        candidate_dxpos = grasp_input.candidate_dxpos
-        initial_locs = get_grasp_locs(phy)
-
-        viz = viz if viz_execution else None
-        phy_plan = phy.copy_all()
-
-        candidate_pos = grasp_locations_to_xpos(phy_plan, candidate_locs)
-        tool_paths = get_tool_paths(candidate_pos, candidate_dxpos)
-
-        # release and settle for any moving grippers
-        release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
-
-        res = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, viz_execution)
-
-        if res.error_code.val != MoveItErrorCodes.SUCCESS:
-            return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
-
-        if viz_execution:
-            self.grasp_rrt.display_result(res)
-
-        plan_final_q = np.array(res.trajectory.joint_trajectory.points[-1].positions)
-
-        # Teleport to the final planned joint configuration
-        qpos_for_act = phy_plan.m.actuator_trnid[:, 0]
-        phy_plan.d.qpos[qpos_for_act] = plan_final_q
-        phy_plan.d.act = plan_final_q
-        mujoco.mj_forward(phy_plan.m, phy_plan.d)
-        if viz_execution:
-            viz.viz(phy_plan, is_planning=True)
-
-        # Activate grasps
-        grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
-
-        # TODO: also use RRT to plan the dxpos motions
-
-        return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
 
     def get_best(self, sim_grasps, viz: Optional[Viz], log_loops=False) -> SimGraspCandidate:
         best_cost = np.inf
@@ -286,6 +260,53 @@ class HomotopyRegraspPlanner:
 
     def in_collision(self, p):
         return self.cc.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
+
+
+def simulate_grasp_parallel(phy: Physics, grasp_input: SimGraspInput):
+    grasp_rrt = GraspRRT()
+    return simulate_grasp(grasp_rrt, phy, None, grasp_input, viz_execution=False)
+
+
+def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput,
+                   viz_execution=False):
+    strategy = grasp_input.strategy
+    candidate_locs = grasp_input.candidate_locs
+    candidate_dxpos = grasp_input.candidate_dxpos
+    initial_locs = get_grasp_locs(phy)
+
+    viz = viz if viz_execution else None
+    phy_plan = phy.copy_all()
+
+    candidate_pos = grasp_locations_to_xpos(phy_plan, candidate_locs)
+    tool_paths = get_tool_paths(candidate_pos, candidate_dxpos)
+
+    # release and settle for any moving grippers
+    release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
+
+    res = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, viz_execution)
+
+    if res.error_code.val != MoveItErrorCodes.SUCCESS:
+        return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
+
+    if viz_execution:
+        grasp_rrt.display_result(res)
+
+    plan_final_q = np.array(res.trajectory.joint_trajectory.points[-1].positions)
+
+    # Teleport to the final planned joint configuration
+    qpos_for_act = phy_plan.m.actuator_trnid[:, 0]
+    phy_plan.d.qpos[qpos_for_act] = plan_final_q
+    phy_plan.d.act = plan_final_q
+    mujoco.mj_forward(phy_plan.m, phy_plan.d)
+    if viz_execution:
+        viz.viz(phy_plan, is_planning=True)
+
+    # Activate grasps
+    grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
+
+    # TODO: also use RRT to plan the dxpos motions
+
+    return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
 
 
 def line_collision_free(cc: CollisionChecker, tools_paths):

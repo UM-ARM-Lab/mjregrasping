@@ -14,11 +14,11 @@ logger = logging.getLogger(f'rosout.{__name__}')
 
 def execute_grasp_plan(phy: Physics, qs, viz: Viz, is_planning: bool, mov: Optional[MjMovieMaker] = None):
     for q in qs:
-        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov)
+        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, reached_tol=5.0, stopped_tol=5.0)
 
 
 def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_planning: bool = False,
-                        mov: Optional[MjMovieMaker] = None):
+                        mov: Optional[MjMovieMaker] = None, reached_tol=1.0, stopped_tol=0.5):
     q_prev = get_q(phy)
     for i in range(100):
         viz.viz(phy, is_planning)
@@ -38,8 +38,8 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_plannin
         abs_qvel = np.abs(q_prev - q_current)
         offending_qvel_idx = np.argmax(abs_qvel)
         # NOTE: this assumes all joints are rotational...
-        reached = np.rad2deg(max_joint_error) < 1
-        stopped = np.rad2deg(np.max(abs_qvel)) < 0.5
+        reached = np.rad2deg(max_joint_error) < reached_tol
+        stopped = np.rad2deg(np.max(abs_qvel)) < stopped_tol
         if reached and stopped:
             return
 
