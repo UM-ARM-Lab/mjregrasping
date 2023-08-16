@@ -6,15 +6,17 @@ from dynamic_reconfigure.server import Server
 
 # These values are considered const by convention
 hp = {
-    "regrasp_horizon":                 15,
+    "regrasp_horizon":                 3,
     "regrasp_n_samples":               50,
     "regrasp_temp":                    0.15,
     "goal_weight":                     1.0,
     "grasp_pos_weight":                1.0,
     "grasp_near_weight":               1.0,
     "grasp_finger_weight":             0.5,
-    "grasp_loc_diff_thresh":           0.07,  # A percentage of rope length
+    "grasp_loc_diff_thresh":           0.025,  # A percentage of rope length
     "smoothness_weight":               0.02,
+    "angle_cost_weight":               0.1,  # for ThreadingGoal
+    "thread_geodesic_w":               5.0,
     "home_weight":                     0.002,
     "nearby_locs_weight":              10,
     "unstable_weight":                 100,
@@ -24,8 +26,6 @@ hp = {
     "state_history_size":              8,
     "warmstart":                       8,
     "settle_steps":                    10,
-    "thread_dir_weight":               1.0,  # for threading
-    "thread_orient_weight":            0.0,  # for threading
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
     "gripper_to_goal_weight":          0.2,

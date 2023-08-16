@@ -21,7 +21,6 @@ from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_gripper_ctrl_indices, get_q
-from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
 from mjregrasping.rrt import GraspRRT
@@ -81,7 +80,8 @@ def rr_log_costs(entity_path, entity_paths, values, colors, strategy, locs):
 
 class HomotopyRegraspPlanner:
 
-    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, collision_checker: CollisionChecker, seed=0):
+    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict,
+                 collision_checker: CollisionChecker, seed=0):
         self.op_goal = op_goal
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
@@ -119,18 +119,11 @@ class HomotopyRegraspPlanner:
         return sim_grasps
 
     def simulate_grasps(self, grasps_inputs, phy, viz, viz_execution):
-        # TODO: Parallelize this
         sim_grasps = []
         for grasp_input in grasps_inputs:
             sim_grasp = simulate_grasp(self.grasp_rrt, phy, viz, grasp_input, viz_execution)
             sim_grasps.append(sim_grasp)
         return sim_grasps
-
-    def simulate_grasps_parallel(self, grasps_inputs, phy):
-        _target = partial(simulate_grasp_parallel, phy)
-        with mp.Pool(mp.cpu_count()) as p:
-            sim_grasps = p.map(_target, grasps_inputs)
-            return sim_grasps
 
     def sample_grasp_inputs(self, phy):
         grasps_inputs = []
@@ -262,6 +255,15 @@ class HomotopyRegraspPlanner:
         return self.cc.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
 
 
+def simulate_grasps_parallel(grasps_inputs, phy):
+    # NOTE: this is actually slower than the serial version, not sure why,
+    #  but recreating the GraspRRT object is definitely part of the problem
+    _target = partial(simulate_grasp_parallel, phy)
+    with mp.Pool(mp.cpu_count()) as p:
+        sim_grasps = p.map(_target, grasps_inputs)
+        return sim_grasps
+
+
 def simulate_grasp_parallel(phy: Physics, grasp_input: SimGraspInput):
     grasp_rrt = GraspRRT()
     return simulate_grasp(grasp_rrt, phy, None, grasp_input, viz_execution=False)
@@ -329,7 +331,7 @@ def get_tool_paths(candidate_pos, candidate_dxpos):
     return tool_paths
 
 
-def get_geodesic_dist(locs, op_goal):
+def get_geodesic_dist(locs, op_goal: ObjectPointGoal):
     return np.min(np.abs(locs - op_goal.loc))
 
 

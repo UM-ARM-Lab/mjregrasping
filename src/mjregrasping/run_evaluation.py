@@ -13,6 +13,7 @@ from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_mpc import RegraspMPC, UnsolvableException
+from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.scenarios import Scenario
 from mjregrasping.viz import make_viz
 

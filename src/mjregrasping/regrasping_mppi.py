@@ -71,8 +71,7 @@ class RegraspMPPI:
                                                                           num_samples,
                                                                           viz=None)
 
-        cost_term_names = goal.cost_names() + ['smoothness', 'ever_not_grasping']
-        for cost_term_name, costs_for_term in zip(cost_term_names, costs_by_term.T):
+        for cost_term_name, costs_for_term in zip(goal.cost_names(), costs_by_term.T):
             rr.log_scalar(f'regrasp_goal/{cost_term_name}', np.mean(costs_for_term))
 
         # normalized cost is only used for visualization, so we avoid numerical issues
@@ -152,7 +151,6 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     do_grasp_dynamics(phy, results_0)
     results = [results_0]
 
-    costs = []
     for t, u in enumerate(u_sample):
         control_step(phy, u, sub_time_s=sub_time_s)
         if viz:
@@ -160,34 +158,12 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
             viz.viz(phy, is_planning=True)
         results_t = goal.get_results(phy)
 
-        # If we haven't created a new grasp, we should add the grasp cost
-        # This encourages grasping as quickly as possible
-        costs_t = goal.cost(results_t)
-
         results.append(results_t)
-        costs.append(costs_t)
 
     results = np.stack(results, dtype=object, axis=1)
+    costs_by_term = goal.costs(results, u_sample)  # ignore cost of initial state, it doesn't matter for planning
 
-    # receding horizon cost
-    gammas = np.power(0.9, np.arange(u_sample.shape[0]))
-    costs = np.stack(costs, axis=0)
-    per_time_cost = np.dot(gammas, np.sum(costs, axis=-1))
-
-    # FIXME: do a better smoothness cost that is more than just one time step, do the full correlation or something
-    #  also how do we treat magnitude vs direction?
-    u_diff_normalized = (u_sample[1:] - u_sample[:-1])
-    smoothness_costs = norm(u_diff_normalized, axis=-1)
-    smoothness_cost = np.dot(gammas[:-1], smoothness_costs) * hp['smoothness_weight']
-
-    is_grasping = as_float(results[2])
-    no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
-    ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
-
-    cost = per_time_cost + smoothness_cost + ever_not_grasping_cost
-
-    full_traj_costs = [smoothness_cost, ever_not_grasping_cost]
-    costs_by_term = np.concatenate([costs.T @ gammas, full_traj_costs], 0)
+    cost = sum(costs_by_term)
 
     return results, cost, costs_by_term
 

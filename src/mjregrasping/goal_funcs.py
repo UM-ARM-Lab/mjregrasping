@@ -3,6 +3,7 @@ import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.geometry import point_to_line_segment, pairwise_squared_distances
+from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -76,6 +77,8 @@ def get_tool_points(phy):
 
 def get_rope_points(phy):
     rope_points = phy.d.xpos[phy.o.rope.body_indices]
+    end_point = grasp_locations_to_xpos(phy, np.ones(1))[0]
+    rope_points = np.concatenate([rope_points, [end_point]])
     return rope_points
 
 
@@ -147,13 +150,12 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
     regrasp_pos_cost = np.sum(regrasp_dists * desired_is_grasping, -1) * hp['grasp_pos_weight']
 
     dists = pairwise_squared_distances(tools_pos, rope_points)
-    min_dist = np.min(dists)
+    min_dist = np.min(np.min(dists, axis=-1), axis=-1)
     regrasp_near_cost = min_dist * hp['grasp_near_weight']
 
     desired_open = check_should_be_open(current_grasp_locs, is_grasping, desired_locs, desired_is_grasping)
     # Double the q_open, so we are encouraged to open a lot more than the minimum required to release the rope
-    desired_finger_qs = np.array(
-        [2 * hp['finger_q_open'] if open_i else hp['finger_q_closed'] for open_i in desired_open])
+    desired_finger_qs = np.where(desired_open, 2 * hp['finger_q_open'], hp['finger_q_closed'])
     regrasp_finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1)) * hp['grasp_finger_weight']
 
     return regrasp_finger_cost, regrasp_pos_cost, regrasp_near_cost

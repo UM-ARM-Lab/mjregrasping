@@ -8,6 +8,7 @@ from matplotlib import cm
 
 import rospy
 from mjregrasping.buffer import Buffer
+from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, release_and_settle, grasp_and_settle, \
     get_geodesic_dist
@@ -33,7 +34,8 @@ class UnsolvableException(Exception):
 
 class RegraspMPC:
 
-    def __init__(self, pool: ThreadPoolExecutor, mppi_nu: int, skeletons, sdf, goal, seed: int, viz: Viz,
+    def __init__(self, pool: ThreadPoolExecutor, mppi_nu: int, skeletons, sdf, goal: ObjectPointGoal, seed: int,
+                 viz: Viz,
                  mov: Optional[MjMovieMaker] = None):
         self.mppi_nu = mppi_nu
         self.skeletons = skeletons

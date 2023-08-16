@@ -61,14 +61,14 @@ class RegraspGoal(MPPIGoal):
         return result(tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint,
                       finger_qs, grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost)
 
-    def cost(self, results):
+    def costs(self, results, u_sample):
         (tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint, finger_qs,
          grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost) = as_floats(results)
-        keypoint_dist = norm(keypoint - self.op_goal.goal_point, axis=-1)
+        op_goal_cost = self.op_goal.cost(rope_points, keypoint)
 
         unstable_cost = is_unstable * hp['unstable_weight']
 
-        goal_cost = keypoint_dist * hp['goal_weight']
+        goal_cost = op_goal_cost * hp['goal_weight']
 
         nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
 
@@ -77,11 +77,32 @@ class RegraspGoal(MPPIGoal):
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
-        gripper_to_goal_cost = np.sum(norm(tools_pos - self.op_goal.goal_point, axis=-1) * is_grasping)
+        gripper_to_goal_cost = np.sum(norm(tools_pos - self.op_goal.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
 
         desired_q = np.zeros_like(joint_positions)
-        desired_q_cost = np.sum(np.abs(joint_positions - desired_q)) * hp['home_weight']
+        desired_q_cost = np.sum(np.abs(joint_positions - desired_q), axis=-1) * hp['home_weight']
+
+        # FIXME: do a better smoothness cost that is more than just one time step, do the full correlation or something
+        #  also how do we treat magnitude vs direction?
+        u_diff_normalized = (u_sample[1:] - u_sample[:-1])
+        smoothness_costs = norm(u_diff_normalized, axis=-1)
+        smoothness_cost = smoothness_costs * hp['smoothness_weight']
+
+        contact_cost = sum(contact_cost)
+        unstable_cost = sum(unstable_cost)
+        goal_cost = sum(goal_cost)
+        grasp_finger_cost = sum(grasp_finger_cost)
+        grasp_pos_cost = sum(grasp_pos_cost)
+        grasp_near_cost = sum(grasp_near_cost)
+        desired_q_cost = sum(desired_q_cost)
+        nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost)
+        gripper_to_goal_cost = sum(gripper_to_goal_cost)
+        smoothness_cost = sum(smoothness_cost)
+
+        is_grasping = as_float(results[2])
+        no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
+        ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
 
         return (
             contact_cost,
@@ -94,6 +115,8 @@ class RegraspGoal(MPPIGoal):
             desired_q_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
+            ever_not_grasping_cost,
+            smoothness_cost,
         )
 
     @staticmethod
@@ -108,6 +131,8 @@ class RegraspGoal(MPPIGoal):
             "desired_q",
             "nongrasping_rope_contact",
             "gripper_to_goal",
+            "ever_not_grasping",
+            "smoothness",
         ]
 
     def viz_result(self, phy: Physics, result, idx: int, scale, color):
