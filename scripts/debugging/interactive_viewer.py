@@ -17,10 +17,10 @@ from geometry_msgs.msg import Pose, Quaternion
 from mjregrasping.basic_3d_pose_marker import Basic3DPoseInteractiveMarker
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.jacobian_ctrl import get_w_in_tool, warn_near_joint_limits
-from mjregrasping.mjsaver import save_data_and_eq
+from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
-from mjregrasping.physics import Physics, rescale_ctrl, get_q
+from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import control_step
 from mjregrasping.scenarios import cable_harness, setup_cable_harness
 from mjregrasping.viz import make_viz
@@ -104,13 +104,12 @@ def main():
     rr.init("viewer")
     rr.connect()
 
-    d = mujoco.MjData(m)
-    # state_path = Path("states/CableHarness/1689602983.pkl")
-    # d = load_data_and_eq(m, state_path, True)
-    phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     viz = make_viz(scenario)
-
-    setup_cable_harness(phy, viz)
+    d = mujoco.MjData(m)
+    state_path = Path("states/CableHarness/init0.pkl")
+    d = load_data_and_eq(m, state_path, True)
+    phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+    # setup_cable_harness(phy, viz)
 
     left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)
     init_im_pose(left_im, phy, 'left_tool')
@@ -182,7 +181,7 @@ def main():
         sys.exit(app.exec())
 
 
-def get_twist_for_tool(phy, im, tool_site_name, viz, w_scale=0.5):
+def get_twist_for_tool(phy, im, tool_site_name, viz, w_scale=0.2):
     pose = im.get_pose()
     desired_position = numpify(pose.position)
     current_position = phy.d.site(tool_site_name).xpos
