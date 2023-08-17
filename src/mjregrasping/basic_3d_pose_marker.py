@@ -36,12 +36,13 @@ def make_sphere(scale: float):
 
 def make_interactive_marker(name: str,
                             position: Point,
-                            make_marker: Callable):
+                            make_marker: Callable,
+                            scale=0.05):
     imarker = InteractiveMarker()
     imarker.header.frame_id = "world"
     imarker.pose.position = position
     imarker.pose.orientation.w = 1
-    imarker.scale = 0.05
+    imarker.scale = scale
 
     imarker.name = name
 
@@ -114,10 +115,12 @@ class Basic3DPoseInteractiveMarker:
                  x: float = 0,
                  y: float = 0,
                  z: float = 0,
-                 shape: Optional[str] = None,
-                 make_marker: Optional[Callable] = None):
+                 shape: Optional[str] = 'sphere',
+                 make_marker: Optional[Callable] = None,
+                 name='basic_3d_imarker',
+                 scale=0.05):
         position = Point(x, y, z)
-        self.server = InteractiveMarkerServer("basic_3d_imarkers")
+        self.server = InteractiveMarkerServer(name)
 
         if make_marker is None:
             if shape is None:
@@ -130,7 +133,7 @@ class Basic3DPoseInteractiveMarker:
                 raise NotImplementedError()
 
         self.marker_name = 'my_imarker'
-        self.imarker = make_interactive_marker(self.marker_name, position, make_marker)
+        self.imarker = make_interactive_marker(self.marker_name, position, make_marker, scale)
         self.server.insert(self.imarker, self.on_feedback)
 
         self.server.applyChanges()

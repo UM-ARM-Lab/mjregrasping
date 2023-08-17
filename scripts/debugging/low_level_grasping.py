@@ -8,21 +8,21 @@ import rerun as rr
 import torch
 from matplotlib import cm
 from pymanopt.manifolds import SpecialOrthogonalGroup
-from scipy.linalg import logm, block_diag
 
 from arc_utilities import ros_init
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
-from mjregrasping.mjsaver import load_data_and_eq
+from mjregrasping.jacobian_ctrl import get_jacobian_ctrl
+from mjregrasping.mjsaver import load_data_and_eq, save_data_and_eq
 from mjregrasping.movie import MjRenderer, MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw, transform_points
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_q, rescale_ctrl
+from mjregrasping.physics import Physics, rescale_ctrl
 from mjregrasping.real_val import RealValCommander
-from mjregrasping.rollout import control_step
-from mjregrasping.scenarios import val_untangle
-from mjregrasping.sdf_autograd import sdf_lookup
+from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
+from mjregrasping.scenarios import val_untangle, setup_untangle
 from mjregrasping.sdf_autograd import point_to_idx as point_to_idx_torch
+from mjregrasping.sdf_autograd import sdf_lookup
 from mjregrasping.viz import make_viz, Viz
 from mjregrasping.voxelgrid import point_to_idx as point_to_idx_np
 from sdf_tools.utils_3d import get_gradient
@@ -48,34 +48,19 @@ def main():
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
 
-    # d = mujoco.MjData(m)
-    # phy = Physics(m, d, objects)
-    # setup_q = np.array([
-    #     -0.6, -0.2,  # torso
-    #     0.4, 0.3, -0.3, -0.5, 0, 0, 0,  # left arm
-    #     0.1,  # left gripper
-    #     -0.8, -0.2, 0, 0.90, 0, -0.8, 0,  # right arm
-    #     0.3,  # right gripper
-    # ])
-    # pid_to_joint_config(phy, viz, setup_q, sub_time_s=DEFAULT_SUB_TIME_S)
-    # setup_q = np.array([
-    #     0.1, 0.4,  # torso
-    #     -0.4, 0.3, -0.3, 0.3, 0, 0, 0,  # left arm
-    #     0.1,  # left gripper
-    #     0.73, 0, 0.0, 0, 1.25, -1.1, 0.33,  # right arm
-    #     0.3,  # right gripper
-    # ])
-    # pid_to_joint_config(phy, viz, setup_q, sub_time_s=DEFAULT_SUB_TIME_S)
-    #
+    d = mujoco.MjData(m)
+    phy = Physics(m, d, objects)
+    setup_untangle(phy, viz)
+    # from mjregrasping.mjsaver import save_data_and_eq
     # save_data_and_eq(phy, Path(f"states/grasp/on_surface_right.pkl"))
 
     # d = load_data_and_eq(m, path=Path("states/grasp/on_surface_left.pkl"))
-    d = load_data_and_eq(m, path=Path("states/grasp/free_space_right.pkl"))
+    # d = load_data_and_eq(m, path=Path("states/grasp/free_space_right.pkl"))
     # d = load_data_and_eq(m, path=Path("states/grasp/on_surface_right.pkl"))
-    tool_idx = 1
+    tool_idx = 0
     phy = Physics(m, d, objects)
 
-    val = RealValCommander(phy.o.robot)
+    # val = RealValCommander(phy.o.robot)
 
     # TODO this is too slow. We either need to use a lower res grid or do something completely different.
     #  what if we just used the BG points and instead of computing a full SDF, we just say that gradient points towards
@@ -83,6 +68,7 @@ def main():
     sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
     sdf_np = np.array(sdf.GetRawData(), dtype=np.float64)
     sdf_np = sdf_np.reshape([sdf.GetNumXCells(), sdf.GetNumYCells(), sdf.GetNumZCells()])
+    print("Computing gradient...")
     sdf_grad_np = get_gradient(sdf, dtype=np.float64)
     sdf_origin_np = sdf.GetOriginTransform().translation().astype(np.float64)
     sdf_res_np = sdf.GetResolution()
@@ -93,11 +79,9 @@ def main():
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
 
-    w_scale = 0.5
     v_scale = 0.05
     max_v_norm = 0.03
     gripper_kp = 5.0
-    jnt_lim_avoidance = 0.25
 
     gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
@@ -162,28 +146,7 @@ def main():
         v_in_tool = get_v_in_tool(max_v_norm, skeleton, v_scale)
         v_in_world = tool2world_mat @ v_in_tool
 
-        # Now compute the angular velocity using matrix logarithm
-        # https://youtu.be/WHn9xJl43nY?t=150
-        W_in_tool = logm(grasp_mat_in_tool).real
-        w_in_tool = np.array([W_in_tool[2, 1], W_in_tool[0, 2], W_in_tool[1, 0]]) * w_scale
-
-        twist_in_tool = np.concatenate([v_in_tool, w_in_tool])
-
-        Jp = np.zeros((3, phy.m.nv))
-        Jr = np.zeros((3, phy.m.nv))
-        mujoco.mj_jacSite(phy.m, phy.d, Jp, Jr, tool_site.id)
-        J_base = np.concatenate((Jp, Jr), axis=0)
-        J_base = J_base[:, phy.m.actuator_trnid[:, 0]]
-        # Transform J from base from to gripper frame
-        J_gripper = block_diag(tool2world_mat.T, tool2world_mat.T) @ J_base
-        J_pinv = np.linalg.pinv(J_gripper)
-        # use null-space projection to avoid joint limits
-        current_q = get_q(phy)
-        zero_vels = (phy.o.rd.q_home - current_q) * jnt_lim_avoidance
-
-        warn_near_joint_limits(current_q, phy)
-
-        ctrl = J_pinv @ twist_in_tool + (np.eye(phy.m.nu) - J_pinv @ J_gripper) @ zero_vels
+        ctrl, w_in_tool = get_jacobian_ctrl(phy, tool_site, grasp_mat_in_tool, v_in_tool)
 
         # grippers
         lin_speed = np.linalg.norm(v_in_tool)
@@ -199,7 +162,7 @@ def main():
         control_step(phy, ctrl, 0.02)
 
         # send commands to the robot
-        val.send_vel_command(phy.m, ctrl)
+        # val.send_vel_command(phy.m, ctrl)
 
         viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
         viz.arrow("v", tool_site_pos, v_in_world, 'w')
@@ -212,7 +175,7 @@ def main():
             print("Grasp successful!")
             break
 
-    val.stop()
+    # val.stop()
 
 
 def get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos, rope_points_in_tool, sdf_np, sdf_grad_np,
@@ -309,27 +272,6 @@ def get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos, rope_poin
             grasp_pos_in_tool += good_grasp_grad
 
     return grasp_mat_in_tool, grasp_pos_in_tool
-
-
-def warn_near_joint_limits(current_q, phy):
-    low = phy.m.actuator_actrange[:, 0]
-    high = phy.m.actuator_actrange[:, 1]
-    near_low = current_q < low + np.deg2rad(5)
-    near_high = current_q > high - np.deg2rad(5)
-    if np.any(near_low):
-        i = np.where(near_low)[0][0]
-        name_i = phy.o.robot.joint_names[i]
-        q_i = current_q[i]
-        limit_i = phy.m.actuator_actrange[i, 0]
-        print(f"WARNING: joint {name_i} is at {q_i}, near lower limit of {limit_i}!")
-    elif np.any(near_high):
-        i = np.where(near_high)[0][0]
-        joint_i = phy.m.actuator_trnid[:, 0][i]
-        name_i = phy.o.robot.joint_names[joint_i]
-
-        q_i = current_q[i]
-        limit_i = phy.m.actuator_actrange[i, 1]
-        print(f"WARNING: joint {name_i} is at {q_i}, near upper limit of {limit_i}!")
 
 
 def mj_get_rgbd_and_rope_mask(d, hand_r, phy):

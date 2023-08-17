@@ -1,4 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+from mjregrasping.mjsaver import save_data_and_eq
 from typing import Optional
 
 import numpy as np
@@ -72,7 +74,7 @@ class RegraspMPC:
         self.reset_trap_detection()
 
         itr = 0
-        max_iters = 5000
+        max_iters = 100
         command = None
         sub_time_s = None
         self.viz.viz(phy)
@@ -94,29 +96,7 @@ class RegraspMPC:
             needs_reset = False
             if np.any(is_stuck_vec):
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
-                initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), self.op_goal)
-                needs_reset = True
-                sim_grasps = planner.simulate_sampled_grasps(phy, self.viz, viz_execution=False)
-                best_grasp = planner.get_best(sim_grasps, self.viz)
-                new_geodesic_cost = get_geodesic_dist(best_grasp.locs, self.op_goal)
-
-                # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
-                if new_geodesic_cost >= initial_geodesic_cost:
-                    print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
-                    print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
-                    planner.update_blacklists(phy)
-                    best_grasp = planner.get_best(sim_grasps, self.viz)
-
-                self.viz.viz(best_grasp.phy, is_planning=True)
-
-                # now execute the plan
-                release_and_settle(phy, best_grasp.strategy, self.viz, is_planning=False, mov=self.mov)
-                qs = np.array([p.positions for p in best_grasp.res.trajectory.joint_trajectory.points])
-                execute_grasp_plan(phy, qs, self.viz, is_planning=False, mov=self.mov)
-                grasp_and_settle(phy, best_grasp.locs, self.viz, is_planning=False, mov=self.mov)
-
-                grasp_goal.set_grasp_locs(best_grasp.locs)
-                # save_data_and_eq(phy, Path(f'states/on_stuck/{int(time.time())}.pkl'))
+                needs_reset = self.on_stuck(grasp_goal, needs_reset, phy, planner)
 
             n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
 
@@ -141,6 +121,30 @@ class RegraspMPC:
             self.mppi.roll()
 
             itr += 1
+
+    def on_stuck(self, grasp_goal: GraspGoal, phy: Physics, planner: HomotopyRegraspPlanner):
+        initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), self.op_goal)
+        sim_grasps = planner.simulate_sampled_grasps(phy, self.viz, viz_execution=False)
+        best_grasp = planner.get_best(sim_grasps, self.viz)
+        new_geodesic_cost = get_geodesic_dist(best_grasp.locs, self.op_goal)
+        # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
+        if new_geodesic_cost >= initial_geodesic_cost:
+            print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
+            print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
+            planner.update_blacklists(phy)
+            best_grasp = planner.get_best(sim_grasps, self.viz)
+        self.viz.viz(best_grasp.phy, is_planning=True)
+        # now execute the plan
+        release_and_settle(phy, best_grasp.strategy, self.viz, is_planning=False, mov=self.mov)
+        qs = np.array([p.positions for p in best_grasp.res.trajectory.joint_trajectory.points])
+        execute_grasp_plan(phy, qs, self.viz, is_planning=False, mov=self.mov)
+        grasp_and_settle(phy, best_grasp.locs, self.viz, is_planning=False, mov=self.mov)
+        grasp_goal.set_grasp_locs(best_grasp.locs)
+
+        # save_data_and_eq(phy, Path(f'states/CableHarness/stuck1.pkl'))
+
+        needs_reset = True
+        return needs_reset
 
     def check_is_stuck(self, phy):
         # TODO: split up q on a per-gripper basis

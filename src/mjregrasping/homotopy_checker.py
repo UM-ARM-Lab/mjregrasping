@@ -186,7 +186,7 @@ def add_edges(graph, rope_points, arm_points):
                 graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
 
 
-def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
+def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points, collapse_empty_gripper_cycles=True):
     """
     This function computes the full h-signature of the current state.
     Two states are homologous if and only if they have the same h-signature.
@@ -199,6 +199,9 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
             the base of the robot, and the tool bodies of the robot. The edges are the paths between the nodes.
         rope_points: The points on the rope.
         arm_points: points of the arms
+        collapse_empty_gripper_cycles: If True, then if there is a cycle between two grippers and the h-signature of
+            the cycle is 0, then we remove one of the grippers and re-run the algorithm. You probably want to set this
+            to False if you are planning hand-over-hand motions.
 
     Returns:
         The h-signature of the current state, and the loops and tool positions that were used to compute it.
@@ -234,20 +237,21 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points):
             loop = np.stack(loop)
             loops.append(loop)
 
-        removed_node = False
-        for loop, cycle in zip(loops, valid_cycles):
-            # If the loop is between grippers, and the h-signature is 0, then delete ones of the two gripper
-            # nodes and re-run the algorithm
-            gg_edge = has_gripper_gripper_edge(cycle)
-            if gg_edge is not None:
-                h = get_h_signature(loop, skeletons)
-                if np.count_nonzero(h) == 0:
-                    # arbitrarily choose the "larger" node in the edge as the one we remove.
-                    graph.remove_node(max(*gg_edge))
-                    removed_node = True
-                    break
-        if removed_node:
-            continue
+        if collapse_empty_gripper_cycles:
+            removed_node = False
+            for loop, cycle in zip(loops, valid_cycles):
+                # If the loop is between grippers, and the h-signature is 0, then delete ones of the two gripper
+                # nodes and re-run the algorithm
+                gg_edge = has_gripper_gripper_edge(cycle)
+                if gg_edge is not None:
+                    h = get_h_signature(loop, skeletons)
+                    if np.count_nonzero(h) == 0:
+                        # arbitrarily choose the "larger" node in the edge as the one we remove.
+                        graph.remove_node(max(*gg_edge))
+                        removed_node = True
+                        break
+            if removed_node:
+                continue
 
         h = Multiset([get_h_signature(loop, skeletons) for loop in loops])
 

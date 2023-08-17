@@ -2,9 +2,11 @@ import numpy as np
 from mujoco import mju_negQuat, mju_mulQuat, mju_quat2Mat, mju_mat2Quat
 from transformations import quaternion_from_euler as _wxyz_quaternion_from_euler
 from transformations import quaternion_from_matrix as _wxyz_quaternion_from_matrix
+from transformations import quaternion_matrix as _wxyz_quaternion_to_matrix
 
 from tf.transformations import quaternion_from_euler as _xyzw_quaternion_from_euler
 from tf.transformations import quaternion_from_matrix as _xyzw_quaternion_from_matrix
+from tf.transformations import quaternion_matrix as _xyzw_quaternion_to_matrix
 
 
 def xyzw_quat_from_euler(roll, pitch, yaw):
@@ -13,6 +15,14 @@ def xyzw_quat_from_euler(roll, pitch, yaw):
 
 def wxyz_quat_from_euler(roll, pitch, yaw):
     return _wxyz_quaternion_from_euler(roll, pitch, yaw)
+
+
+def xyzw_quat_to_matrix(quat):
+    return _xyzw_quaternion_to_matrix(quat)[:3, :3]
+
+
+def wxyz_quat_to_matrix(quat):
+    return _wxyz_quaternion_to_matrix(quat)[:3, :3]
 
 
 def xyzw_quat_from_matrix(matrix):

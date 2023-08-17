@@ -6,7 +6,6 @@ import mujoco
 import numpy as np
 from transformations import quaternion_from_euler
 
-from mjregrasping.bfield_integral import BFieldIntegral
 from mjregrasping.goals import ObjectPointGoal, ThreadingGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.homotopy_utils import load_skeletons
@@ -167,22 +166,35 @@ def setup_cable_harness(phy, viz):
     activate_grasp(phy, 'attach1', 0.0)
 
     q = np.array([
-        -0.4, 0.3,  # torso
+        0.4, 0.8,  # torso
         0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
         0,  # left gripper
-        0.4, 0.0, 0, 0.0, 0, 0.0, 1.5,  # right arm
-        0.3,  # right gripper
+        0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
+        0.2,  # right gripper
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
     activate_grasp(phy, 'right', 0.93)
     settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
+    q = np.array([
+        -0.2, 0.0,  # torso
+        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+        0,  # left gripper
+        0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
+        0.06,  # right gripper
+    ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-    q[-1] = 0.05  # close right gripper
+    q = np.array([
+        -0.5, 0.3,  # torso
+        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+        0,  # left gripper
+        0.3, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
+        0.06,  # right gripper
+    ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
 
 
 def make_ch_goal1(viz):
     skeletons = load_skeletons(cable_harness.skeletons_path)
-    loop1_skel = skeletons['loop1']
-    goal = ThreadingGoal(loop1_skel, demo_path=Path("states/CableHarness/goal1.pkl"), loc=1, viz=viz)
+    loop1_skel = skeletons['loop2']
+    goal = ThreadingGoal(loop1_skel, demo_path=Path("states/CableHarness/goal1.pkl"), loc=0.98, viz=viz)
     return goal

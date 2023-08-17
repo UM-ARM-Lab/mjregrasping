@@ -129,9 +129,13 @@ class HomotopyRegraspPlanner:
         grasps_inputs = []
         is_grasping = get_is_grasping(phy)
         for strategy in get_all_strategies_from_phy(phy):
-            for i in range(15):
+            for i in range(20):
                 if i == 0:
                     sample_loc = self.op_goal.loc
+                elif i == 1:
+                    sample_loc = 0
+                elif i == 2:
+                    sample_loc = 1
                 else:
                     sample_loc = self.rng.uniform(0, 1)
                 candidate_locs = []

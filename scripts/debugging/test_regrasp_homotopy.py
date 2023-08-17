@@ -22,7 +22,7 @@ from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle, make_untangle_goal
+from mjregrasping.scenarios import val_untangle, make_untangle_goal, cable_harness
 from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import Viz
 
@@ -33,7 +33,7 @@ def main():
     rr.init('test_regrasp_homotopy')
     rr.connect()
 
-    scenario = val_untangle
+    scenario = cable_harness
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     tfw = TF2Wrapper()
@@ -53,11 +53,11 @@ def main():
     goal = make_untangle_goal(viz)
     r = MjRenderer(m)
 
-    states_dir = Path("states/untangle")
     rr.set_time_sequence('homotopy', 0)
     states_paths = [
-        Path("states/on_stuck/1690927082.pkl"),
-        Path("states/Untangle/1690834987.pkl"),
+        Path("states/CableHarness/stuck1.pkl"),
+        # Path("states/on_stuck/1690927082.pkl"),
+        # Path("states/Untangle/1690834987.pkl"),
     ]
     grasp_rrt = GraspRRT()
     for state_path in states_paths:
@@ -82,9 +82,9 @@ def main():
             # t1 = perf_counter()
             # print(f'parallel: {t1 - t0:.3f}s')
             t0 = perf_counter()
-            sim_grasps = planner.simulate_grasps(grasps_inputs, phy, viz=None, viz_execution=False)
+            sim_grasps = planner.simulate_grasps(grasps_inputs, phy, viz=None, viz_execution=True)
             t1 = perf_counter()
-            print(f'serial: {t1 - t0:.3f}s')
+            print(f'planning time: {t1 - t0:.3f}s')
             best_grasp = planner.get_best(sim_grasps, viz=None)
 
             costs = [planner.cost(g, None) for g in sim_grasps]
