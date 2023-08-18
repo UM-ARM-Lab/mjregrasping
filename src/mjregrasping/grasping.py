@@ -79,3 +79,15 @@ def get_loc_idx_offset_xpos(phy: Physics):
             loc = grasp_indices_to_locations(phy.o.rope.body_indices, idx) + (offset / rope_length)
             yield loc, idx, offset, xpos
         continue
+
+
+def get_eq_points(phy, eq, eq_constraint_idx):
+    body1_offset_in_body = phy.m.eq_data[eq_constraint_idx, 0:3]
+    body1_xmat = phy.d.xmat[eq.obj1id].reshape(-1, 3, 3)
+    body1_offset_in_world = (body1_xmat @ body1_offset_in_body)[0]
+    body1_pos = phy.d.xpos[eq.obj1id][0] + body1_offset_in_world
+    body2_xmat = phy.d.xmat[eq.obj2id].reshape(-1, 3, 3)
+    body2_offset_in_body = phy.m.eq_data[eq_constraint_idx, 3:6]
+    body2_offset_in_world = (body2_xmat @ body2_offset_in_body)[0]
+    body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
+    return body1_pos, body2_pos

@@ -21,7 +21,7 @@ from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
 from mjregrasping.physics import Physics, get_q
-from mjregrasping.rollout import control_step
+from mjregrasping.rollout import control_step, limit_actuator_windup, slow_when_eqs_bad
 from mjregrasping.scenarios import cable_harness, setup_cable_harness
 from mjregrasping.viz import make_viz
 from ros_numpy import numpify, msgify
@@ -33,6 +33,8 @@ class CmdType(Enum):
     RELEASE = auto()
     START_RECORDING = auto()
     STOP_RECORDING = auto()
+    DISABLE_IMS = auto()
+    ENABLE_IMS = auto()
 
 
 @dataclass
@@ -57,12 +59,19 @@ class InteractiveControls(QMainWindow):
         self.release_right_button.clicked.connect(self.release_right)
         self.start_button.clicked.connect(self.start_recording)
         self.stop_button.clicked.connect(self.stop_recording)
+        self.ims_enabled_checkbox.stateChanged.connect(self.ims_enabled_changed)
         self.show()
 
         self.latest_cmd = None
         self.save_filename = None
         self.loc = None
         self.eq_name = None
+
+    def ims_enabled_changed(self):
+        if self.ims_enabled_checkbox.isChecked():
+            self.latest_cmd = CmdType.ENABLE_IMS
+        else:
+            self.latest_cmd = CmdType.DISABLE_IMS
 
     def start_recording(self):
         self.latest_cmd = CmdType.START_RECORDING
@@ -111,6 +120,7 @@ def main():
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     # setup_cable_harness(phy, viz)
 
+
     left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)
     init_im_pose(left_im, phy, 'left_tool')
     right_im = Basic3DPoseInteractiveMarker(name='right', scale=0.1)
@@ -126,12 +136,16 @@ def main():
 
         controls_window = InteractiveControls()
         is_recording = False
+        ims_enabled = False
         now = int(time.time())
         recording_path = Path(f"demos/{scenario.name}/{now}")
         recording_path.mkdir(exist_ok=True, parents=True)
 
+        dt = phy.m.opt.timestep * 10
+        n_sub_time = int(dt / m.opt.timestep)
+
         def _update_sim():
-            nonlocal is_recording
+            nonlocal is_recording, ims_enabled
             latest_cmd = controls_window.latest_cmd
 
             step_start = time.time()
@@ -142,33 +156,61 @@ def main():
             left_twists_in_tool = get_twist_for_tool(phy, left_im, 'left_tool', viz)
             right_twists_in_tool = get_twist_for_tool(phy, right_im, 'right_tool', viz)
             twists_in_tool = np.concatenate([left_twists_in_tool, right_twists_in_tool])
+            # set the initial ctrl based on the IMs
             ctrl = get_val_dual_jac_ctrl(phy, twists_in_tool)
-            dt = phy.m.opt.timestep * 10
-            control_step(phy, ctrl, dt)
 
             # Rudimentary time keeping, will drift relative to wall clock.
             time_until_next_step = dt - (time.time() - step_start)
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
 
+            gripper_vel = 0.1
+            grasp_n_steps = 25
             if latest_cmd == CmdType.SAVE:
                 path = root / f"{controls_window.save_filename}.pkl"
                 print(f"Saving to {path}")
                 save_data_and_eq(phy, path)
             elif latest_cmd == CmdType.GRASP:
                 activate_grasp(phy, controls_window.eq_name, controls_window.loc)
+                if 'left' in controls_window.eq_name:
+                    ctrl[phy.m.actuator('leftgripper_vel').id] = -gripper_vel
+                if 'right' in controls_window.eq_name:
+                    ctrl[phy.m.actuator('rightgripper_vel').id] = -gripper_vel
+                for _ in range(grasp_n_steps):
+                    control_step(phy, ctrl, dt)
+                    viewer.sync()
+                    viz.viz(phy, is_planning=False)
             elif latest_cmd == CmdType.RELEASE:
                 phy.m.eq(controls_window.eq_name).active = 0
+                if 'left' in controls_window.eq_name:
+                    ctrl[phy.m.actuator('leftgripper_vel').id] = gripper_vel
+                if 'right' in controls_window.eq_name:
+                    ctrl[phy.m.actuator('rightgripper_vel').id] = gripper_vel
+                for _ in range(grasp_n_steps):
+                    control_step(phy, ctrl, dt)
+                    viewer.sync()
+                    viz.viz(phy, is_planning=False)
             elif latest_cmd == CmdType.START_RECORDING:
                 is_recording = True
             elif latest_cmd == CmdType.STOP_RECORDING:
                 is_recording = False
+            elif latest_cmd == CmdType.DISABLE_IMS:
+                ims_enabled = False
+            elif latest_cmd == CmdType.ENABLE_IMS:
+                ims_enabled = True
 
             if is_recording:
                 if int(d.time * 10) % 10 == 0:
                     now = int(time.time())
                     path = recording_path / f"{now}.pkl"
                     save_data_and_eq(phy, path)
+
+            # Now step the simulation
+            if ims_enabled:
+                d.ctrl = ctrl
+            slow_when_eqs_bad(phy)
+            limit_actuator_windup(phy)
+            mujoco.mj_step(m, d, nstep=n_sub_time)
 
             # ensure events are processed only once
             controls_window.latest_cmd = None

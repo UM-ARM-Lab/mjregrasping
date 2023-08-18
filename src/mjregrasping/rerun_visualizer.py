@@ -11,6 +11,7 @@ from mujoco import mjtSensor, mjtGeom, mj_id2name
 from mujoco._structs import _MjDataGeomViews, _MjModelGeomViews
 from trimesh.creation import box, cylinder
 
+from mjregrasping.grasping import get_eq_points
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics, get_total_contact_force, get_parent_child_names
 from mjregrasping.rviz import MujocoXmlMeshParser
@@ -54,6 +55,7 @@ class MjReRun:
         self.viz_bodies(phy.m, phy.d, entity_prefix, detailed)
         self.viz_sites(phy, entity_prefix)
         self.viz_contacts(phy, entity_prefix)
+        self.viz_eqs(phy, entity_prefix)
 
     def viz_sites(self, phy: Physics, entity_prefix):
         for site_id in range(phy.m.nsite):
@@ -145,8 +147,9 @@ class MjReRun:
             if eq.active and eq.type == mujoco.mjtEq.mjEQ_CONNECT:
                 color = list(to_rgba("y"))
                 color[-1] = 0.4
-                points = [phy.d.xpos[eq.obj1id][0], phy.d.xpos[eq.obj2id][0]]
-                rr.log_line_strip(f"{entity_prefix}/eq_{eq.name}", points, color=color)
+                points = get_eq_points(phy, eq, eq_constraint_idx)
+                entity_path = "/".join(filter(None, ["eqs", entity_prefix, eq.name]))
+                rr.log_line_strip(entity_path, points, color=color)
 
     def sdf(self, sdf, frame_id, idx):
         points = []

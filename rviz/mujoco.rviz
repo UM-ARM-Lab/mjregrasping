@@ -9,8 +9,6 @@ Panels:
         - /MotionPlanning1/Scene Geometry1
         - /MotionPlanning1/Scene Robot1
         - /MotionPlanning1/Planned Path1
-        - /left im1
-        - /right im1
         - /PlanningScene1/Scene Geometry1
         - /PlanningScene1/Scene Robot1
       Splitter Ratio: 0.6027777791023254
@@ -50,288 +48,12 @@ Visualization Manager:
       Show Trail: false
       Value: true
     - Class: rviz/TF
-      Enabled: true
+      Enabled: false
       Filter (blacklist): ""
       Filter (whitelist): ""
       Frame Timeout: 99999
       Frames:
         All Enabled: false
-        B_1_body:
-          Value: false
-        B_2_body:
-          Value: false
-        B_3_body:
-          Value: false
-        B_4_body:
-          Value: false
-        B_5_body:
-          Value: false
-        B_6_body:
-          Value: false
-        B_7_body:
-          Value: false
-        B_8_body:
-          Value: false
-        B_9_body:
-          Value: false
-        B_first_body:
-          Value: false
-        B_last_body:
-          Value: false
-        Drive56_mesh_geom:
-          Value: false
-        G0_geom:
-          Value: false
-        G10_geom:
-          Value: false
-        G1_geom:
-          Value: false
-        G2_geom:
-          Value: false
-        G3_geom:
-          Value: false
-        G4_geom:
-          Value: false
-        G5_geom:
-          Value: false
-        G6_geom:
-          Value: false
-        G7_geom:
-          Value: false
-        G8_geom:
-          Value: false
-        G9_geom:
-          Value: false
-        S_first_site:
-          Value: false
-        S_last_site:
-          Value: false
-        attach1_body:
-          Value: false
-        attach1_geom:
-          Value: false
-        attach2_body:
-          Value: false
-        attach2_geom:
-          Value: false
-        cable_harness_obstacles_body:
-          Value: false
-        cc_sphere_body:
-          Value: false
-        cc_sphere_geom:
-          Value: false
-        drive10_body:
-          Value: false
-        drive1_body:
-          Value: false
-        drive1_mesh_geom:
-          Value: false
-        drive2_body:
-          Value: false
-        drive3_body:
-          Value: false
-        drive41_body:
-          Value: false
-        drive41_mesh_geom:
-          Value: false
-        drive42_body:
-          Value: false
-        drive42_mesh_geom:
-          Value: false
-        drive43_body:
-          Value: false
-        drive43_mesh_geom:
-          Value: false
-        drive44_body:
-          Value: false
-        drive44_mesh_geom:
-          Value: false
-        drive45_body:
-          Value: false
-        drive45_mesh_geom:
-          Value: false
-        drive46_body:
-          Value: false
-        drive46_mesh_geom:
-          Value: false
-        drive47_body:
-          Value: false
-        drive47_housing_mesh_geom:
-          Value: false
-        drive47_mesh_geom:
-          Value: false
-        drive4_body:
-          Value: false
-        drive4_mesh_geom:
-          Value: false
-        drive50_body:
-          Value: false
-        drive56_body:
-          Value: false
-        drive57_body:
-          Value: false
-        drive57_mesh_geom:
-          Value: false
-        drive5_body:
-          Value: false
-        drive5_mesh_geom:
-          Value: false
-        drive6_body:
-          Value: false
-        drive6_mesh_geom:
-          Value: false
-        drive7_body:
-          Value: false
-        drive7_housing_mesh_geom:
-          Value: false
-        drive7_mesh_geom:
-          Value: false
-        floor_body:
-          Value: false
-        floor_geom:
-          Value: false
-        joint2_mesh_geom:
-          Value: false
-        joint3_mesh_geom:
-          Value: false
-        left_d405_body:
-          Value: false
-        left_d405_mount_geom:
-          Value: false
-        left_finger_pad2_body:
-          Value: false
-        left_finger_pad2_geom:
-          Value: false
-        left_finger_pad_body:
-          Value: false
-        left_finger_pad_geom:
-          Value: false
-        left_forearm_bracket_geom:
-          Value: false
-        left_hand_cam:
-          Value: false
-        left_hand_cam_site:
-          Value: false
-        left_shoulder_bracket_geom:
-          Value: false
-        left_tool_site:
-          Value: true
-        left_wrist_mesh_geom:
-          Value: false
-        leftforearm_body:
-          Value: false
-        leftgripper2_body:
-          Value: false
-        leftgripper2_geom:
-          Value: false
-        leftgripper_body:
-          Value: false
-        leftgripper_geom:
-          Value: false
-        leftshoulder_body:
-          Value: false
-        lefttube_and_drive_body:
-          Value: false
-        lefttube_body:
-          Value: false
-        lefttube_mesh_geom:
-          Value: false
-        leftwrist_body:
-          Value: false
-        loop1_body:
-          Value: false
-        loop1_bottom_geom:
-          Value: false
-        loop1_front_geom:
-          Value: false
-        loop1_top_geom:
-          Value: false
-        loop2_body:
-          Value: false
-        loop2_bottom_geom:
-          Value: false
-        loop2_front_geom:
-          Value: false
-        loop2_top_geom:
-          Value: false
-        loop3_body:
-          Value: false
-        loop3_bottom_geom:
-          Value: false
-        loop3_front_geom:
-          Value: false
-        loop3_top_geom:
-          Value: false
-        mycamera_body:
-          Value: false
-        mycamera_cam:
-          Value: false
-        pedestal_body:
-          Value: false
-        right_d405_body:
-          Value: false
-        right_d405_mount_geom:
-          Value: false
-        right_d450_body:
-          Value: false
-        right_finger_pad2_body:
-          Value: false
-        right_finger_pad2_geom:
-          Value: false
-        right_finger_pad_body:
-          Value: false
-        right_finger_pad_geom:
-          Value: false
-        right_forearm_bracket_geom:
-          Value: false
-        right_hand_cam:
-          Value: false
-        right_hand_cam_site:
-          Value: false
-        right_shoulder_bracket_geom:
-          Value: false
-        right_tool_site:
-          Value: true
-        rightforearm_body:
-          Value: false
-        rightgripper2_body:
-          Value: false
-        rightgripper2_geom:
-          Value: false
-        rightgripper_body:
-          Value: false
-        rightgripper_geom:
-          Value: false
-        rightshoulder_body:
-          Value: false
-        righttube_and_drive_body:
-          Value: false
-        righttube_body:
-          Value: false
-        righttube_mesh_geom:
-          Value: false
-        rightwrist_body:
-          Value: false
-        rightwrist_mesh_geom:
-          Value: false
-        rope_body:
-          Value: false
-        stand_body:
-          Value: false
-        stand_geom:
-          Value: false
-        torso_body:
-          Value: false
-        torso_geom:
-          Value: false
-        val_base_body:
-          Value: false
-        wall_geom:
-          Value: false
-        world:
-          Value: false
-        world_body:
-          Value: false
       Marker Alpha: 1
       Marker Scale: 0.4000000059604645
       Name: TF
@@ -339,290 +61,15 @@ Visualization Manager:
       Show Axes: true
       Show Names: false
       Tree:
-        world:
-          B_1_body:
-            {}
-          B_2_body:
-            {}
-          B_3_body:
-            {}
-          B_4_body:
-            {}
-          B_5_body:
-            {}
-          B_6_body:
-            {}
-          B_7_body:
-            {}
-          B_8_body:
-            {}
-          B_9_body:
-            {}
-          B_first_body:
-            {}
-          B_last_body:
-            {}
-          Drive56_mesh_geom:
-            {}
-          G0_geom:
-            {}
-          G10_geom:
-            {}
-          G1_geom:
-            {}
-          G2_geom:
-            {}
-          G3_geom:
-            {}
-          G4_geom:
-            {}
-          G5_geom:
-            {}
-          G6_geom:
-            {}
-          G7_geom:
-            {}
-          G8_geom:
-            {}
-          G9_geom:
-            {}
-          S_first_site:
-            {}
-          S_last_site:
-            {}
-          attach1_body:
-            {}
-          attach1_geom:
-            {}
-          attach2_body:
-            {}
-          attach2_geom:
-            {}
-          cable_harness_obstacles_body:
-            {}
-          cc_sphere_body:
-            {}
-          cc_sphere_geom:
-            {}
-          drive10_body:
-            {}
-          drive1_body:
-            {}
-          drive1_mesh_geom:
-            {}
-          drive2_body:
-            {}
-          drive3_body:
-            {}
-          drive41_body:
-            {}
-          drive41_mesh_geom:
-            {}
-          drive42_body:
-            {}
-          drive42_mesh_geom:
-            {}
-          drive43_body:
-            {}
-          drive43_mesh_geom:
-            {}
-          drive44_body:
-            {}
-          drive44_mesh_geom:
-            {}
-          drive45_body:
-            {}
-          drive45_mesh_geom:
-            {}
-          drive46_body:
-            {}
-          drive46_mesh_geom:
-            {}
-          drive47_body:
-            {}
-          drive47_housing_mesh_geom:
-            {}
-          drive47_mesh_geom:
-            {}
-          drive4_body:
-            {}
-          drive4_mesh_geom:
-            {}
-          drive50_body:
-            {}
-          drive56_body:
-            {}
-          drive57_body:
-            {}
-          drive57_mesh_geom:
-            {}
-          drive5_body:
-            {}
-          drive5_mesh_geom:
-            {}
-          drive6_body:
-            {}
-          drive6_mesh_geom:
-            {}
-          drive7_body:
-            {}
-          drive7_housing_mesh_geom:
-            {}
-          drive7_mesh_geom:
-            {}
-          floor_body:
-            {}
-          floor_geom:
-            {}
-          joint2_mesh_geom:
-            {}
-          joint3_mesh_geom:
-            {}
-          left_d405_body:
-            {}
-          left_d405_mount_geom:
-            {}
-          left_finger_pad2_body:
-            {}
-          left_finger_pad2_geom:
-            {}
-          left_finger_pad_body:
-            {}
-          left_finger_pad_geom:
-            {}
-          left_forearm_bracket_geom:
-            {}
-          left_hand_cam:
-            {}
-          left_hand_cam_site:
-            {}
-          left_shoulder_bracket_geom:
-            {}
-          left_tool_site:
-            {}
-          left_wrist_mesh_geom:
-            {}
-          leftforearm_body:
-            {}
-          leftgripper2_body:
-            {}
-          leftgripper2_geom:
-            {}
-          leftgripper_body:
-            {}
-          leftgripper_geom:
-            {}
-          leftshoulder_body:
-            {}
-          lefttube_and_drive_body:
-            {}
-          lefttube_body:
-            {}
-          lefttube_mesh_geom:
-            {}
-          leftwrist_body:
-            {}
-          loop1_body:
-            {}
-          loop1_bottom_geom:
-            {}
-          loop1_front_geom:
-            {}
-          loop1_top_geom:
-            {}
-          loop2_body:
-            {}
-          loop2_bottom_geom:
-            {}
-          loop2_front_geom:
-            {}
-          loop2_top_geom:
-            {}
-          loop3_body:
-            {}
-          loop3_bottom_geom:
-            {}
-          loop3_front_geom:
-            {}
-          loop3_top_geom:
-            {}
-          mycamera_body:
-            {}
-          mycamera_cam:
-            {}
-          pedestal_body:
-            {}
-          right_d405_body:
-            {}
-          right_d405_mount_geom:
-            {}
-          right_d450_body:
-            {}
-          right_finger_pad2_body:
-            {}
-          right_finger_pad2_geom:
-            {}
-          right_finger_pad_body:
-            {}
-          right_finger_pad_geom:
-            {}
-          right_forearm_bracket_geom:
-            {}
-          right_hand_cam:
-            {}
-          right_hand_cam_site:
-            {}
-          right_shoulder_bracket_geom:
-            {}
-          right_tool_site:
-            {}
-          rightforearm_body:
-            {}
-          rightgripper2_body:
-            {}
-          rightgripper2_geom:
-            {}
-          rightgripper_body:
-            {}
-          rightgripper_geom:
-            {}
-          rightshoulder_body:
-            {}
-          righttube_and_drive_body:
-            {}
-          righttube_body:
-            {}
-          righttube_mesh_geom:
-            {}
-          rightwrist_body:
-            {}
-          rightwrist_mesh_geom:
-            {}
-          rope_body:
-            {}
-          stand_body:
-            {}
-          stand_geom:
-            {}
-          torso_body:
-            {}
-          torso_geom:
-            {}
-          val_base_body:
-            {}
-          wall_geom:
-            {}
-          world_body:
-            {}
+        {}
       Update Interval: 0
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /markers
       Name: debug markers
       Namespaces:
-        left_tool_v: true
-        right_tool_v: true
+        {}
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -735,20 +182,13 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /contacts
       Name: contacts
       Namespaces:
-        G0_wall: true
-        G10_loop2_bottom: true
-        G10_loop2_front: true
-        G10_right_finger_pad: true
-        G10_rightgripper: true
-        G7_loop3_bottom: true
-        drive41_mesh_joint3_mesh: true
-        right_finger_pad_right_finger_pad2: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Acceleration_Scaling_Factor: 0.1
       Class: moveit_rviz_plugin/MotionPlanning
       Enabled: false
@@ -833,22 +273,22 @@ Visualization Manager:
       Velocity_Scaling_Factor: 0.1
     - Class: rviz/InteractiveMarkers
       Enable Transparency: true
-      Enabled: true
+      Enabled: false
       Name: left im
       Show Axes: true
       Show Descriptions: true
       Show Visual Aids: false
       Update Topic: /left/update
-      Value: true
+      Value: false
     - Class: rviz/InteractiveMarkers
       Enable Transparency: true
-      Enabled: true
+      Enabled: false
       Name: right im
       Show Axes: true
       Show Descriptions: true
       Show Visual Aids: false
       Update Topic: /right/update
-      Value: true
+      Value: false
     - Class: rviz/Image
       Enabled: false
       Image Topic: fig
@@ -1432,7 +872,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.5422917604446411
+      Distance: 3.674696445465088
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -1440,17 +880,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.00422471109777689
-        Y: 0.6297885775566101
-        Z: 0.1178029328584671
+        X: 0.29070204496383667
+        Y: 0.8117799758911133
+        Z: 0.33959588408470154
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 1.004797339439392
+      Pitch: 0.1397980898618698
       Target Frame: anim_camera
-      Yaw: 4.538259029388428
+      Yaw: 5.063295364379883
     Saved: ~
 Window Geometry:
   Displays:

@@ -154,6 +154,13 @@
      </layout>
     </item>
     <item>
+     <widget class="QCheckBox" name="ims_enabled_checkbox">
+      <property name="text">
+       <string>IMs Enabled</string>
+      </property>
+     </widget>
+    </item>
+    <item>
      <layout class="QHBoxLayout" name="horizontalLayout_5">
       <item>
        <widget class="QPushButton" name="reset_button">

@@ -80,12 +80,20 @@ def get_true_homotopy_different(skeletons: Dict, phy1: Physics, phy2: Physics, l
     return true_homotopy_different
 
 
-def get_full_h_signature_from_phy(skeletons: Dict, phy: Physics):
+DEFAULT_COLLAPSE_EMPTY_GRIPPER_CYCLES = True
+GRIPPER_IDS_IN_H_SIGNATURE = False
+
+
+def get_full_h_signature_from_phy(skeletons: Dict, phy: Physics,
+                                  collapse_empty_gripper_cycles=DEFAULT_COLLAPSE_EMPTY_GRIPPER_CYCLES,
+                                  gripper_ids_in_h_signature=GRIPPER_IDS_IN_H_SIGNATURE):
     graph = create_graph_nodes(phy)
     rope_points = get_rope_points(phy)
     arm_points = get_arm_points(phy)
 
-    return get_full_h_signature(skeletons, graph, rope_points, arm_points)
+    return get_full_h_signature(skeletons, graph, rope_points, arm_points,
+                                collapse_empty_gripper_cycles,
+                                gripper_ids_in_h_signature)
 
 
 def get_arm_points(phy: Physics):
@@ -186,7 +194,8 @@ def add_edges(graph, rope_points, arm_points):
                 graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
 
 
-def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points, collapse_empty_gripper_cycles=True):
+def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
+                         collapse_empty_gripper_cycles, gripper_ids_in_h_signature):
     """
     This function computes the full h-signature of the current state.
     Two states are homologous if and only if they have the same h-signature.
@@ -202,6 +211,8 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points, collap
         collapse_empty_gripper_cycles: If True, then if there is a cycle between two grippers and the h-signature of
             the cycle is 0, then we remove one of the grippers and re-run the algorithm. You probably want to set this
             to False if you are planning hand-over-hand motions.
+        gripper_ids_in_h_signature: If True, then the h-signature will include the ids of the grippers. You probably
+            want to set this to True if you are planning hand-over-hand motions.
 
     Returns:
         The h-signature of the current state, and the loops and tool positions that were used to compute it.
@@ -219,12 +230,18 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points, collap
             # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
             # detection we don't care about direction.
             if len(cycle) == 3 and 'b' in cycle and check_new_cycle(cycle, valid_cycles):
+                # ensure all cycles start with b
+                while True:
+                    if cycle[0] == 'b':
+                        break
+                    cycle = cycle[1:] + cycle[:1]
                 valid_cycles.append(cycle)
 
         if len(valid_cycles) == 0:
             return NO_HOMOTOPY, []  # No valid cycles, so we give it a bogus h value
 
         loops = []
+        loop_ids = []
         for valid_cycle in valid_cycles:
             # Close the cycle by adding the first node to the end,
             # so that we can get the edge_path of edge from the last node back to the first node.
@@ -235,7 +252,9 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points, collap
                 loop.extend(edge_path)
             loop.append(loop[0])
             loop = np.stack(loop)
+            loop_id = ','.join(valid_cycle[:-1])
             loops.append(loop)
+            loop_ids.append(loop_id)
 
         if collapse_empty_gripper_cycles:
             removed_node = False
@@ -253,7 +272,11 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points, collap
             if removed_node:
                 continue
 
-        h = Multiset([get_h_signature(loop, skeletons) for loop in loops])
+        h = [get_h_signature(loop, skeletons) for loop in loops]
+        if gripper_ids_in_h_signature:
+            # Add the gripper ids to the h-signature
+            h = [(loop_id,) + h_i for loop_id, h_i in zip(loop_ids, h)]
+        h = Multiset(h)
 
         return h, loops
 
@@ -283,7 +306,7 @@ def compare_h_signature_to_goal(skeletons: Dict, rope_points, goal_rope_points):
     ASSUMPTION: the start and end points of rope_points and goal_rope_points are close or the same.
     """
     h = get_h_signature_for_goal(skeletons, rope_points, goal_rope_points)
-    zero_h = (0, ) * len(skeletons)
+    zero_h = (0,) * len(skeletons)
     return h == zero_h
 
 

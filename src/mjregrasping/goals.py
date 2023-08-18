@@ -146,7 +146,7 @@ class ThreadingGoal(ObjectPointGoal):
             rope_points[0] + np.array([0, 0, -1]),
             rope_points[0]
         ]], axis=0)
-        self.viz.lines(rope_loop, ns='rope_loop', idx=0, scale=0.01, color='b')
+        # self.viz.lines(rope_loop, ns='rope_loop', idx=0, scale=0.01, color='b')
         h = get_h_signature(rope_loop, {'obs': self.skel})[0]
         through = (h == 1)
         return through

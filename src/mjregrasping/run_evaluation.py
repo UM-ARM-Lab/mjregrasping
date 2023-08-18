@@ -40,18 +40,18 @@ def run_evaluation(scenario: Scenario, skeletons, make_goal: Callable, setup_sce
 
         setup_scene(phy, viz)
 
+        goal = make_goal(viz)
+
         mov = MjMovieMaker(m)
         now = int(time.time())
         mov_path = root / f'seed_{seed}_{now}.mp4'
         print(f"Saving movie to {mov_path}")
         mov.start(mov_path, fps=8)
 
-        goal = make_goal(viz)
-
         with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-            mpc = RegraspMPC(pool, phy.m.nu, skeletons, sdf, goal, seed, viz, mov)
+            mpc = RegraspMPC(pool, phy.m.nu, skeletons, sdf, seed, viz, mov)
             try:
-                mpc.run(phy)
+                mpc.run_point_goal(phy, goal)
             except UnsolvableException:
                 print(f"{Fore.RED}Unsolvable{Fore.RESET}")
             mpc.close()

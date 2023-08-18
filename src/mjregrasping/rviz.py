@@ -13,6 +13,7 @@ import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import Point
 from mjregrasping.goal_funcs import is_valid_contact
+from mjregrasping.grasping import get_eq_points
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics, get_parent_child_names
 from mjregrasping.homotopy_utils import make_ring_mat
@@ -271,14 +272,7 @@ class MjRViz:
                 # body_x_axis = body_xmat[:, :, 0]
                 # xpos = body_xpos + body_x_axis * offsets[:, None]
 
-                body1_offset_in_body = phy.m.eq_data[eq_constraint_idx, 0:3]
-                body1_xmat = phy.d.xmat[eq.obj1id].reshape(-1, 3, 3)
-                body1_offset_in_world = (body1_xmat @ body1_offset_in_body)[0]
-                body1_pos = phy.d.xpos[eq.obj1id][0] + body1_offset_in_world
-                body2_xmat = phy.d.xmat[eq.obj2id].reshape(-1, 3, 3)
-                body2_offset_in_body = phy.m.eq_data[eq_constraint_idx, 3:6]
-                body2_offset_in_world = (body2_xmat @ body2_offset_in_body)[0]
-                body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
+                body1_pos, body2_pos = get_eq_points(phy, eq, eq_constraint_idx)
 
                 eq_marker.points.append(Point(*body1_pos))
                 eq_marker.points.append(Point(*body2_pos))
