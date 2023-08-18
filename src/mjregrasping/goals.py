@@ -1,17 +1,21 @@
 from copy import deepcopy
-import matplotlib.cm as cm
-from pathlib import Path
+from typing import Dict
 
+import mujoco
 import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint
-from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets
-from mjregrasping.grasping import get_is_grasping
+from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_locations_to_xpos
+from mjregrasping.grasp_strategies import Strategies
+from mjregrasping.grasping import get_is_grasping, get_finger_qs, activate_grasp
+from mjregrasping.homotopy_checker import get_loops_from_phy, get_full_h_signature_from_phy
+from mjregrasping.teleport_to_plan import teleport_to_end_of_plan, teleport_to_planned_q
 from mjregrasping.homotopy_utils import skeleton_field_dir, get_h_signature
 from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
 
 
@@ -111,18 +115,25 @@ class ObjectPointGoal(MPPIGoal):
 
 class ThreadingGoal(ObjectPointGoal):
 
-    def __init__(self, skeleton: np.ndarray, demo_path: Path, loc: float, viz: Viz):
-        goal_point = np.mean(skeleton, axis=0)
+    def __init__(self, skeletons: Dict, skeleton_name, loc: float, next_tool_name: str, next_loc: float, next_h,
+                 grasp_rrt: GraspRRT, viz: Viz):
+        self.skel = skeletons[skeleton_name]
+        goal_point = np.mean(self.skel, axis=0)
         goal_radius = 0.05  # TODO: deduce this from the skeleton
         super().__init__(goal_point, goal_radius, loc, viz)
 
-        self.skel = skeleton
-        self.goal_dir = skeleton_field_dir(skeleton, self.goal_point[None])[0] * 0.01
-        self.demo_path = demo_path
+        self.skeletons = skeletons
+        self.goal_dir = skeleton_field_dir(self.skel, self.goal_point[None])[0] * 0.01
+        self.next_tool_name = next_tool_name
+        self.next_loc = next_loc
+        self.next_h = next_h
+        self.grasp_rrt = grasp_rrt
 
     def viz_goal(self, phy: Physics):
         super().viz_goal(phy)
         self.viz.arrow('goal_dir', self.goal_point, self.goal_dir, 'g')
+        xpos = grasp_locations_to_xpos(phy, [self.loc])[0]
+        self.viz.sphere('current_loc', xpos, 0.015, 'g')
 
     def cost(self, rope_points, keypoint):
         rope_deltas = rope_points[1:] - rope_points[:-1]  # [t-1, n, 3]
@@ -140,13 +151,21 @@ class ThreadingGoal(ObjectPointGoal):
         return angle_cost + keypoint_dist
 
     def satisfied(self, phy: Physics):
-        rope_points = get_rope_points(phy)
-        rope_loop = np.concatenate([rope_points, [
-            rope_points[-1] + np.array([0, 0, -1]),
-            rope_points[0] + np.array([0, 0, -1]),
-            rope_points[0]
-        ]], axis=0)
-        # self.viz.lines(rope_loop, ns='rope_loop', idx=0, scale=0.01, color='b')
-        h = get_h_signature(rope_loop, {'obs': self.skel})[0]
-        through = (h == 1)
-        return through
+        # See if we can grasp the next loc and if we can, and it's the right homotopy, then we're done
+        from time import perf_counter
+        t0 = perf_counter()
+        res = self.grasp_rrt.plan(phy, [Strategies.NEW_GRASP, Strategies.STAY], np.array([self.next_loc, self.loc]),
+                                  viz=None, viz_execution=False, allowed_planning_time=1.0)
+        plan_found = res.error_code.val == res.error_code.SUCCESS
+        print(f'dt: {perf_counter() - t0:.4f}, {plan_found=}')
+        if not plan_found:
+            return False
+
+        # self.grasp_rrt.display_result(res)
+        phy_plan = phy.copy_all()
+        teleport_to_end_of_plan(phy_plan, res)
+        activate_grasp(phy_plan, self.next_tool_name, self.next_loc)
+
+        h, _ = get_full_h_signature_from_phy(self.skeletons, phy_plan, gripper_ids_in_h_signature=True)
+        satisfied = h == self.next_h
+        return satisfied

@@ -5,13 +5,14 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /TF1/Frames1
+        - /debug markers1/Namespaces1
         - /mujoco1/Namespaces1
         - /MotionPlanning1/Scene Geometry1
         - /MotionPlanning1/Scene Robot1
         - /MotionPlanning1/Planned Path1
         - /PlanningScene1/Scene Geometry1
         - /PlanningScene1/Scene Robot1
-      Splitter Ratio: 0.6027777791023254
+      Splitter Ratio: 0.574999988079071
     Tree Height: 844
   - Class: rviz/Selection
     Name: Selection
@@ -69,7 +70,17 @@ Visualization Manager:
       Marker Topic: /markers
       Name: debug markers
       Namespaces:
-        {}
+        ee_0: true
+        ee_1: true
+        goal: true
+        goal_dir: true
+        goal_positions/0: true
+        homotopy/left_tool_path: true
+        homotopy/right_tool_path: true
+        left_xpos: true
+        next_xpos: true
+        right_xpos: true
+        rope: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -178,6 +189,7 @@ Visualization Manager:
       Name: constraints
       Namespaces:
         eq_attach1: true
+        eq_left: true
         eq_right: true
       Queue Size: 100
       Value: true
@@ -322,8 +334,244 @@ Visualization Manager:
           Expand Link Details: false
           Expand Tree: false
           Link Tree Style: Links in Alphabetic Order
+          base:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive1:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive10:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive2:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive3:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive4:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive41:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive42:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive43:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive44:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive45:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive46:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive47:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive5:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive50:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive56:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive57:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive6:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive7:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_left:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_right:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          hdt_michigan_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          left_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          lefttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          mount:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          pedestal_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          righttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          robot_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          torso:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zed2i_baro_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_camera_center:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zed2i_left_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_left_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_mag_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_left_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_right_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
         Robot Alpha: 1
-        Show Robot Collision: false
+        Show Robot Collision: true
         Show Robot Visual: false
       Value: false
     - Class: moveit_rviz_plugin/Trajectory
@@ -577,7 +825,7 @@ Visualization Manager:
       Robot Alpha: 0.5
       Robot Color: 150; 50; 150
       Robot Description: hdt_michigan/robot_description
-      Show Robot Collision: false
+      Show Robot Collision: true
       Show Robot Visual: false
       Show Trail: false
       State Display Time: 0.05s
@@ -872,7 +1120,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.674696445465088
+      Distance: 1.7312541007995605
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -880,17 +1128,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.29070204496383667
-        Y: 0.8117799758911133
-        Z: 0.33959588408470154
+        X: 0.17749148607254028
+        Y: 0.5876166820526123
+        Z: 0.3504704236984253
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.1397980898618698
+      Pitch: 0.7647964954376221
       Target Frame: anim_camera
-      Yaw: 5.063295364379883
+      Yaw: 5.468418598175049
     Saved: ~
 Window Geometry:
   Displays:

@@ -5,7 +5,6 @@ from functools import partial
 from time import perf_counter
 from typing import Dict, Optional, List
 
-import mujoco
 import numpy as np
 import rerun as rr
 from matplotlib import cm
@@ -21,6 +20,7 @@ from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_gripper_ctrl_indices, get_q
+from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
 from mjregrasping.rrt import GraspRRT
@@ -297,13 +297,8 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     if viz_execution:
         grasp_rrt.display_result(res)
 
-    plan_final_q = np.array(res.trajectory.joint_trajectory.points[-1].positions)
-
     # Teleport to the final planned joint configuration
-    qpos_for_act = phy_plan.m.actuator_trnid[:, 0]
-    phy_plan.d.qpos[qpos_for_act] = plan_final_q
-    phy_plan.d.act = plan_final_q
-    mujoco.mj_forward(phy_plan.m, phy_plan.d)
+    teleport_to_end_of_plan(phy_plan, res)
     if viz_execution:
         viz.viz(phy_plan, is_planning=True)
 

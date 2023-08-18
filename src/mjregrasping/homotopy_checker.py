@@ -96,6 +96,21 @@ def get_full_h_signature_from_phy(skeletons: Dict, phy: Physics,
                                 gripper_ids_in_h_signature)
 
 
+def get_loops_from_phy(phy):
+    graph = create_graph_nodes(phy)
+    rope_points = get_rope_points(phy)
+    arm_points = get_arm_points(phy)
+
+    add_edges(graph, rope_points, arm_points)
+
+    valid_cycles = get_valid_cycles(graph)
+
+    if len(valid_cycles) == 0:
+        raise ValueError("No valid cycles")
+
+    return get_loops(graph, valid_cycles)
+
+
 def get_arm_points(phy: Physics):
     arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in phy.o.rd.tool_bodies]
     return arm_points
@@ -223,38 +238,12 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
 
         skeletons = deepcopy(skeletons)
 
-        valid_cycles = []
-        for cycle in nx.simple_cycles(graph, length_bound=3):
-            # Cycle must be length 3 and contain the base.
-            # Also, we filter out ones that are the same as previous ones up to ordering (aka edges have no direction)
-            # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
-            # detection we don't care about direction.
-            if len(cycle) == 3 and 'b' in cycle and check_new_cycle(cycle, valid_cycles):
-                # ensure all cycles start with b
-                while True:
-                    if cycle[0] == 'b':
-                        break
-                    cycle = cycle[1:] + cycle[:1]
-                valid_cycles.append(cycle)
+        valid_cycles = get_valid_cycles(graph)
 
         if len(valid_cycles) == 0:
             return NO_HOMOTOPY, []  # No valid cycles, so we give it a bogus h value
 
-        loops = []
-        loop_ids = []
-        for valid_cycle in valid_cycles:
-            # Close the cycle by adding the first node to the end,
-            # so that we can get the edge_path of edge from the last node back to the first node.
-            valid_cycle = valid_cycle + [valid_cycle[0]]
-            loop = []
-            for edge in pairwise(valid_cycle):
-                edge_path = graph.get_edge_data(*edge)['edge_path']
-                loop.extend(edge_path)
-            loop.append(loop[0])
-            loop = np.stack(loop)
-            loop_id = ','.join(valid_cycle[:-1])
-            loops.append(loop)
-            loop_ids.append(loop_id)
+        loop_ids, loops = get_loops(graph, valid_cycles)
 
         if collapse_empty_gripper_cycles:
             removed_node = False
@@ -279,6 +268,42 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
         h = Multiset(h)
 
         return h, loops
+
+
+def get_loops(graph, valid_cycles):
+    loops = []
+    loop_ids = []
+    for valid_cycle in valid_cycles:
+        # Close the cycle by adding the first node to the end,
+        # so that we can get the edge_path of edge from the last node back to the first node.
+        valid_cycle = valid_cycle + [valid_cycle[0]]
+        loop = []
+        for edge in pairwise(valid_cycle):
+            edge_path = graph.get_edge_data(*edge)['edge_path']
+            loop.extend(edge_path)
+        loop.append(loop[0])
+        loop = np.stack(loop)
+        loop_id = ','.join(valid_cycle[:-1])
+        loops.append(loop)
+        loop_ids.append(loop_id)
+    return loop_ids, loops
+
+
+def get_valid_cycles(graph):
+    valid_cycles = []
+    for cycle in nx.simple_cycles(graph, length_bound=3):
+        # Cycle must be length 3 and contain the base.
+        # Also, we filter out ones that are the same as previous ones up to ordering (aka edges have no direction)
+        # We used a DiGraph initially because edge direction does matter for the edge_path, but for the cycle
+        # detection we don't care about direction.
+        if len(cycle) == 3 and 'b' in cycle and check_new_cycle(cycle, valid_cycles):
+            # ensure all cycles start with b
+            while True:
+                if cycle[0] == 'b':
+                    break
+                cycle = cycle[1:] + cycle[:1]
+            valid_cycles.append(cycle)
+    return valid_cycles
 
 
 def get_h_signature_for_goal(skeletons: Dict, rope_points, goal_rope_points):

@@ -142,7 +142,7 @@ class RegraspGoal(MPPIGoal):
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
-        grasp_xpos = as_float(result[9])[t0]
-        for name, xpos in zip(phy.o.rd.rope_grasp_eqs, grasp_xpos):
-            self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), idx=0,
-                            frame_id='world')
+        # grasp_xpos = as_float(result[9])[t0]
+        # for name, xpos in zip(phy.o.rd.rope_grasp_eqs, grasp_xpos):
+        #     self.viz.sphere(f'{name}_xpos', xpos, radius=hp['grasp_goal_radius'], color=(0, 1, 0, 0.4), idx=0,
+        #                     frame_id='world')

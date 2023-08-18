@@ -111,30 +111,6 @@ def get_reachability_cost(phy_before, phy_after, reached, locs, is_grasping):
     return new_contact_cost + nearby_locs_cost if reached else BIG_PENALTY
 
 
-def ray_based_reachability(candidates_xpos, phy, tools_pos, max_d=0.7):
-    # by having group 1 set to 0, we exclude the rope and grippers/fingers
-    # FIXME: this reachability check is not accurate!
-    include_groups = np.array([1, 0, 0, 0, 0, 0], dtype=np.uint8)
-    is_reachable = np.zeros([len(tools_pos), len(candidates_xpos)], dtype=bool)
-    for i, tool_pos in enumerate(tools_pos):
-        for j, xpos in enumerate(candidates_xpos):
-            out_geomids = np.array([-1], dtype=np.int32)
-            candidate_to_tool = (tool_pos - xpos)
-            # print(i, j, candidate_to_tool, out_geomids)
-            if norm(candidate_to_tool) > max_d:
-                # print("not reachable because the candidate is too far away")
-                is_reachable[i, j] = False
-                continue
-            d = mujoco.mj_ray(phy.m, phy.d, xpos, candidate_to_tool, include_groups, 1, -1, out_geomids)
-            if d > max_d or out_geomids[0] == -1:
-                # print("reachable because either there was no collision, or the collision was far away")
-                is_reachable[i, j] = True
-            else:
-                # print("not reachable because there was a collision and it was close")
-                is_reachable[i, j] = False
-    return is_reachable
-
-
 def ik_based_reachability(candidates_xpos, phy, tools_pos):
     is_reachable = np.zeros([len(tools_pos), len(candidates_xpos)], dtype=bool)
     from time import perf_counter

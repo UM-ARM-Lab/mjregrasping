@@ -39,6 +39,8 @@ def grasp_locations_to_indices_and_offsets_and_xpos(phy: Physics, grasp_location
 
 
 def grasp_locations_to_xpos(phy: Physics, grasp_locations):
+    if isinstance(grasp_locations, list):
+        grasp_locations = np.array(grasp_locations)
     grasp_indices, offsets = grasp_locations_to_indices_and_offsets(grasp_locations, phy)
     xpos = body_plus_offset(phy, grasp_indices, offsets)
     return xpos

@@ -1,6 +1,4 @@
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
-from mjregrasping.mjsaver import save_data_and_eq
 from typing import Optional, List
 
 import numpy as np
@@ -55,68 +53,6 @@ class RegraspMPC:
     def reset_trap_detection(self):
         self.state_history.reset()
         self.max_dq = 0
-
-    def run_threading_goal(self, phy: Physics, threading_goals: List[ThreadingGoal]):
-        num_samples = hp['regrasp_n_samples']
-        grasp_rrt = GraspRRT()
-
-        cc = SDFCollisionChecker(self.sdf)
-        threading_goals_idx = 0
-
-        grasp_goal = GraspGoal(get_grasp_locs(phy))
-
-        self.mppi.reset()
-        self.reset_trap_detection()
-
-        itr = 0
-        max_iters = 100
-        command = None
-        sub_time_s = None
-        self.viz.viz(phy)
-        while True:
-            if rospy.is_shutdown():
-                self.mov.close()
-                raise RuntimeError("ROS shutdown")
-
-            if itr > max_iters:
-                return False
-
-            threading_goal = threading_goals[threading_goals_idx]
-            regrasp_goal = RegraspGoal(threading_goal, grasp_goal, hp['grasp_goal_radius'], self.viz)
-            regrasp_goal.viz_goal(phy)
-
-            stuck_frac = self.check_is_stuck(phy)
-            is_stuck_vec = np.array([stuck_frac, stuck_frac]) < hp['frac_dq_threshold']
-            needs_reset = False
-            if np.any(is_stuck_vec):
-                print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
-                planner = HomotopyRegraspPlanner(threading_goal, grasp_rrt, self.skeletons, cc)
-                needs_reset = self.on_stuck(grasp_goal, threading_goal, phy, planner)
-                threading_goals_idx += 1
-
-            n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
-
-            if needs_reset:
-                self.mppi.reset()
-                self.reset_trap_detection()
-                n_warmstart = hp['warmstart']
-
-            for k in range(n_warmstart):
-                command, sub_time_s = self.mppi.command(phy, regrasp_goal, num_samples, viz=self.viz)
-                self.mppi_viz(self.mppi, regrasp_goal, phy, command, sub_time_s)
-
-            control_step(phy, command, sub_time_s)
-            self.viz.viz(phy)
-
-            if self.mov:
-                self.mov.render(phy.d)
-
-            results = regrasp_goal.get_results(phy)
-            do_grasp_dynamics(phy, results)
-
-            self.mppi.roll()
-
-            itr += 1
 
     def run_point_goal(self, phy: Physics, point_goal: ObjectPointGoal):
         num_samples = hp['regrasp_n_samples']

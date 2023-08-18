@@ -198,10 +198,3 @@ def make_ch_goal1(viz):
     loop1_skel = skeletons['loop1']
     goal = ThreadingGoal(loop1_skel, demo_path=Path("states/CableHarness/goal1.pkl"), loc=0.95, viz=viz)
     return goal
-
-
-def make_ch_goal2(viz):
-    skeletons = load_skeletons(cable_harness.skeletons_path)
-    loop1_skel = skeletons['loop2']
-    goal = ThreadingGoal(loop1_skel, demo_path=Path("states/CableHarness/goal2.pkl"), loc=0.95, viz=viz)
-    return goal
