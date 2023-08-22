@@ -89,7 +89,6 @@ class ObjectPointGoalBase(MPPIGoal):
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
-
 class ObjectPointGoal(ObjectPointGoalBase):
 
     def __init__(self, goal_point: np.array, goal_radius: float, loc: float, viz: Viz):
@@ -186,15 +185,14 @@ class ThreadingGoal(ObjectPointGoalBase):
         strategy = get_strategy(current_locs, self.next_locs)
 
         t0 = perf_counter()
-        res, scene_msg = self.grasp_rrt.plan(phy, strategy, self.next_locs, viz=None, allowed_planning_time=1.0)
-        # res, scene_msg = self.grasp_rrt.plan(phy, strategy, self.next_locs, viz=self.viz, allowed_planning_time=1.0)
+        res, scene_msg = self.grasp_rrt.plan(phy, strategy, self.next_locs, viz=self.viz, allowed_planning_time=1.0)
         plan_found = res.error_code.val == res.error_code.SUCCESS
         print(f'dt: {perf_counter() - t0:.4f}, {plan_found=}')
         if not plan_found:
             return None, None
 
         # self.viz.rviz.viz_scene(scene_msg)
-        # self.grasp_rrt.display_result(res, scene_msg)
+        # self.grasp_rrt.display_result(self.viz, res, scene_msg)
         return res, scene_msg
 
 

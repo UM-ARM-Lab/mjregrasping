@@ -48,7 +48,7 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
     ctrl = np.zeros(phy.m.nu)
     last_rope_points = get_rope_points(phy)
     last_q = get_q(phy)
-    max_t = 40
+    max_t = 50
     for t in range(max_t):
         control_step(phy, ctrl, sub_time_s=5 * DEFAULT_SUB_TIME_S)
         rope_points = get_rope_points(phy)

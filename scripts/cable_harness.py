@@ -115,8 +115,8 @@ def main():
     mpc.mppi.reset()
     mpc.reset_trap_detection()
 
-    threading_goal = goals[goal_idx]
-    regrasp_goal = RegraspGoal(threading_goal, grasp_goal, hp['grasp_goal_radius'], mpc.viz)
+    subgoal = goals[goal_idx]
+    regrasp_goal = RegraspGoal(subgoal, grasp_goal, hp['grasp_goal_radius'], mpc.viz)
 
     itr = 0
     max_iters = 500
@@ -131,32 +131,37 @@ def main():
 
         regrasp_goal.viz_goal(phy)
 
-        res, scene_msg = threading_goal.plan_to_next_locs(phy)
-        if res:
-            if threading_goal.satisfied_from_res(phy, res):
-                print(Fore.GREEN + "SubGoal reached!" + Fore.RESET)
-                mpc.mppi.reset()
-                grasp_rrt.display_result(viz, res, scene_msg)
-                goal_idx += 1
-                strategy, locs = goals[goal_idx]
-                # qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
-                # execute_grasp_plan(phy, qs, viz, is_planning=False, mov=mov, stop_on_contact=True)
-                teleport_to_end_of_plan(phy, res)
-                # force the grippers to be closed, just like we do in `make_planning_scene()`
-                teleport_grippers_closed(phy)
-                viz.viz(phy, is_planning=False)
-                grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
-                release_and_settle(phy, strategy, viz, is_planning=False, mov=mov)
-                # TODO: confirm that the H signature of the grasp is correct.
-                #  if it's not, then we need to replan the grasp.
-                grasp_goal.set_grasp_locs(locs)
+        if isinstance(subgoal, ObjectPointGoal):
+            if subgoal.satisfied(phy):
+                print(Fore.GREEN + "Goal reached!" + Fore.RESET)
+                break
+        else:
+            res, scene_msg = subgoal.plan_to_next_locs(phy)
+            if res:
+                if subgoal.satisfied_from_res(phy, res):
+                    print(Fore.GREEN + "SubGoal reached!" + Fore.RESET)
+                    mpc.mppi.reset()
+                    grasp_rrt.display_result(viz, res, scene_msg)
+                    goal_idx += 1
+                    strategy, locs = goals[goal_idx]
+                    # qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
+                    # execute_grasp_plan(phy, qs, viz, is_planning=False, mov=mov, stop_on_contact=True)
+                    teleport_to_end_of_plan(phy, res)
+                    # force the grippers to be closed, just like we do in `make_planning_scene()`
+                    teleport_grippers_closed(phy)
+                    viz.viz(phy, is_planning=False)
+                    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
+                    release_and_settle(phy, strategy, viz, is_planning=False, mov=mov)
+                    # TODO: confirm that the H signature of the grasp is correct.
+                    #  if it's not, then we need to replan the grasp.
+                    grasp_goal.set_grasp_locs(locs)
 
-                goal_idx += 1
-                threading_goal = goals[goal_idx]
-                regrasp_goal.op_goal = threading_goal
-                if goal_idx >= len(goals):
-                    print(Fore.GREEN + "Goal reached!" + Fore.RESET)
-                    break
+                    goal_idx += 1
+                    subgoal = goals[goal_idx]
+                    regrasp_goal.op_goal = subgoal
+                    if goal_idx >= len(goals):
+                        print(Fore.GREEN + "Goal reached!" + Fore.RESET)
+                        break
 
         command, sub_time_s = mpc.mppi.command(phy, regrasp_goal, num_samples, viz=mpc.viz)
         mpc.mppi_viz(mpc.mppi, regrasp_goal, phy, command, sub_time_s)

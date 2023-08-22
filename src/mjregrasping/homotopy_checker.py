@@ -112,7 +112,11 @@ def get_loops_from_phy(phy):
 
 
 def get_arm_points(phy: Physics):
-    arm_points = [parents_points(phy.m, phy.d, tool_body) for tool_body in phy.o.rd.tool_bodies]
+    arm_points = []
+    for tool_body, tool_site in zip(phy.o.rd.tool_bodies, phy.o.rd.tool_sites):
+        arm_points_i = parents_points(phy.m, phy.d, tool_body)
+        arm_points_i = np.insert(arm_points_i, 0, phy.d.site(tool_site).xpos, 0)
+        arm_points.append(arm_points_i)
     return arm_points
 
 

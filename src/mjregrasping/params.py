@@ -17,7 +17,7 @@ hp = {
     "smoothness_weight":               0.02,
     "angle_cost_weight":               0.2,  # for ThreadingGoal
     "thread_geodesic_w":               10.0,
-    "home_weight":                     0.002,
+    "home_weight":                     0.1,
     "nearby_locs_weight":              10,
     "unstable_weight":                 100,
     "ever_not_grasping_weight":        5.0,

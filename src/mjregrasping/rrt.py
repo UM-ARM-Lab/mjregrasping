@@ -18,17 +18,17 @@ class GraspRRT:
     def __init__(self):
         self.rrt = RRTPlanner()
 
-    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0):
+    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0, pos_noise=0.05):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
         # Visualize the goals
-        if viz:
-            for i, v in enumerate(goals.values()):
-                viz.sphere(f'goal_positions/{i}', v, 0.05, [0, 1, 0, 0.2])
+        # if viz:
+        #     for i, v in enumerate(goals.values()):
+        #         viz.sphere(f'goal_positions/{i}', v, 0.05, [0, 1, 0, 0.2])
 
         scene_msg = make_planning_scene(phy_plan)
-        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time)
+        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time, pos_noise)
         return res, scene_msg
 
     def display_result(self, viz, res, scene_msg):
