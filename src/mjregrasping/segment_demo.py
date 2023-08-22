@@ -19,6 +19,8 @@ def print_hs(hs):
 
 
 def load_demo(demo: Path, scenario: Scenario):
+    if not demo.exists():
+        raise ValueError(f'Demo {demo} does not exist.')
     skeletons = load_skeletons(scenario.skeletons_path)
     paths = sorted(list(demo.glob("*.pkl")))
     print(f'Found {len(paths)} states in the demonstration.')
@@ -36,7 +38,7 @@ def load_demo(demo: Path, scenario: Scenario):
         locs_seq.append(locs)
         hs.append(h)
         phys.append(phy.copy_all())
-    return hs, locs_seq, phys
+    return hs, locs_seq, phys, paths
 
 
 def viz_subgoals_by_locs(phys, locs_seq, viz):
@@ -55,15 +57,17 @@ def viz_subgoals_by_locs(phys, locs_seq, viz):
     viz.viz(phy, is_planning=False)
 
 
-def viz_subgoals_by_h(phys, hs, viz):
+def viz_subgoals_by_h(phys, hs, paths, viz):
     print_hs(hs)
     last_subgoal_h = None
     subgoal_phys = []
+    subgoal_paths = []
     rr.set_time_sequence('subgoal_by_h', 0)
-    for h, phy in zip(hs, phys):
+    for h, phy, path in zip(hs, phys, paths):
         if h != last_subgoal_h or last_subgoal_h is None:
             last_subgoal_h = h
             subgoal_phys.append(phy)
+            subgoal_paths.append(path)
             rr.set_time_sequence('subgoal_by_h', len(subgoal_phys))
             viz.viz(phy, is_planning=False, detailed=True)
             rr.log_text_entry('h', f'{h}')

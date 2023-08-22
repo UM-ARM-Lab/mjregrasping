@@ -35,6 +35,7 @@ class CmdType(Enum):
     STOP_RECORDING = auto()
     DISABLE_IMS = auto()
     ENABLE_IMS = auto()
+    RESET_TO_IMS = auto()
 
 
 @dataclass
@@ -60,12 +61,16 @@ class InteractiveControls(QMainWindow):
         self.start_button.clicked.connect(self.start_recording)
         self.stop_button.clicked.connect(self.stop_recording)
         self.ims_enabled_checkbox.stateChanged.connect(self.ims_enabled_changed)
+        self.reset_button.clicked.connect(self.reset_to_ims)
         self.show()
 
         self.latest_cmd = None
         self.save_filename = None
         self.loc = None
         self.eq_name = None
+
+    def reset_to_ims(self):
+        self.latest_cmd = CmdType.RESET_TO_IMS
 
     def ims_enabled_changed(self):
         if self.ims_enabled_checkbox.isChecked():
@@ -115,15 +120,15 @@ def main():
 
     viz = make_viz(scenario)
     d = mujoco.MjData(m)
-    state_path = Path("states/CableHarness/init0.pkl")
-    d = load_data_and_eq(m, state_path, True)
+    # state_path = Path("states/CableHarness/init0.pkl")
+    # d = load_data_and_eq(m, state_path, True)
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-    # setup_cable_harness(phy, viz)
+    setup_cable_harness(phy, viz)
 
 
     left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)
-    init_im_pose(left_im, phy, 'left_tool')
     right_im = Basic3DPoseInteractiveMarker(name='right', scale=0.1)
+    init_im_pose(left_im, phy, 'left_tool')
     init_im_pose(right_im, phy, 'right_tool')
 
     root = Path(f"states/{scenario.name}")
@@ -180,6 +185,7 @@ def main():
                     control_step(phy, ctrl, dt)
                     viewer.sync()
                     viz.viz(phy, is_planning=False)
+                zero_ctrl()
             elif latest_cmd == CmdType.RELEASE:
                 phy.m.eq(controls_window.eq_name).active = 0
                 if 'left' in controls_window.eq_name:
@@ -190,14 +196,20 @@ def main():
                     control_step(phy, ctrl, dt)
                     viewer.sync()
                     viz.viz(phy, is_planning=False)
+                zero_ctrl()
             elif latest_cmd == CmdType.START_RECORDING:
                 is_recording = True
             elif latest_cmd == CmdType.STOP_RECORDING:
                 is_recording = False
             elif latest_cmd == CmdType.DISABLE_IMS:
+                zero_ctrl()
                 ims_enabled = False
             elif latest_cmd == CmdType.ENABLE_IMS:
+                zero_ctrl()
                 ims_enabled = True
+            elif latest_cmd == CmdType.RESET_TO_IMS:
+                init_im_pose(left_im, phy, 'left_tool')
+                init_im_pose(right_im, phy, 'right_tool')
 
             if is_recording:
                 if int(d.time * 10) % 10 == 0:
@@ -214,6 +226,9 @@ def main():
 
             # ensure events are processed only once
             controls_window.latest_cmd = None
+
+        def zero_ctrl():
+            phy.d.ctrl = np.zeros(phy.m.nu)
 
         timer = QTimer()
         timer.timeout.connect(_update_sim)

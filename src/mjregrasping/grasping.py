@@ -91,3 +91,5 @@ def get_eq_points(phy, eq, eq_constraint_idx):
     body2_offset_in_world = (body2_xmat @ body2_offset_in_body)[0]
     body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
     return body1_pos, body2_pos
+
+

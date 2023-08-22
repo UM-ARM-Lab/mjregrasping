@@ -12,6 +12,7 @@ class RobotData:
     ignored_robot_self_collision_geoms_names: List[str]
     gripper_geom_names: List[List[str]]
     gripper_actuator_names: List[str]
+    gripper_joint_names: List[str]
     tool_sites: List[str]
     camera_names: List[str]
     n_g: int
@@ -37,6 +38,10 @@ val = RobotData(
     gripper_geom_names=[
         ['left_finger_pad', 'left_finger_pad2', 'leftgripper', 'leftgripper2'],
         ['right_finger_pad', 'right_finger_pad2', 'rightgripper', 'rightgripper2'],
+    ],
+    gripper_joint_names=[
+        'leftgripper', 'leftgripper2',
+        'rightgripper', 'rightgripper2'
     ],
     gripper_actuator_names=['leftgripper_vel', 'rightgripper_vel'],
     tool_sites=[
@@ -82,6 +87,7 @@ conq = RobotData(
     world_rope_eqs=['rope_hand_world'],
     tool_bodies=["hand"],
     gripper_actuator_names=['finger_vel'],
+    gripper_joint_names=['finger'],
     ik_tol=0.02,
     camera_names=['hand'],
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
@@ -92,5 +98,3 @@ conq = RobotData(
     ]),
     q_home=np.array([])
 )
-
-

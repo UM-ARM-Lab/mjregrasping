@@ -3,7 +3,7 @@ from numpy.linalg import norm
 
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, get_regrasp_costs, \
     get_nongrasping_rope_contact_cost
-from mjregrasping.goals import MPPIGoal, result, as_floats, as_float
+from mjregrasping.goals import MPPIGoal, result, as_floats, as_float, GraspLocsGoal, ObjectPointGoalBase
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, \
     grasp_locations_to_xpos
 from mjregrasping.grasping import get_is_grasping, get_finger_qs, get_grasp_locs
@@ -12,21 +12,9 @@ from mjregrasping.physics import Physics
 from mjregrasping.viz import Viz
 
 
-class GraspGoal:
-
-    def __init__(self, current_locs):
-        self.locs = current_locs
-
-    def get_grasp_locs(self):
-        return self.locs
-
-    def set_grasp_locs(self, grasp_locs):
-        self.locs = grasp_locs
-
-
 class RegraspGoal(MPPIGoal):
 
-    def __init__(self, op_goal, grasp_goal, grasp_goal_radius, viz: Viz):
+    def __init__(self, op_goal: ObjectPointGoalBase, grasp_goal: GraspLocsGoal, grasp_goal_radius, viz: Viz):
         super().__init__(viz)
         self.op_goal = op_goal
         self.grasp_goal_radius = grasp_goal_radius
@@ -81,6 +69,7 @@ class RegraspGoal(MPPIGoal):
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
 
         desired_q = np.zeros_like(joint_positions)
+        desired_q[1] = 0.5
         desired_q_cost = np.sum(np.abs(joint_positions - desired_q), axis=-1) * hp['home_weight']
 
         # FIXME: do a better smoothness cost that is more than just one time step, do the full correlation or something

@@ -14,15 +14,14 @@ from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_grasp_locs, get_is_grasping, activate_grasp
+from mjregrasping.grasping import get_grasp_locs, get_is_grasping
+from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration, get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY
-from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_gripper_ctrl_indices, get_q
+from mjregrasping.physics import Physics
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.rerun_visualizer import log_skeletons
-from mjregrasping.rollout import DEFAULT_SUB_TIME_S, control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
@@ -55,21 +54,6 @@ def _timeit(f):
         return ret
 
     return __timeit
-
-
-def release_and_settle(phy_plan, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
-    needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
-
-    rope_grasp_eqs = phy_plan.o.rd.rope_grasp_eqs
-    ctrl = np.zeros(phy_plan.m.nu)
-    gripper_ctrl_indices = get_gripper_ctrl_indices(phy_plan)
-    for eq_name, release_i, ctrl_i in zip(rope_grasp_eqs, needs_release, gripper_ctrl_indices):
-        eq = phy_plan.m.eq(eq_name)
-        if release_i:
-            eq.active = 0
-            ctrl[ctrl_i] = 0.2
-
-    settle_with_checks(ctrl, phy_plan, viz, is_planning, mov)
 
 
 def rr_log_costs(entity_path, entity_paths, values, colors, strategy, locs):
@@ -289,13 +273,13 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     # release and settle for any moving grippers
     release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
 
-    res = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, viz_execution)
+    res, scene_msg = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
     if res.error_code.val != MoveItErrorCodes.SUCCESS:
         return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
 
     if viz_execution:
-        grasp_rrt.display_result(res)
+        grasp_rrt.display_result(viz, res, scene_msg)
 
     # Teleport to the final planned joint configuration
     teleport_to_end_of_plan(phy_plan, res)
@@ -339,46 +323,6 @@ def get_will_be_grasping(s: Strategies, is_grasping: bool):
         return s in [Strategies.STAY, Strategies.MOVE]
     else:
         return s in [Strategies.NEW_GRASP]
-
-
-def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
-    rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
-    ctrl = np.zeros(phy.m.nu)
-    gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
-    for eq_name, grasp_loc_i, ctrl_i in zip(rope_grasp_eqs, grasp_locs, gripper_ctrl_indices):
-        if grasp_loc_i == -1:
-            continue
-        ctrl[ctrl_i] = -0.5
-        activate_grasp(phy, eq_name, grasp_loc_i)
-
-    settle_with_checks(ctrl, phy, viz, is_planning, mov)
-
-
-def settle_with_checks(ctrl, phy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
-    """
-    In contrast to settle(), which steps for a fixed number of steps, this function steps until the rope and robot
-    have settled.
-    """
-    last_rope_points = get_rope_points(phy)
-    last_q = get_q(phy)
-    max_t = 40
-    for t in range(max_t):
-        control_step(phy, ctrl, sub_time_s=5 * DEFAULT_SUB_TIME_S)
-        rope_points = get_rope_points(phy)
-        q = get_q(phy)
-        if viz:
-            viz.viz(phy, is_planning=is_planning)
-        if mov:
-            mov.render(phy.d)
-        rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
-        robot_displacements = np.linalg.norm(q - last_q)
-        is_unstable = phy.d.warning.number.sum() > 0
-        if np.mean(rope_displacements) < 0.01 and np.mean(robot_displacements) < np.deg2rad(1) or is_unstable:
-            return
-        last_rope_points = rope_points
-        last_q = q
-    if not is_planning:
-        print(f'WARNING: settle_with_checks failed to settle after {max_t} steps')
 
 
 def get_all_strategies_from_phy(phy: Physics):

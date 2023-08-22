@@ -4,6 +4,7 @@ from mujoco import mju_mat2Quat, mjtGeom
 import rospy
 from geometry_msgs.msg import Pose
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
+from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q, get_parent_child_names
 from moveit_msgs.msg import PlanningScene, CollisionObject
 from shape_msgs.msg import SolidPrimitive
@@ -17,6 +18,11 @@ def make_planning_scene(phy: Physics):
     q = get_full_q(phy)
     scene_msg.robot_state.joint_state.name = phy.o.robot.joint_names
     scene_msg.robot_state.joint_state.position = q.tolist()
+
+    # Force the grippers to be "closed" for grasp planning
+    for name in phy.o.rd.gripper_joint_names:
+        i = scene_msg.robot_state.joint_state.name.index(name)
+        scene_msg.robot_state.joint_state.position[i] = hp['finger_q_closed']
 
     # Collision objects
     for geom_id in phy.o.obstacle.geom_indices:

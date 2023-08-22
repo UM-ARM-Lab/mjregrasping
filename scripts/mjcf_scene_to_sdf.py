@@ -22,12 +22,13 @@ import numpy as np
 import pysdf_tools
 import rerun as rr
 
+from arc_utilities import ros_init
 from mjregrasping.mujoco_object import MjObject
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.voxelgrid import make_vg, get_points_and_values
 
-
+@ros_init.with_ros("mjcf_scene_to_sdf")
 def main():
     parser = argparse.ArgumentParser("Convert a mjcf scene to a voxel grid and save it as a pickle file.")
     parser.add_argument('model_filename', type=pathlib.Path)
@@ -53,7 +54,7 @@ def main():
     zmin = args.zmin
     zmax = args.zmax
 
-    m = mujoco.MjModel.from_xml_path(args.model_filename.as_posix())
+    m = mujoco.MjModel.from_xml_path(str(args.model_filename))
     d = mujoco.MjData(m)
     phy = Physics(m, d)
     mujoco.mj_forward(m, d)
@@ -65,6 +66,9 @@ def main():
 
     mjrr = MjReRun(model_filename)
     mjrr.viz(phy)
+    # from mjregrasping.rviz import MjRViz
+    # mjrviz = MjRViz(args.model_filename)
+    # mjrviz.viz(phy, is_planning=False)
 
     nickname = model_filename.stem
     if nickname.endswith("_scene"):
@@ -100,10 +104,14 @@ def main():
     oob_value = pysdf_tools.COLLISION_CELL(-10000)
     sdf_result = vg.ExtractSignedDistanceField(oob_value.occupancy, False, False)
     sdf: pysdf_tools.SignedDistanceField = sdf_result[0]
-    print(f"Saving to {outfilename}")
     sdf.SaveToFile(str(outfilename), True)
+    print(f"Saved to {outfilename}")
 
-    # Visualize slice sof the SDF in rerun:
+    # Visualize slices of the SDF in rerun:
+    # viz_slices(sdf)
+
+
+def viz_slices(sdf):
     red = np.array([1, 0, 0, 1.0])
     green = np.array([0, 1, 0, 1.0])
     slice_axis = 2

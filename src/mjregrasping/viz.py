@@ -108,10 +108,10 @@ class Viz:
         if self.p.rr:
             self.mjrr.viz(phy, is_planning, detailed)
 
-    def sdf(self, sdf: pysdf_tools.SignedDistanceField, frame_id, idx):
+    def sdf(self, sdf: pysdf_tools.SignedDistanceField, frame_id='world', idx=0):
         # NOTE: VERY SLOW!!! only use for debugging
         if self.p.rr:
-            self.mjrr.sdf(sdf, frame_id, idx)
+            self.mjrr.sdf(sdf)
         if self.p.rviz:
             pass
         #     self.rviz.sdf(sdf, frame_id, idx)

@@ -8,15 +8,15 @@ from matplotlib import cm
 
 import rospy
 from mjregrasping.buffer import Buffer
-from mjregrasping.goals import ObjectPointGoal, ThreadingGoal
+from mjregrasping.goals import ObjectPointGoal, ThreadingGoal, GraspLocsGoal
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, release_and_settle, grasp_and_settle, \
-    get_geodesic_dist
+from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, get_geodesic_dist
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_goal import RegraspGoal, GraspGoal
+from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics, rollout
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
@@ -61,7 +61,7 @@ class RegraspMPC:
         cc = SDFCollisionChecker(self.sdf)
         planner = HomotopyRegraspPlanner(point_goal, grasp_rrt, self.skeletons, cc)
 
-        grasp_goal = GraspGoal(get_grasp_locs(phy))
+        grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
         regrasp_goal = RegraspGoal(point_goal, grasp_goal, hp['grasp_goal_radius'], self.viz)
         regrasp_goal.viz_goal(phy)
@@ -118,7 +118,7 @@ class RegraspMPC:
 
             itr += 1
 
-    def on_stuck(self, grasp_goal: GraspGoal, op_goal, phy: Physics, planner: HomotopyRegraspPlanner):
+    def on_stuck(self, grasp_goal: GraspLocsGoal, op_goal, phy: Physics, planner: HomotopyRegraspPlanner):
         initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), op_goal)
         sim_grasps = planner.simulate_sampled_grasps(phy, self.viz, viz_execution=False)
         best_grasp = planner.get_best(sim_grasps, self.viz)

@@ -151,7 +151,7 @@ class MjReRun:
                 entity_path = "/".join(filter(None, ["eqs", entity_prefix, eq.name]))
                 rr.log_line_strip(entity_path, points, color=color)
 
-    def sdf(self, sdf, frame_id, idx):
+    def sdf(self, sdf):
         points = []
         colors = []
         for x_i in range(0, sdf.GetNumXCells(), 1):
@@ -162,7 +162,7 @@ class MjReRun:
                     points.append(p)
                     sdf_value = sdf.GetValueByIndex(x_i, y_i, z_i)[0]
                     colors.append([1, 0, 0, 1.0] if sdf_value < 0 else [0, 1, 0, 1.0])
-        rr.log_points(f'sdf/{idx}', positions=points, colors=colors, radii=sdf.getresolution() / 2)
+        rr.log_points(f'sdf', positions=points, colors=colors, radii=sdf.GetResolution() / 2)
 
 
 def make_entity_path(*names):

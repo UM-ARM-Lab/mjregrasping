@@ -3,6 +3,7 @@ from typing import Optional
 import numpy as np
 from pymjregrasping_cpp import RRTPlanner
 
+import rospy
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_is_grasping
@@ -17,8 +18,7 @@ class GraspRRT:
     def __init__(self):
         self.rrt = RRTPlanner()
 
-    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], viz_execution: bool,
-             allowed_planning_time=5.0):
+    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
@@ -28,10 +28,11 @@ class GraspRRT:
                 viz.sphere(f'goal_positions/{i}', v, 0.05, [0, 1, 0, 0.2])
 
         scene_msg = make_planning_scene(phy_plan)
-        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, viz_execution, allowed_planning_time)
-        return res
+        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time)
+        return res, scene_msg
 
-    def display_result(self, res):
+    def display_result(self, viz, res, scene_msg):
+        viz.rviz.viz_scene(scene_msg)
         self.rrt.display_result(res)
 
 

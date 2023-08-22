@@ -26,9 +26,9 @@ def main():
 
     viz = make_viz(scenario)
 
-    hs, locs_seq, phys = load_demo(args.demo, scenario)
+    hs, locs_seq, phys, paths = load_demo(args.demo, scenario)
 
-    viz_subgoals_by_h(phys, hs, viz)
+    viz_subgoals_by_h(phys, hs, paths, viz)
     # segment_by_locs(phys, locs_seq, viz)
 
 

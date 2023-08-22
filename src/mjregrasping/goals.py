@@ -1,22 +1,24 @@
 from copy import deepcopy
+from time import perf_counter
 from typing import Dict
 
-import mujoco
 import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_locations_to_xpos
-from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_is_grasping, get_finger_qs, activate_grasp
-from mjregrasping.homotopy_checker import get_loops_from_phy, get_full_h_signature_from_phy
-from mjregrasping.teleport_to_plan import teleport_to_end_of_plan, teleport_to_planned_q
-from mjregrasping.homotopy_utils import skeleton_field_dir, get_h_signature
+from mjregrasping.grasp_strategies import get_strategy
+from mjregrasping.grasping import get_is_grasping, get_grasp_locs
+from mjregrasping.grasp_and_settle import grasp_and_settle
+from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
+from mjregrasping.homotopy_utils import skeleton_field_dir
 from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
+from moveit_msgs.msg import MotionPlanResponse
 
 
 def as_floats(results):
@@ -72,16 +74,30 @@ class MPPIGoal:
         raise NotImplementedError()
 
 
-class ObjectPointGoal(MPPIGoal):
-
-    def __init__(self, goal_point: np.array, goal_radius: float, loc: float, viz: Viz):
+class ObjectPointGoalBase(MPPIGoal):
+    def __init__(self, goal_point: np.array, loc: float, viz: Viz):
         super().__init__(viz)
         self.goal_point = goal_point
         self.loc = loc
+
+    def keypoint_dist_to_goal(self, keypoint):
+        return norm((keypoint - self.goal_point), axis=-1)
+
+    def viz_result(self, phy: Physics, result, idx: int, scale, color):
+        tools_pos = as_float(result[2])
+        keypoints = as_float(result[0])
+        self.viz_ee_lines(tools_pos, idx, scale, color)
+        self.viz_rope_lines(keypoints, idx, scale, color='y')
+
+
+class ObjectPointGoal(ObjectPointGoalBase):
+
+    def __init__(self, goal_point: np.array, goal_radius: float, loc: float, viz: Viz):
+        super().__init__(goal_point, loc, viz)
         self.goal_radius = goal_radius
 
     def get_results(self, phy: Physics):
-        tools_pos, joint_positions, contact_cost, is_unstable = get_results_common()
+        tools_pos, joint_positions, contact_cost, is_unstable = get_results_common(phy)
         body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy)
         rope_points = get_rope_points(phy)
         is_grasping = get_is_grasping(phy)
@@ -100,40 +116,32 @@ class ObjectPointGoal(MPPIGoal):
         error = self.keypoint_dist_to_goal(keypoint).squeeze()
         return error < self.goal_radius
 
-    def keypoint_dist_to_goal(self, keypoint):
-        return norm((keypoint - self.goal_point), axis=-1)
-
-    def viz_result(self, phy: Physics, result, idx: int, scale, color):
-        tools_pos = as_float(result[2])
-        keypoints = as_float(result[0])
-        self.viz_ee_lines(tools_pos, idx, scale, color)
-        self.viz_rope_lines(keypoints, idx, scale, color='y')
-
     def viz_goal(self, phy: Physics):
         self.viz_sphere(self.goal_point, self.goal_radius)
 
 
-class ThreadingGoal(ObjectPointGoal):
+class ThreadingGoal(ObjectPointGoalBase):
 
-    def __init__(self, skeletons: Dict, skeleton_name, loc: float, next_tool_name: str, next_loc: float, next_h,
+    def __init__(self, skeletons: Dict, skeleton_name, loc: float, next_tool_name: str, next_locs, next_h,
                  grasp_rrt: GraspRRT, viz: Viz):
         self.skel = skeletons[skeleton_name]
         goal_point = np.mean(self.skel, axis=0)
-        goal_radius = 0.05  # TODO: deduce this from the skeleton
-        super().__init__(goal_point, goal_radius, loc, viz)
+        super().__init__(goal_point, loc, viz)
 
         self.skeletons = skeletons
         self.goal_dir = skeleton_field_dir(self.skel, self.goal_point[None])[0] * 0.01
         self.next_tool_name = next_tool_name
-        self.next_loc = next_loc
+        self.next_locs = next_locs
         self.next_h = next_h
         self.grasp_rrt = grasp_rrt
 
     def viz_goal(self, phy: Physics):
-        super().viz_goal(phy)
         self.viz.arrow('goal_dir', self.goal_point, self.goal_dir, 'g')
         xpos = grasp_locations_to_xpos(phy, [self.loc])[0]
         self.viz.sphere('current_loc', xpos, 0.015, 'g')
+        next_xpos = grasp_locations_to_xpos(phy, self.next_locs)
+        for tool_name, next_xpos in zip(phy.o.rd.tool_sites, next_xpos):
+            self.viz.sphere(f'next_loc_{tool_name}', next_xpos, 0.015, (1, 0, 1, 0.2))
 
     def cost(self, rope_points, keypoint):
         rope_deltas = rope_points[1:] - rope_points[:-1]  # [t-1, n, 3]
@@ -152,20 +160,52 @@ class ThreadingGoal(ObjectPointGoal):
 
     def satisfied(self, phy: Physics):
         # See if we can grasp the next loc and if we can, and it's the right homotopy, then we're done
-        from time import perf_counter
+        res, scene_msg = self.plan_to_next_locs(phy)
+        if res is None:
+            return False
+        else:
+            satisfied = self.satisfied_from_res(phy, res)
+            return satisfied
+
+    def satisfied_from_res(self, phy: Physics, res: MotionPlanResponse):
+        if res is None:
+            return False
+
+        phy_plan = phy.copy_all()
+        teleport_to_end_of_plan(phy_plan, res)
+        grasp_and_settle(phy_plan, self.next_locs, viz=None, is_planning=True)
+
+        h, _ = get_full_h_signature_from_phy(self.skeletons, phy_plan,
+                                             collapse_empty_gripper_cycles=False,
+                                             gripper_ids_in_h_signature=True)
+        satisfied = h == self.next_h
+        return satisfied
+
+    def plan_to_next_locs(self, phy: Physics):
+        current_locs = get_grasp_locs(phy)
+        strategy = get_strategy(current_locs, self.next_locs)
+
         t0 = perf_counter()
-        res = self.grasp_rrt.plan(phy, [Strategies.NEW_GRASP, Strategies.STAY], np.array([self.next_loc, self.loc]),
-                                  viz=None, viz_execution=False, allowed_planning_time=1.0)
+        res, scene_msg = self.grasp_rrt.plan(phy, strategy, self.next_locs, viz=None, allowed_planning_time=1.0)
+        # res, scene_msg = self.grasp_rrt.plan(phy, strategy, self.next_locs, viz=self.viz, allowed_planning_time=1.0)
         plan_found = res.error_code.val == res.error_code.SUCCESS
         print(f'dt: {perf_counter() - t0:.4f}, {plan_found=}')
         if not plan_found:
-            return False
+            return None, None
 
-        # self.grasp_rrt.display_result(res)
-        phy_plan = phy.copy_all()
-        teleport_to_end_of_plan(phy_plan, res)
-        activate_grasp(phy_plan, self.next_tool_name, self.next_loc)
+        # self.viz.rviz.viz_scene(scene_msg)
+        # self.grasp_rrt.display_result(res, scene_msg)
+        return res, scene_msg
 
-        h, _ = get_full_h_signature_from_phy(self.skeletons, phy_plan, gripper_ids_in_h_signature=True)
-        satisfied = h == self.next_h
-        return satisfied
+
+class GraspLocsGoal:
+    """ This is just a wrapper around the grasp locations, so that we can pass it to RegraspGoal """
+
+    def __init__(self, current_locs):
+        self.locs = current_locs
+
+    def get_grasp_locs(self):
+        return self.locs
+
+    def set_grasp_locs(self, grasp_locs):
+        self.locs = grasp_locs
