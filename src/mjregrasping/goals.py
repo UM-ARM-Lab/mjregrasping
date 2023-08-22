@@ -89,6 +89,7 @@ class ObjectPointGoalBase(MPPIGoal):
         self.viz_ee_lines(tools_pos, idx, scale, color)
         self.viz_rope_lines(keypoints, idx, scale, color='y')
 
+
 class ObjectPointGoal(ObjectPointGoalBase):
 
     def __init__(self, goal_point: np.array, goal_radius: float, loc: float, viz: Viz):
@@ -147,7 +148,7 @@ class ThreadingGoal(ObjectPointGoalBase):
         bfield_dirs_flat = skeleton_field_dir(self.skel, rope_points[:-1].reshape(-1, 3))
         bfield_dirs = bfield_dirs_flat.reshape(rope_deltas.shape)  # [t-1, n, 3]
         angle_cost = angle_between(rope_deltas, bfield_dirs)
-        # weight by the geodesic distance from each rope point to self.loc
+        # weight by the geodesic distance from each rope point to the loc we're threading through
         w = np.exp(-hp['thread_geodesic_w'] * np.abs(np.linspace(0, 1, rope_points.shape[1]) - self.loc))
         angle_cost = angle_cost @ w * hp['angle_cost_weight']
         # self.viz.arrow('bfield_dir', rope_points[0, -1], 0.5 * bfield_dirs[0, -1], cm.Reds(angle_cost[0] / np.pi))

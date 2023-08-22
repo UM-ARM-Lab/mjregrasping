@@ -184,10 +184,10 @@ def setup_cable_harness(phy, viz):
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
     q = np.array([
-        -0.6, 0.3,  # torso
+        -0.6, 0.25,  # torso
         0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
         0,  # left gripper
-        0.8, 0.0, 0, -0.5, 0, -0.0, -0.5,  # right arm
+        0.4, 0.0, 0, -0.13, 0, -0.0, -0.5,  # right arm
         0.06,  # right gripper
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
