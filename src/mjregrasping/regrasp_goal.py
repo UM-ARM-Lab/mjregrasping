@@ -68,10 +68,6 @@ class RegraspGoal(MPPIGoal):
         gripper_to_goal_cost = np.sum(norm(tools_pos - self.op_goal.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
 
-        # desired_q = np.zeros_like(joint_positions)
-        # desired_q[1] = 0.5
-        desired_q_cost = np.sum(np.abs(joint_positions[:, 1] - 0.5), axis=-1) * hp['home_weight']
-
         # FIXME: do a better smoothness cost that is more than just one time step, do the full correlation or something
         #  also how do we treat magnitude vs direction?
         du = (u_sample[1:] - u_sample[:-1])
@@ -100,7 +96,6 @@ class RegraspGoal(MPPIGoal):
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,
-            desired_q_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
@@ -116,7 +111,6 @@ class RegraspGoal(MPPIGoal):
             "grasp_finger",
             "grasp_pos",
             "grasp_near",
-            "desired_q",
             "nongrasping_rope_contact",
             "gripper_to_goal",
             "ever_not_grasping",

@@ -16,8 +16,7 @@ hp = {
     "grasp_loc_diff_thresh":           0.025,  # A percentage of rope length
     "smoothness_weight":               0.02,
     "angle_cost_weight":               0.2,  # for ThreadingGoal
-    "thread_geodesic_w":               25.0,
-    "home_weight":                     0.1,
+    "thread_geodesic_w":               20.0,
     "nearby_locs_weight":              10,
     "unstable_weight":                 100,
     "ever_not_grasping_weight":        5.0,

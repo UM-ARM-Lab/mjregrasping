@@ -176,16 +176,16 @@ def setup_cable_harness(phy, viz):
     activate_grasp(phy, 'right', 0.93)
     settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
     q = np.array([
-        -0.2, 0.0,  # torso
-        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+        -0.6, 0.1,  # torso
+        -0.2, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
         0,  # left gripper
-        0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
+        -0.1, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
         0.06,  # right gripper
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
     q = np.array([
-        -0.6, 0.25,  # torso
-        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+        -0.65, 0.25,  # torso
+        -0.4, 0.0, 0, 0.4, 0.8, 0.2, 0,  # left arm
         0,  # left gripper
         0.4, 0.0, 0, -0.13, 0, -0.0, -0.5,  # right arm
         0.06,  # right gripper
