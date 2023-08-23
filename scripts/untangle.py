@@ -22,7 +22,7 @@ from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_mpc import TrapDetection
+from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step

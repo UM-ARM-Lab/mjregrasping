@@ -1,5 +1,8 @@
+#!/usr/bin/env python
+
 import argparse
 
+import rospkg
 import torch
 from cdcpd_torch.core.deformable_object_configuration import RopeConfiguration
 from cdcpd_torch.core.tracking_map import TrackingMap
@@ -9,9 +12,14 @@ from cdcpd_torch.modules.cdcpd_module_arguments import CDCPDModuleArguments
 from cdcpd_torch.modules.cdcpd_network import CDCPDModule
 from cdcpd_torch.modules.cdcpd_parameters import CDCPDParamValues
 from cdcpd_torch.modules.post_processing.configuration import PostProcConfig, PostProcModuleChoice
-
 import rospy
 from visualization_msgs.msg import MarkerArray
+import rospy
+import rosnode
+import dynamic_reconfigure.client
+from zivid_camera.srv import LoadSettingsFromFile, Capture
+from std_msgs.msg import String
+from sensor_msgs.msg import PointCloud2
 
 
 # from gnn.mab import KFMANDB
@@ -23,10 +31,10 @@ from visualization_msgs.msg import MarkerArray
 # from rope_utils.visual_prior import get_point_cloud
 
 
-def cdcpd_helper(tracking_map, cdcpd_module, depth, mask, intrinsic, grip_points, rope_points_in_world, K):
+def cdcpd_helper(tracking_map, cdcpd_module, depth, mask, intrinsic, grip_points, previous_estimate, kvis=100.0):
     verts = tracking_map.form_vertices_cloud()
     verts_np = verts.detach().numpy()
-    Y_emit_prior = visibility_prior(verts_np, depth, mask, intrinsic[:3, :3], K)
+    Y_emit_prior = visibility_prior(verts_np, depth, mask, intrinsic[:3, :3], kvis)
     Y_emit_prior = torch.from_numpy(Y_emit_prior.reshape(-1, 1)).to(torch.double)
 
     grasped_points = GrippersInfo()
@@ -34,7 +42,7 @@ def cdcpd_helper(tracking_map, cdcpd_module, depth, mask, intrinsic, grip_points
         grasped_points.append(
             GripperInfoSingle(fixed_pt_pred=point, grasped_vertex_idx=idx),
         )
-    model_input = CDCPDModuleArguments(tracking_map, rope_points_in_world, gripper_info=grasped_points)
+    model_input = CDCPDModuleArguments(tracking_map, previous_estimate, gripper_info=grasped_points)
     model_input.set_Y_emit_prior(Y_emit_prior)
 
     cdcpd_module_arguments = cdcpd_module(model_input)
@@ -46,22 +54,6 @@ def cdcpd_helper(tracking_map, cdcpd_module, depth, mask, intrinsic, grip_points
     cur_state_estimate = verts.detach().numpy().T
 
     return cur_state_estimate
-
-
-NUM_TRACKED_POINTS = 25
-MAX_ROPE_LENGTH = .768
-
-USE_DEBUG_MODE = False
-
-ALPHA = 0.5
-BETA = 1.0
-LAMBDA = 1.0
-K = 100.0
-ZETA = 50.0
-OBSTACLE_COST_WEIGHT = 0.02
-FIXED_POINTS_WEIGHT = 100.0
-OBJECTIVE_VALUE_THRESHOLD = 1.0
-MIN_DISTANCE_THRESHOLD = 0.04
 
 
 class CDCPDTorchNode:
@@ -97,6 +89,19 @@ def main():
     rope_end_pos = torch.tensor(rope_end_pos).to(device)
     grip_constraints = [(0, rope_start_pos), (24, rope_end_pos)]
 
+    NUM_TRACKED_POINTS = 25
+    MAX_ROPE_LENGTH = .768
+
+    USE_DEBUG_MODE = False
+
+    ALPHA = 0.5
+    BETA = 1.0
+    LAMBDA = 1.0
+    ZETA = 50.0
+    OBSTACLE_COST_WEIGHT = 0.02
+    FIXED_POINTS_WEIGHT = 100.0
+    OBJECTIVE_VALUE_THRESHOLD = 1.0
+    MIN_DISTANCE_THRESHOLD = 0.04
     def_obj_config = RopeConfiguration(NUM_TRACKED_POINTS, MAX_ROPE_LENGTH, rope_start_pos,
                                        rope_end_pos)
     def_obj_config.initialize_tracking()
@@ -130,6 +135,40 @@ def main():
                                     previous_estimate, K)
     plot_rope_rviz(cdcpd_pred_pub, cur_state_estimate, 333, 'cdcpd_pred', color='r', frame_id='world', s=2)
 
+
+
+class Sample:
+    def __init__(self):
+        rospy.init_node("sample_capture_py", anonymous=True)
+
+        rospy.loginfo("Starting sample_capture.py")
+
+        rospy.wait_for_service("/zivid_camera/capture", 30.0)
+
+        rospy.Subscriber("/zivid_camera/points/xyzrgba", PointCloud2, self.on_points)
+
+        self.capture_service = rospy.ServiceProxy("/zivid_camera/capture", Capture)
+
+        self.load_settings_from_file_service = rospy.ServiceProxy(
+            "/zivid_camera/load_settings_from_file", LoadSettingsFromFile
+        )
+        samples_path = rospkg.RosPack().get_path("mjregrasping")
+        settings_path = samples_path / "camera_settings.yml"
+        self.load_settings_from_file_service(settings_path)
+
+    def capture(self):
+        rospy.loginfo("Calling capture service")
+        self.capture_service()
+
+    def on_points(self, data):
+        rospy.loginfo("PointCloud received")
+        self.capture()
+
+
+if __name__ == "__main__":
+    s = Sample()
+    s.capture()
+    rospy.spin()
 
 if __name__ == "__main__":
     main()
