@@ -64,7 +64,7 @@ def main():
 
     mov = MjMovieMaker(m)
     now = int(time.time())
-    seed = 1
+    seed = 2
     mov_path = root / f'seed_{seed}_{now}.mp4'
     print(f"Saving movie to {mov_path}")
     mov.start(mov_path, fps=8)

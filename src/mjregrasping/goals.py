@@ -313,7 +313,6 @@ class ThreadingGoal(ObjectPointGoalBase):
         contact_cost = sum(contact_cost)
         unstable_cost = sum(unstable_cost)
 
-
         no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
         ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
 
@@ -324,12 +323,15 @@ class ThreadingGoal(ObjectPointGoalBase):
 
         sdf_cost = get_next_xpos_sdf_cost(self.sdf, next_xpos, self.next_locs)
 
+        torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
+
         return (
             contact_cost,
             unstable_cost,
             angle_cost,
             keypoint_cost,
             sdf_cost,
+            torso_cost,
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,
@@ -347,6 +349,7 @@ class ThreadingGoal(ObjectPointGoalBase):
             "threading_angle",
             "threading_keypoint",
             "threading_sdf",
+            "torso_cost",
             "grasp_finger",
             "grasp_pos",
             "grasp_near",
@@ -432,12 +435,15 @@ class PullThroughGoal(ThreadingGoal):
 
         sdf_cost = get_next_xpos_sdf_cost(self.sdf, next_xpos, self.next_locs)
 
+        torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
+
         return (
             contact_cost,
             unstable_cost,
             angle_cost,
             keypoint_cost,
             sdf_cost,
+            torso_cost,
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,

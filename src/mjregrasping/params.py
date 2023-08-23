@@ -11,6 +11,7 @@ hp = {
     "regrasp_temp":                    0.15,
     "keypoint_weight":                 1.0,
     "next_xpos_sdf_weight":            0.1,
+    "torso_weight":                    0.1,
     "grasp_pos_weight":                1.0,
     "grasp_near_weight":               1.0,
     "grasp_finger_weight":             0.5,
