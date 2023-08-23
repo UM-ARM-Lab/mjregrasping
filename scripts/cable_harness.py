@@ -13,7 +13,7 @@ from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.goals import ThreadingGoal, GraspLocsGoal, ObjectPointGoal, PullThroughGoal
+from mjregrasping.goals import ThreadingGoal, GraspLocsGoal, ObjectPointGoal, PullThroughGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
@@ -66,7 +66,7 @@ def main():
 
     mov = MjMovieMaker(m)
     now = int(time.time())
-    seed = 2
+    seed = 1
     mov_path = root / f'seed_{seed}_{now}.mp4'
     print(f"Saving movie to {mov_path}")
     mov.start(mov_path)
@@ -106,14 +106,14 @@ def main():
                       grasp_rrt, sdf,
                       viz),
         ([Strategies.NEW_GRASP, Strategies.RELEASE], subgoal_locs[10]),
-        ObjectPointGoal(grasp_goal, np.array([-0.75, 0.63, 0.4]), 0.03, 1, viz)
+        point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
     ]
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['regrasp_horizon'], noise_sigma=val.noise_sigma,
-                       temp=hp['regrasp_temp'])
-    num_samples = hp['regrasp_n_samples']
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val.noise_sigma,
+                       temp=hp['temp'])
+    num_samples = hp['n_samples']
     goal_idx = 0
 
     mppi.reset()

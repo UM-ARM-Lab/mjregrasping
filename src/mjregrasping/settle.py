@@ -15,10 +15,9 @@ def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mo
     for _ in range(settle_steps):
         if viz:
             viz.viz(phy, is_planning)
-        control_step(phy, ctrl, sub_time_s=sub_time_s)
 
-        if not is_planning and mov:
-            mov.render(phy.d)
+        if not is_planning:
+            control_step(phy, ctrl, sub_time_s=sub_time_s, mov=mov)
 
         result_tuple = result_func(phy)
 

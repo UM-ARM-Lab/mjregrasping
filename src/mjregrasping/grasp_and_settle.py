@@ -8,7 +8,6 @@ from mjregrasping.grasping import activate_grasp
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.physics import get_gripper_ctrl_indices, get_q, Physics
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
-from mjregrasping.settle import settle
 from mjregrasping.viz import Viz
 
 
@@ -23,7 +22,7 @@ def release_and_settle(phy, strategy, viz: Optional[Viz], is_planning: bool, mov
         if release_i:
             eq.active = 0
             ctrl[ctrl_i] = 0.4
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 10)
+    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 10, mov=mov)
     settle_with_checks(phy, viz, is_planning, mov)
 
 
@@ -36,7 +35,7 @@ def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov
             continue
         ctrl[ctrl_i] = -0.4
         activate_grasp(phy, eq_name, grasp_loc_i)
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5)
+    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov)
     settle_with_checks(phy, viz, is_planning, mov)
 
 

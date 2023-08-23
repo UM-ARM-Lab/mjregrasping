@@ -89,7 +89,7 @@ def setup_untangle(phy, viz):
         -0.5, 0.4,  # torso
         -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
         0.1,  # left gripper
-        1.2, -0.2, 0, -0.90, 0, -0.6, 0,  # right arm
+        1.2, -0.2, 0, -0.90, 0, -0.6, 1.5707,  # right arm
         0.3,  # right gripper
     ])
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
@@ -97,7 +97,6 @@ def setup_untangle(phy, viz):
     activate_grasp(phy, 'right', 1.0)
     robot_q2[-1] = 0.05  # close right gripper
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-
 
 
 def setup_pull(phy, viz):

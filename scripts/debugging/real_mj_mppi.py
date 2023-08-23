@@ -39,8 +39,8 @@ def main():
     real_val = RealValCommander(phy.o.robot)
 
     with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:
-        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=0, horizon=hp['regrasp_horizon'], noise_sigma=val.noise_sigma,
-                           temp=hp['regrasp_temp'])
+        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=0, horizon=hp['horizon'], noise_sigma=val.noise_sigma,
+                           temp=hp['temp'])
         for _ in range(30):
             if rospy.is_shutdown():
                 raise RuntimeError("ROS shutdown")

@@ -12,9 +12,8 @@ from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal
+from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
-from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, get_geodesic_dist
 from mjregrasping.homotopy_utils import load_skeletons
@@ -47,7 +46,7 @@ def main():
     root = Path("results") / scenario.name
     root.mkdir(exist_ok=True, parents=True)
 
-    seed = 3
+    seed = 0
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     d = mujoco.MjData(m)
     objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
@@ -60,9 +59,9 @@ def main():
     skeletons = load_skeletons(scenario.skeletons_path)
     setup_untangle(phy, viz)
 
-    loc = 1
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
-    goal = ObjectPointGoal(grasp_goal, phy.d.geom("goal").xpos, phy.m.geom("goal").size[0], loc, viz)
+    # Subtract a small amount from the radius so the rope is more clearly "inside" the goal region
+    goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
 
     mov = MjMovieMaker(m)
     now = int(time.time())
@@ -72,9 +71,9 @@ def main():
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['regrasp_horizon'], noise_sigma=val.noise_sigma,
-                       temp=hp['regrasp_temp'])
-    num_samples = hp['regrasp_n_samples']
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val.noise_sigma,
+                       temp=hp['temp'])
+    num_samples = hp['n_samples']
     grasp_rrt = GraspRRT()
 
     cc = SDFCollisionChecker(sdf)

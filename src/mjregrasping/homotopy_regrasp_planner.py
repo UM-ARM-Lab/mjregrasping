@@ -277,6 +277,8 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
         # the RRT will fail here, so first try to perturb the qpos of the robot to get it out of collision
         for i in range(10):
             qpos = phy_plan.d.qpos
+            # TODO: would be better to look up the jiggle_fraction ros param and use that
+            #  although why isn't the jiggle fraction fixing this problem in the first place?
             qpos[phy_plan.o.robot.qpos_indices] += np.deg2rad(rng.uniform(-2, 2, size=len(phy_plan.o.robot.qpos_indices)))
             valid = grasp_rrt.is_state_valid(phy_plan)
             if valid:

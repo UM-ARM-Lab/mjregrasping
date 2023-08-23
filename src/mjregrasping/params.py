@@ -6,9 +6,9 @@ from dynamic_reconfigure.server import Server
 
 # These values are considered const by convention
 hp = {
-    "regrasp_horizon":                 12,
-    "regrasp_n_samples":               45,
-    "regrasp_temp":                    0.15,
+    "horizon":                 10,
+    "n_samples":               40,
+    "temp":                    0.15,
     "keypoint_weight":                 1.0,
     "next_xpos_sdf_weight":            0.1,
     "torso_weight":                    0.1,
@@ -52,7 +52,7 @@ hp = {
     "sim_ik_solref_decay":             0.8,
     "sim_ik_min_solref":               0.02,
     "attach_loop_size":                0.02,
-    "joint_kp":                        5.0,
+    "joint_kp":                        6.0,
     "act_windup_limit":                0.02,
     "bayes_opt":                       {
         "n_iter": 14,

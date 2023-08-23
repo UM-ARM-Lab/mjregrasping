@@ -452,3 +452,9 @@ class PullThroughGoal(ThreadingGoal):
             ever_not_grasping_cost,
             smoothness_cost,
         )
+
+
+def point_goal_from_geom(grasp_goal: GraspLocsGoal, phy: Physics, geom: str, loc: float, viz: Viz):
+    goal_point = phy.d.geom(geom).xpos
+    goal_radius = phy.m.geom(geom).size[0] - 0.01
+    return ObjectPointGoal(grasp_goal, goal_point, goal_radius, loc, viz)
