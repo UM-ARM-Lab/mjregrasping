@@ -6,8 +6,8 @@ from dynamic_reconfigure.server import Server
 
 # These values are considered const by convention
 hp = {
-    "regrasp_horizon":                 15,
-    "regrasp_n_samples":               50,
+    "regrasp_horizon":                 12,
+    "regrasp_n_samples":               45,
     "regrasp_temp":                    0.15,
     "keypoint_weight":                 1.0,
     "next_xpos_sdf_weight":            0.1,

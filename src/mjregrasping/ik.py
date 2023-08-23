@@ -14,18 +14,6 @@ from mjregrasping.viz import Viz
 BIG_PENALTY = 100
 
 
-def jacobian_ik_is_reachable(phy, body_idx, target_point, n_steps=100, pos_tol=0.005):
-    for i in range(n_steps):
-        ctrl, error = position_jacobian(phy, body_idx, target_point)
-        np.copyto(phy.d.ctrl, ctrl)
-        mujoco.mj_step(phy.m, phy.d, nstep=25)
-
-        if error < pos_tol:
-            return True
-
-    return False
-
-
 def position_jacobian(phy, body_idx, target_position):
     J = full_body_jacobian(phy, body_idx)
     J_T = J.T

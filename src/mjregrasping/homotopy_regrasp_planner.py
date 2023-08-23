@@ -105,7 +105,7 @@ class HomotopyRegraspPlanner:
     def simulate_grasps(self, grasps_inputs, phy, viz, viz_execution):
         sim_grasps = []
         for grasp_input in grasps_inputs:
-            sim_grasp = simulate_grasp(self.grasp_rrt, phy, viz, grasp_input, viz_execution)
+            sim_grasp = simulate_grasp(self.grasp_rrt, phy, viz, grasp_input, self.rng, viz_execution)
             sim_grasps.append(sim_grasp)
         return sim_grasps
 
@@ -243,21 +243,21 @@ class HomotopyRegraspPlanner:
         return self.cc.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
 
 
-def simulate_grasps_parallel(grasps_inputs, phy):
+def simulate_grasps_parallel(grasps_inputs, phy, rng):
     # NOTE: this is actually slower than the serial version, not sure why,
     #  but recreating the GraspRRT object is definitely part of the problem
-    _target = partial(simulate_grasp_parallel, phy)
+    _target = partial(simulate_grasp_parallel, phy, rng)
     with mp.Pool(mp.cpu_count()) as p:
         sim_grasps = p.map(_target, grasps_inputs)
         return sim_grasps
 
 
-def simulate_grasp_parallel(phy: Physics, grasp_input: SimGraspInput):
+def simulate_grasp_parallel(phy: Physics, grasp_input: SimGraspInput, rng):
     grasp_rrt = GraspRRT()
-    return simulate_grasp(grasp_rrt, phy, None, grasp_input, viz_execution=False)
+    return simulate_grasp(grasp_rrt, phy, None, grasp_input, rng, viz_execution=False)
 
 
-def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput,
+def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, rng,
                    viz_execution=False):
     strategy = grasp_input.strategy
     candidate_locs = grasp_input.candidate_locs
@@ -273,6 +273,14 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     # release and settle for any moving grippers
     release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
 
+    if not grasp_rrt.is_state_valid(phy_plan):
+        # the RRT will fail here, so first try to perturb the qpos of the robot to get it out of collision
+        for i in range(10):
+            qpos = phy_plan.d.qpos
+            qpos[phy_plan.o.robot.qpos_indices] += np.deg2rad(rng.uniform(-2, 2, size=len(phy_plan.o.robot.qpos_indices)))
+            valid = grasp_rrt.is_state_valid(phy_plan)
+            if valid:
+                break
     res, scene_msg = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
     if res.error_code.val != MoveItErrorCodes.SUCCESS:

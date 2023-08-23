@@ -1,7 +1,10 @@
+from typing import Optional
+
 import mujoco
 import numpy as np
 
 from mjregrasping.eq_errors import compute_eq_errors
+from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 
@@ -12,7 +15,7 @@ def no_results(*args, **kwargs):
     return (None,)
 
 
-def control_step(phy: Physics, qvel_target, sub_time_s: float):
+def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None):
     m = phy.m
     d = phy.d
 
@@ -26,7 +29,13 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float):
 
     limit_actuator_windup(phy)
 
-    mujoco.mj_step(m, d, nstep=n_sub_time)
+    if mov:
+        # This renders every frame
+        for _ in range(n_sub_time):
+            mujoco.mj_step(m, d, nstep=1)
+            mov.render(d)
+    else:
+        mujoco.mj_step(m, d, nstep=n_sub_time)
 
 
 def slow_when_eqs_bad(phy):

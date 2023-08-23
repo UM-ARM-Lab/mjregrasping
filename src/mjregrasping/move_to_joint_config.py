@@ -35,10 +35,7 @@ def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_plannin
             return
 
         # take the step on the real phy
-        control_step(phy, command, sub_time_s=sub_time_s)
-
-        if mov:
-            mov.render(phy.d)
+        control_step(phy, command, sub_time_s=sub_time_s, mov=mov)
 
         # get the new current q
         q_current = get_q(phy)

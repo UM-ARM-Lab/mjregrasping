@@ -50,13 +50,11 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
     last_q = get_q(phy)
     max_t = 50
     for t in range(max_t):
-        control_step(phy, ctrl, sub_time_s=5 * DEFAULT_SUB_TIME_S)
+        control_step(phy, ctrl, sub_time_s=5 * DEFAULT_SUB_TIME_S, mov=mov)
         rope_points = get_rope_points(phy)
         q = get_q(phy)
         if viz:
             viz.viz(phy, is_planning=is_planning)
-        if mov:
-            mov.render(phy.d)
         rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
         robot_displacements = np.abs(q - last_q)
         is_unstable = phy.d.warning.number.sum() > 0

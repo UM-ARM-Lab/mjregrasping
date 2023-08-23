@@ -1,23 +1,157 @@
 #!/usr/bin/env python3
-import numpy as np
+import multiprocessing
+import time
+from concurrent.futures.thread import ThreadPoolExecutor
+from pathlib import Path
 
+import mujoco
+import numpy as np
+import pysdf_tools
+import rerun as rr
+from colorama import Fore
+
+import rospy
 from arc_utilities import ros_init
+from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal
+from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
+from mjregrasping.grasp_strategies import Strategies
+from mjregrasping.grasping import get_grasp_locs
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, get_geodesic_dist
 from mjregrasping.homotopy_utils import load_skeletons
-from mjregrasping.run_evaluation import run_evaluation
-from mjregrasping.scenarios import val_untangle, make_untangle_goal, setup_untangle
+from mjregrasping.move_to_joint_config import execute_grasp_plan
+from mjregrasping.movie import MjMovieMaker
+from mjregrasping.mujoco_objects import MjObjects
+from mjregrasping.params import hp
+from mjregrasping.physics import Physics
+from mjregrasping.regrasp_mpc import TrapDetection
+from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
+from mjregrasping.robot_data import val
+from mjregrasping.rollout import control_step
+from mjregrasping.rrt import GraspRRT
+from mjregrasping.scenarios import val_untangle, setup_untangle
+from mjregrasping.sdf_collision_checker import SDFCollisionChecker
+from mjregrasping.viz import make_viz
+from moveit_msgs.msg import MoveItErrorCodes
 
 
 @ros_init.with_ros("untangle")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    run_evaluation(
-        scenario=val_untangle,
-        make_goal=make_untangle_goal,
-        skeletons=load_skeletons(val_untangle.skeletons_path),
-        setup_scene=setup_untangle,
-        seeds=[2],
-    )
+    rr.init('untangle')
+    rr.connect()
+
+    scenario = val_untangle
+    viz = make_viz(scenario)
+
+    root = Path("results") / scenario.name
+    root.mkdir(exist_ok=True, parents=True)
+
+    seed = 3
+    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+    d = mujoco.MjData(m)
+    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
+    phy = Physics(m, d, objects)
+
+    sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
+    mujoco.mj_forward(phy.m, phy.d)
+    viz.viz(phy)
+
+    skeletons = load_skeletons(scenario.skeletons_path)
+    setup_untangle(phy, viz)
+
+    loc = 1
+    grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
+    goal = ObjectPointGoal(grasp_goal, phy.d.geom("goal").xpos, phy.m.geom("goal").size[0], loc, viz)
+
+    mov = MjMovieMaker(m)
+    now = int(time.time())
+    mov_path = root / f'seed_{seed}_{now}.mp4'
+    print(f"Saving movie to {mov_path}")
+    mov.start(mov_path)
+
+    pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
+    traps = TrapDetection()
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['regrasp_horizon'], noise_sigma=val.noise_sigma,
+                       temp=hp['regrasp_temp'])
+    num_samples = hp['regrasp_n_samples']
+    grasp_rrt = GraspRRT()
+
+    cc = SDFCollisionChecker(sdf)
+    planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons, cc)
+
+    goal.viz_goal(phy)
+
+    mppi.reset()
+    traps.reset_trap_detection()
+
+    itr = 0
+    max_iters = 100
+    command = None
+    sub_time_s = None
+    viz.viz(phy)
+    while True:
+        if rospy.is_shutdown():
+            mov.close()
+            return False
+
+        if itr > max_iters:
+            break
+
+        goal.viz_goal(phy)
+        if goal.satisfied(phy):
+            print(Fore.GREEN + "Goal reached!" + Fore.RESET)
+            break
+
+        stuck_frac = traps.check_is_stuck(phy)
+        is_stuck_vec = np.array([stuck_frac, stuck_frac]) < hp['frac_dq_threshold']
+        needs_reset = False
+        if np.any(is_stuck_vec):
+            print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
+            initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal)
+            sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+            best_grasp = planner.get_best(sim_grasps, viz=None)
+            new_geodesic_cost = get_geodesic_dist(best_grasp.locs, goal)
+            # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
+            if initial_geodesic_cost - new_geodesic_cost < 0.01:  # less than 1% closer to the keypoint
+                print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
+                print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
+                planner.update_blacklists(phy)
+                best_grasp = planner.get_best(sim_grasps, viz=None)
+            if best_grasp.res.error_code.val != MoveItErrorCodes.SUCCESS:
+                print(Fore.RED + "Failed to find a plan." + Fore.RESET)
+            viz.viz(best_grasp.phy, is_planning=True)
+            # now execute the plan
+            release_and_settle(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
+            qs = np.array([p.positions for p in best_grasp.res.trajectory.joint_trajectory.points])
+            execute_grasp_plan(phy, qs, viz, is_planning=False, mov=mov)
+            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
+            grasp_goal.set_grasp_locs(best_grasp.locs)
+
+            # save_data_and_eq(phy, Path(f'states/CableHarness/stuck1.pkl'))
+            needs_reset = True
+
+        n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
+
+        if needs_reset:
+            mppi.reset()
+            traps.reset_trap_detection()
+            n_warmstart = hp['warmstart']
+
+        for k in range(n_warmstart):
+            command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
+            mppi_viz(viz, mppi, goal, phy, command, sub_time_s)
+
+        control_step(phy, command, sub_time_s, mov=mov)
+        viz.viz(phy)
+
+        results = goal.get_results(phy)
+        do_grasp_dynamics(phy, results)
+
+        mppi.roll()
+
+        itr += 1
+    mov.close()
 
 
 if __name__ == "__main__":

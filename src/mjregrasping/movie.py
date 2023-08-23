@@ -17,8 +17,9 @@ class MjMovieMaker:
         """ Render the current mujoco scene and store the resulting image """
         self.writer.append_data(self.r.render(d))
 
-    def start(self, filename, fps):
+    def start(self, filename):
         """ Reset the movie maker """
+        fps = int(1 / self.m.opt.timestep)
         self.writer = imageio.get_writer(filename, fps=fps)
 
     def close(self):

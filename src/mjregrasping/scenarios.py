@@ -6,7 +6,7 @@ import mujoco
 import numpy as np
 from transformations import quaternion_from_euler
 
-from mjregrasping.goals import ObjectPointGoal, ThreadingGoal
+from mjregrasping.goals import ObjectPointGoal, ThreadingGoal, GraspLocsGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.move_to_joint_config import pid_to_joint_config
@@ -98,12 +98,6 @@ def setup_untangle(phy, viz):
     robot_q2[-1] = 0.05  # close right gripper
     pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
 
-
-def make_untangle_goal(viz):
-    loc = 1
-    goal_point = np.array([-0.04, 0.5, 0.805])
-    goal = ObjectPointGoal(goal_point, 0.06, loc, viz)
-    return goal
 
 
 def setup_pull(phy, viz):

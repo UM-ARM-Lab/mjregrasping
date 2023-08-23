@@ -72,7 +72,7 @@ def get_next_xpos_sdf_cost(sdf, next_xpos, next_locs):
     sdf_dists = np.zeros(next_xpos.shape[:2])
     for t, xpos_t in enumerate(next_xpos):
         for i, xpos_ti in enumerate(xpos_t):
-            dist = sdf.GetValueByCoordinates(*xpos_ti)[0]
+            dist = np.clip(sdf.GetValueByCoordinates(*xpos_ti)[0], -1, 1)
             sdf_dists[t, i] = dist
     sdf_cost = np.sum(np.exp(-sdf_dists) * hp['next_xpos_sdf_weight'] * next_is_grasping, axis=1)
     sdf_cost = sum(sdf_cost)

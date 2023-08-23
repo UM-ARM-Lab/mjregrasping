@@ -2,14 +2,18 @@ import time
 
 import numpy as np
 import rerun as rr
+from matplotlib import cm
 from numpy.linalg import norm
 
-from mjregrasping.goals import as_float
+import rospy
+from mjregrasping.goals import MPPIGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
 from mjregrasping.grasping import get_grasp_eqs
 from mjregrasping.math import softmax
 from mjregrasping.params import hp
+from mjregrasping.physics import Physics
 from mjregrasping.rollout import control_step
+from mjregrasping.viz import Viz
 
 
 class RegraspMPPI:
@@ -201,3 +205,26 @@ def do_grasp_dynamics(phy, results):
                 did_new_grasp = True
 
     return did_new_grasp
+
+def mppi_viz(viz: Viz, mppi: RegraspMPPI, goal: MPPIGoal, phy: Physics, command: np.ndarray, sub_time_s: float):
+    if not viz.p.mppi_rollouts:
+        return
+
+    sorted_traj_indices = np.argsort(mppi.cost)
+
+    i = None
+    num_samples = mppi.cost.shape[0]
+    for i in range(min(num_samples, 10)):
+        sorted_traj_idx = sorted_traj_indices[i]
+        cost_normalized = mppi.cost_normalized[sorted_traj_idx]
+        c = list(cm.RdYlGn(1 - cost_normalized))
+        c[-1] = 0.8
+        result_i = mppi.rollout_results[:, sorted_traj_idx]
+        goal.viz_result(phy, result_i, i, color=c, scale=0.002)
+        rospy.sleep(0.001)  # needed otherwise messages get dropped :( I hate ROS...
+
+    if command is not None:
+        cmd_rollout_results, _, _ = rollout(phy.copy_all(), goal, np.expand_dims(command, 0),
+                                            np.expand_dims(sub_time_s, 0), viz=None)
+        goal.viz_result(phy, cmd_rollout_results, i, color='b', scale=0.004)
+
