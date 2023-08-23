@@ -1,3 +1,4 @@
+import pickle
 from pathlib import Path
 
 import mujoco.viewer
@@ -11,6 +12,8 @@ from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.scenarios import Scenario
+
+CACHED_DEMO = 'cached_demo'
 
 
 def print_hs(hs):
@@ -28,6 +31,8 @@ def load_demo(demo: Path, scenario: Scenario):
     locs_seq = []
     phys = []
     for path in paths:
+        if path.stem == CACHED_DEMO:
+            continue
         m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
         d = load_data_and_eq(m, path, True)
         phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
@@ -84,3 +89,15 @@ def get_subgoals_by_h(phys, hs):
             yield get_grasp_locs(phy), h
 
     yield get_grasp_locs(phys[-1]), hs[-1]
+
+
+def save_cached_demo(demo: Path, hs, locs_seq, paths, phys):
+    cached_demo_path = demo / f'{CACHED_DEMO}.pkl'
+    with cached_demo_path.open("wb") as f:
+        pickle.dump((hs, locs_seq, phys, paths), f)
+
+
+def load_cached_demo(demo: Path):
+    cached_demo_path = demo / f'{CACHED_DEMO}.pkl'
+    with cached_demo_path.open("rb") as f:
+        return pickle.load(f)

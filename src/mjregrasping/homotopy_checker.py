@@ -287,7 +287,7 @@ def get_loops(graph, valid_cycles):
             loop.extend(edge_path)
         loop.append(loop[0])
         loop = np.stack(loop)
-        loop_id = ','.join(valid_cycle[:-1])
+        loop_id = ','.join(sorted(valid_cycle[:-1]))
         loops.append(loop)
         loop_ids.append(loop_id)
     return loop_ids, loops

@@ -22,7 +22,7 @@ def make_planning_scene(phy: Physics):
     # Force the grippers to be "closed" for grasp planning
     for name in phy.o.rd.gripper_joint_names:
         i = scene_msg.robot_state.joint_state.name.index(name)
-        scene_msg.robot_state.joint_state.position[i] = hp['finger_q_closed']
+        scene_msg.robot_state.joint_state.position[i] = hp['finger_q_pregrasp']
 
     # Collision objects
     for geom_id in phy.o.obstacle.geom_indices:

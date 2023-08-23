@@ -13,7 +13,7 @@ from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.goals import ThreadingGoal, GraspLocsGoal, ObjectPointGoal
+from mjregrasping.goals import ThreadingGoal, GraspLocsGoal, ObjectPointGoal, PullThroughGoal
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
@@ -22,13 +22,13 @@ from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.regrasp_goal import RegraspGoal
 from mjregrasping.regrasp_mpc import RegraspMPC
 from mjregrasping.regrasping_mppi import do_grasp_dynamics
+from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import cable_harness, setup_cable_harness
-from mjregrasping.segment_demo import load_demo, get_subgoals_by_h
+from mjregrasping.segment_demo import load_demo, get_subgoals_by_h, load_cached_demo
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.viz import make_viz
 
@@ -64,45 +64,42 @@ def main():
 
     mov = MjMovieMaker(m)
     now = int(time.time())
-    seed = 2
+    seed = 1
     mov_path = root / f'seed_{seed}_{now}.mp4'
     print(f"Saving movie to {mov_path}")
     mov.start(mov_path, fps=8)
 
     # First, we need to segment the demonstration and construct a sequences of Goal instances based on that
     print("loading demo...")
-    hs, locs, phys, _ = load_demo(args.demo, scenario)
+    hs, locs, phys, _ = load_cached_demo(args.demo)
+    print("done.")
 
     skeletons = load_skeletons(scenario.skeletons_path)
+    log_skeletons(skeletons)
     grasp_rrt = GraspRRT()
     subgoals = list(get_subgoals_by_h(phys, hs))
     subgoal_locs = [subgoal[0] for subgoal in subgoals]
     subgoal_hs = [subgoal[1] for subgoal in subgoals]
 
-    goals = []
-    # for subgoal, next_subgoal in zip(subgoals, subgoals[1:]):
-    #     locs, h = subgoal
-    #     next_locs, next_h = next_subgoal
-    #     is_next_grasp = (locs == -1) & (next_locs != -1)
-    #     loc = locs[np.where(locs != -1)[0][0]]  # assumes there are two grippers that are alternating
-    #     next_loc = next_locs[np.where(is_next_grasp)[0][0]]  # assumes there are two grippers that are alternating
-    #     next_tool_name = phy.o.rd.tool_sites[np.where(is_next_grasp)[0][0]]
-    #     skel = skeletons['loop3']
-    #     goal_i = ThreadingGoal(skel, loc, next_tool_name, next_loc, bio_ik, viz)
-    #     goals.append(goal_i)
-    # goals.append(subgoals[-1])
+    grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
+
     goals = [
-        ThreadingGoal(skeletons, 'loop1', subgoal_locs[1][0], 'left', subgoal_locs[1], subgoal_hs[1], grasp_rrt, viz),
+        ThreadingGoal(grasp_goal, skeletons, 'loop1', subgoal_locs[1][0], 'left', subgoal_locs[1], subgoal_hs[1], grasp_rrt, sdf,
+                      viz),
         ([Strategies.NEW_GRASP, Strategies.RELEASE], subgoal_locs[2]),
-        ThreadingGoal(skeletons, 'loop1', subgoal_locs[3][1], 'right', subgoal_locs[3], subgoal_hs[3], grasp_rrt, viz),
+        PullThroughGoal(grasp_goal, skeletons, 'loop1', subgoal_locs[3][1], 'right', subgoal_locs[3], subgoal_hs[3], grasp_rrt, sdf,
+                        viz),
         ([Strategies.RELEASE, Strategies.NEW_GRASP], subgoal_locs[4]),
-        ThreadingGoal(skeletons, 'loop2', subgoal_locs[5][0], 'left', subgoal_locs[5], subgoal_hs[5], grasp_rrt, viz),
+        ThreadingGoal(grasp_goal, skeletons, 'loop2', subgoal_locs[5][0], 'left', subgoal_locs[5], subgoal_hs[5], grasp_rrt, sdf,
+                      viz),
         ([Strategies.NEW_GRASP, Strategies.RELEASE], subgoal_locs[6]),
-        ThreadingGoal(skeletons, 'loop2', subgoal_locs[7][1], 'right', subgoal_locs[7], subgoal_hs[7], grasp_rrt, viz),
+        PullThroughGoal(grasp_goal, skeletons, 'loop2', subgoal_locs[7][1], 'right', subgoal_locs[7], subgoal_hs[7], grasp_rrt, sdf,
+                        viz),
         ([Strategies.RELEASE, Strategies.NEW_GRASP], subgoal_locs[8]),
-        ThreadingGoal(skeletons, 'loop3', subgoal_locs[9][0], 'left', subgoal_locs[9], subgoal_hs[9], grasp_rrt, viz),
+        ThreadingGoal(grasp_goal, skeletons, 'loop3', subgoal_locs[9][0], 'left', subgoal_locs[9], subgoal_hs[9], grasp_rrt, sdf,
+                      viz),
         ([Strategies.NEW_GRASP, Strategies.RELEASE], subgoal_locs[10]),
-        ObjectPointGoal(np.array([-0.75, 0.75, 0.4]), 0.05, 1, viz)
+        ObjectPointGoal(grasp_goal, np.array([-0.75, 0.63, 0.4]), 0.03, 1, viz)
     ]
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
@@ -110,13 +107,10 @@ def main():
     num_samples = hp['regrasp_n_samples']
     goal_idx = 0
 
-    grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
-
     mpc.mppi.reset()
     mpc.reset_trap_detection()
 
-    subgoal = goals[goal_idx]
-    regrasp_goal = RegraspGoal(subgoal, grasp_goal, hp['grasp_goal_radius'], mpc.viz)
+    goal = goals[goal_idx]
 
     itr = 0
     max_iters = 500
@@ -129,16 +123,16 @@ def main():
         if itr > max_iters:
             break
 
-        regrasp_goal.viz_goal(phy)
+        goal.viz_goal(phy)
 
-        if isinstance(subgoal, ObjectPointGoal):
-            if subgoal.satisfied(phy):
+        if isinstance(goal, ObjectPointGoal):
+            if goal.satisfied(phy):
                 print(Fore.GREEN + "Goal reached!" + Fore.RESET)
                 break
         else:
-            res, scene_msg = subgoal.plan_to_next_locs(phy)
+            res, scene_msg = goal.plan_to_next_locs(phy)
             if res:
-                if subgoal.satisfied_from_res(phy, res):
+                if goal.satisfied_from_res(phy, res):
                     print(Fore.GREEN + "SubGoal reached!" + Fore.RESET)
                     mpc.mppi.reset()
                     grasp_rrt.display_result(viz, res, scene_msg)
@@ -148,7 +142,7 @@ def main():
                     # execute_grasp_plan(phy, qs, viz, is_planning=False, mov=mov, stop_on_contact=True)
                     teleport_to_end_of_plan(phy, res)
                     # force the grippers to be closed, just like we do in `make_planning_scene()`
-                    teleport_grippers_closed(phy)
+                    teleport_grippers_pregrasp(phy)
                     viz.viz(phy, is_planning=False)
                     grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
                     release_and_settle(phy, strategy, viz, is_planning=False, mov=mov)
@@ -157,14 +151,13 @@ def main():
                     grasp_goal.set_grasp_locs(locs)
 
                     goal_idx += 1
-                    subgoal = goals[goal_idx]
-                    regrasp_goal.op_goal = subgoal
+                    goal = goals[goal_idx]
                     if goal_idx >= len(goals):
                         print(Fore.GREEN + "Goal reached!" + Fore.RESET)
                         break
 
-        command, sub_time_s = mpc.mppi.command(phy, regrasp_goal, num_samples, viz=mpc.viz)
-        mpc.mppi_viz(mpc.mppi, regrasp_goal, phy, command, sub_time_s)
+        command, sub_time_s = mpc.mppi.command(phy, goal, num_samples, viz=mpc.viz)
+        mpc.mppi_viz(mpc.mppi, goal, phy, command, sub_time_s)
 
         control_step(phy, command, sub_time_s)
         mpc.viz.viz(phy)
@@ -172,7 +165,7 @@ def main():
         if mpc.mov:
             mpc.mov.render(phy.d)
 
-        results = regrasp_goal.get_results(phy)
+        results = goal.get_results(phy)
         do_grasp_dynamics(phy, results)
 
         mpc.mppi.roll()
@@ -182,11 +175,11 @@ def main():
     mpc.close()
 
 
-def teleport_grippers_closed(phy):
+def teleport_grippers_pregrasp(phy):
     gripper_q_ids = [phy.m.joint(n).qposadr[0] for n in phy.o.rd.gripper_joint_names]
     gripper_act_ids = [phy.m.actuator(n).trnid[0] for n in phy.o.rd.gripper_actuator_names]
-    phy.d.qpos[gripper_q_ids] = hp['finger_q_closed']
-    phy.d.qpos[gripper_act_ids] = hp['finger_q_closed']
+    phy.d.qpos[gripper_q_ids] = hp['finger_q_pregrasp']
+    phy.d.qpos[gripper_act_ids] = hp['finger_q_pregrasp']
     mujoco.mj_forward(phy.m, phy.d)
 
 
