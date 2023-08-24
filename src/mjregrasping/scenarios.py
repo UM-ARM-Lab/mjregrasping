@@ -153,8 +153,6 @@ def setup_cable_harness(phy, viz):
     rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
     phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
     phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0.2, np.pi)
-    mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
 
     activate_grasp(phy, 'attach1', 0.0)
 

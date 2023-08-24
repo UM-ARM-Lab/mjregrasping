@@ -102,10 +102,9 @@ def main():
             print(Fore.GREEN + "Goal reached!" + Fore.RESET)
             break
 
-        stuck_frac = traps.check_is_stuck(phy)
-        is_stuck_vec = np.array([stuck_frac, stuck_frac]) < hp['frac_dq_threshold']
+        is_stuck = traps.check_is_stuck(phy)
         needs_reset = False
-        if np.any(is_stuck_vec):
+        if is_stuck:
             print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
             initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal)
             sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=False)

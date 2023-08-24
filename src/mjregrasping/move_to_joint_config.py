@@ -18,11 +18,12 @@ def execute_grasp_plan(phy: Physics, qs, viz: Viz, is_planning: bool, mov: Optio
     pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov, stop_on_contact=stop_on_contact)
 
 
-def pid_to_joint_config(phy: Physics, viz: Viz, q_target, sub_time_s, is_planning: bool = False,
+def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, is_planning: bool = False,
                         mov: Optional[MjMovieMaker] = None, reached_tol=1.0, stopped_tol=0.5, stop_on_contact=False):
     q_prev = get_q(phy)
     for i in range(60):
-        viz.viz(phy, is_planning)
+        if viz:
+            viz.viz(phy, is_planning)
         q_current = get_q(phy)
         command = hp['joint_kp'] * (q_target - q_current)
 

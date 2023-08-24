@@ -7,20 +7,12 @@ from mjregrasping.rollout import control_step, no_results
 from mjregrasping.viz import Viz
 
 
-def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mov: Optional[MjMovieMaker] = None,
-           result_func: Optional[Callable] = no_results):
+def settle(phy, sub_time_s, viz: Optional[Viz], is_planning, settle_steps=20, mov: Optional[MjMovieMaker] = None):
     ctrl = np.zeros(phy.m.nu)
 
-    results = []
     for _ in range(settle_steps):
         if viz:
             viz.viz(phy, is_planning)
 
         if not is_planning:
             control_step(phy, ctrl, sub_time_s=sub_time_s, mov=mov)
-
-        result_tuple = result_func(phy)
-
-        results.append(result_tuple)
-
-    return results

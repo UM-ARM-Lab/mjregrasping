@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from pathlib import Path
+import zivid
 
 import numpy as np
 import rospkg
@@ -13,6 +14,7 @@ from cdcpd_torch.modules.cdcpd_module_arguments import CDCPDModuleArguments
 from cdcpd_torch.modules.cdcpd_network import CDCPDModule
 from cdcpd_torch.modules.cdcpd_parameters import CDCPDParamValues
 from cdcpd_torch.modules.post_processing.configuration import PostProcConfig, PostProcModuleChoice
+from zivid.experimental import calibration
 
 import message_filters
 import ros_numpy
@@ -106,28 +108,6 @@ class CDCPDTorchNode:
     """
 
     def __init__(self):
-        self.intrinsic = None
-        rospy.wait_for_service("/zivid_camera/capture", 30.0)
-
-        topics = [
-            "/zivid_camera/color/image_color",
-            "/zivid_camera/depth/image",
-        ]
-        self.subs = [message_filters.Subscriber(topic, Image) for topic in topics]
-        self.ts = message_filters.ApproximateTimeSynchronizer(self.subs, 10, slop=0.5)
-        # self.ts.registerCallback(self.on_data)
-
-        self.capture_service = rospy.ServiceProxy("/zivid_camera/capture", Capture)
-
-        self.load_settings_from_file_service = rospy.ServiceProxy(
-            "/zivid_camera/load_settings_from_file", LoadSettingsFromFile
-        )
-        samples_path = rospkg.RosPack().get_path("mjregrasping")
-        settings_path = Path(samples_path) / "camera_settings.yml"
-        self.load_settings_from_file_service(str(settings_path))
-
-        self.info_sub = rospy.Subscriber("/zivid_camera/depth/camera_info", CameraInfo, self.on_camera_info)
-
         # CDCPD
         self.cdcpd_pred_pub = rospy.Publisher('cdcpd_pred', MarkerArray, queue_size=10)
 
@@ -172,13 +152,37 @@ class CDCPDTorchNode:
         for idx, point in [(0, rope_start_pos), (24, rope_end_pos)]:
             self.grasped_points.append(GripperInfoSingle(fixed_pt_pred=point, grasped_vertex_idx=idx))
 
+        print("Compiling CDCPD module...")
         cdcpd_module = CDCPDModule(deformable_object_config_init=def_obj_config, param_vals=param_vals,
                                    postprocessing_option=postproc_config, debug=USE_DEBUG_MODE, device=device)
         self.cdcpd_module = cdcpd_module.eval()
+        print("done.")
 
-    def run(self):
-        while not rospy.is_shutdown():
-            self.capture_service()
+        self.intrinsics = None
+
+    def run(self, camera):
+        camera_matrix = calibration.intrinsics(camera).camera_matrix
+        self.intrinsics = np.array([
+            [camera_matrix.fx, 0, camera_matrix.cx],
+            [0, camera_matrix.fy, camera_matrix.cy],
+            [0, 0, 1]
+        ])
+        settings = zivid.Settings.load('camera_settings.yml')
+
+        from time import perf_counter
+        last_t = perf_counter()
+        while True:
+            with camera.capture(settings) as frame:
+                point_cloud = frame.point_cloud()
+                xyz = point_cloud.copy_data("xyz")
+                xyz_flat = xyz.reshape(-1, 3)
+                xyz_flat = xyz_flat[~np.isnan(xyz_flat).any(axis=1)]
+                rgba = point_cloud.copy_data("rgba")
+                rgb = rgba[:, :, :3]
+            now = perf_counter()
+            dt = now - last_t
+            print(f'dt: {dt:.4f}')
+            last_t = now
 
     def on_camera_info(self, camera_info_msg: CameraInfo):
         self.intrinsic = np.array(camera_info_msg.K).reshape(3, 3)
@@ -217,7 +221,9 @@ class CDCPDTorchNode:
 def main():
     rospy.init_node("cdcpd_torch_node")
     n = CDCPDTorchNode()
-    n.run()
+    with zivid.Application() as app:
+        with app.connect_camera() as camera:
+            n.run(camera)
 
 
 if __name__ == "__main__":

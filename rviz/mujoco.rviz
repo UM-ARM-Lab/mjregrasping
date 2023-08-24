@@ -4,6 +4,7 @@ Panels:
     Name: Displays
     Property Tree Widget:
       Expanded:
+        - /Global Options1
         - /TF1/Frames1
         - /debug markers1/Namespaces1
         - /mujoco1/Namespaces1
@@ -70,9 +71,10 @@ Visualization Manager:
       Marker Topic: /markers
       Name: debug markers
       Namespaces:
+        current_loc: true
         ee_0: false
         ee_1: false
-        goal: true
+        goal_dir: true
         rope: true
       Queue Size: 100
       Value: true
@@ -81,23 +83,19 @@ Visualization Manager:
       Marker Topic: /all
       Name: mujoco
       Namespaces:
+        cable_harness_obstacles/attach1/attach1: true
+        cable_harness_obstacles/attach2/attach2: true
+        cable_harness_obstacles/loop1/loop3_bottom: true
+        cable_harness_obstacles/loop1/loop3_front: true
+        cable_harness_obstacles/loop1/loop3_top: true
+        cable_harness_obstacles/loop2/loop2_bottom: true
+        cable_harness_obstacles/loop2/loop2_front: true
+        cable_harness_obstacles/loop2/loop2_top: true
+        cable_harness_obstacles/loop3/loop1_bottom: true
+        cable_harness_obstacles/loop3/loop1_front: true
+        cable_harness_obstacles/loop3/loop1_top: true
+        cable_harness_obstacles/wall/wall: true
         cc_sphere/cc_sphere/cc_sphere: true
-        computer_rack/attach/rack_attach: true
-        computer_rack/computer/case: true
-        computer_rack/computer/port: true
-        computer_rack/rack1/rack1_bottom: true
-        computer_rack/rack1/rack1_post1: true
-        computer_rack/rack1/rack1_post2: true
-        computer_rack/rack1/rack1_post3: true
-        computer_rack/rack1/rack1_post4: true
-        computer_rack/rack2/box1: true
-        computer_rack/rack2/rack2_bottom: true
-        computer_rack/rack2/rack2_post1: true
-        computer_rack/rack2/rack2_post2: true
-        computer_rack/rack2/rack2_post3: true
-        computer_rack/rack2/rack2_post4: true
-        computer_rack/rack2/rack2_top: true
-        computer_rack/wall/wall: true
         floor/floor/floor: true
         goal/goal/goal: true
         rope/B_1/G1: true
@@ -186,7 +184,8 @@ Visualization Manager:
       Marker Topic: /eq_constraints
       Name: constraints
       Namespaces:
-        eq_attach: true
+        eq_attach1: true
+        eq_left: true
         eq_right: true
       Queue Size: 100
       Value: true
@@ -195,11 +194,48 @@ Visualization Manager:
       Marker Topic: /contacts
       Name: contacts
       Namespaces:
-        G0_rack_attach: true
+        G0_wall: true
+        G10_drive7_housing_mesh: true
+        G10_left_finger_pad: true
+        G10_loop3_bottom: true
+        G10_loop3_front: true
         G10_right_finger_pad: true
         G10_right_finger_pad2: true
-        G2_rack2_bottom: true
-        G3_rack2_bottom: true
+        G10_rightgripper: true
+        G10_rightgripper2: true
+        G10_wall: true
+        G1_wall: true
+        G2_wall: true
+        G3_wall: true
+        G4_wall: true
+        G6_wall: true
+        G7_wall: true
+        G9_right_finger_pad: true
+        G9_right_finger_pad2: true
+        G9_rightgripper: true
+        G9_rightgripper2: true
+        G9_wall: true
+        attach1_G0: true
+        floor_G10: true
+        floor_G4: true
+        floor_G5: true
+        floor_G6: true
+        floor_G7: true
+        floor_G8: true
+        floor_G9: true
+        left_finger_pad_left_finger_pad2: true
+        loop2_bottom_joint2_mesh: true
+        loop2_front_drive41_mesh: true
+        loop2_front_joint2_mesh: true
+        loop3_bottom_left_finger_pad: true
+        loop3_bottom_left_finger_pad2: true
+        right_finger_pad_right_finger_pad2: true
+        right_finger_pad_rightgripper2: true
+        rightgripper_right_finger_pad2: true
+        rightgripper_rightgripper2: true
+        wall_left_finger_pad2: true
+        wall_right_finger_pad: true
+        wall_right_finger_pad2: true
       Queue Size: 100
       Value: true
     - Acceleration_Scaling_Factor: 0.1
@@ -885,7 +921,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.006319761276245
+      Distance: 0.43270570039749146
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -893,17 +929,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.29445725679397583
-        Y: 0.6633262038230896
-        Z: 0.19210368394851685
+        X: 0.38967669010162354
+        Y: 0.6223922967910767
+        Z: 0.29469677805900574
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.6047970056533813
+      Pitch: 0.5797972083091736
       Target Frame: anim_camera
-      Yaw: 4.856875419616699
+      Yaw: 4.106924533843994
     Saved: ~
 Window Geometry:
   Displays:

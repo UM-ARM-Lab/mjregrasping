@@ -22,7 +22,6 @@ class TrapDetection:
         self.max_dq = 0
 
     def check_is_stuck(self, phy):
-        # NOTE: could be cool to split up trap detection on a per-gripper basis?
         latest_q = get_q_for_trap_detection(phy)
         self.state_history.insert(latest_q)
         qs = np.array(self.state_history.data)
@@ -34,7 +33,9 @@ class TrapDetection:
             # trap detection isn't thrown off.
             self.max_dq = min(max(self.max_dq, dq), hp['max_max_dq'])
             frac_dq = dq / self.max_dq
-            rr.log_scalar('mab/frac_dq', frac_dq, color=[255, 0, 255])
-            return frac_dq
+            rr.log_scalar('trap_detection/frac_dq', frac_dq, color=[255, 0, 255])
+            rr.log_scalar('trap_detection/threshold', hp['frac_dq_threshold'], color=[255, 0, 0])
+
+            return frac_dq < hp['frac_dq_threshold']
         else:
-            return 1
+            return False
