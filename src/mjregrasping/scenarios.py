@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 import mujoco
 import numpy as np
@@ -24,6 +24,7 @@ class Scenario:
     obstacle_name: str
     robot_data: RobotData
     rope_name: str
+    noise_sigma: Union[np.ndarray, float]
 
 
 conq_hose = Scenario(
@@ -34,16 +35,7 @@ conq_hose = Scenario(
     obstacle_name="hose_obstacles",
     robot_data=conq,
     rope_name="rope",
-)
-
-val_pull = Scenario(
-    name="Pull",
-    xml_path=Path("models/pull_scene.xml"),
-    skeletons_path=None,
-    sdf_path=Path("sdfs/pull.sdf"),
-    obstacle_name="floor_obstacles",
-    robot_data=val,
-    rope_name="rope",
+    noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
 )
 
 val_untangle = Scenario(
@@ -54,6 +46,7 @@ val_untangle = Scenario(
     obstacle_name="computer_rack",
     robot_data=val,
     rope_name="rope",
+    noise_sigma=np.deg2rad(2)
 )
 
 cable_harness = Scenario(
@@ -64,6 +57,7 @@ cable_harness = Scenario(
     obstacle_name="cable_harness_obstacles",
     robot_data=val,
     rope_name="rope",
+    noise_sigma=np.deg2rad(1)
 )
 
 

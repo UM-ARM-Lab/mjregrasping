@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+""""
+Based on "An Online Method for Tight-tolerance Insertion Tasks for String and Rope" by Wang, Berenson, and Balkcom, 2015
+"""
 import argparse
 import multiprocessing
 import time
@@ -13,33 +16,63 @@ from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.goals import ThreadingGoal, GraspLocsGoal, ObjectPointGoal, PullThroughGoal, point_goal_from_geom
-from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
-from mjregrasping.grasp_conversions import grasp_locations_to_xpos
+from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, \
+    WeifuThreadingGoal
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_utils import load_skeletons, skeleton_field_dir
-from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.grasping import get_grasp_locs, activate_grasp
+from mjregrasping.homotopy_utils import skeleton_field_dir
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.robot_data import val
-from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
+from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import cable_harness, setup_cable_harness
-from mjregrasping.segment_demo import get_subgoals_by_h, load_cached_demo
-from mjregrasping.teleport_to_plan import teleport_to_end_of_plan, teleport_along_plan
+from mjregrasping.teleport_to_plan import teleport_to_planned_q
 from mjregrasping.viz import make_viz
 
 
-def penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy: Physics, loc: float):
-    xpos = grasp_locations_to_xpos(phy, loc)
-    # FIXME:
-    return False
+def dx(x):
+    return np.array([x, 0, 0])
+
+
+def dy(y):
+    return np.array([0, y, 0])
+
+
+def dz(z):
+    return np.array([0, 0, z])
+
+
+def get_cable_harness_skeletons(phy: Physics):
+    d = phy.d
+    m = phy.m
+    return {
+        "loop1": d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop1_top").size[0]) * 2,
+            dz(m.geom("loop1_front").size[2] * 2),
+            -dy(m.geom("loop1_top").size[0] * 2),
+            dz(-m.geom("loop1_front").size[2] * 2),
+        ], axis=0),
+        "loop2": d.geom("loop2_front").xpos - dz(m.geom("loop2_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop2_top").size[0]) * 2,
+            dz(m.geom("loop2_front").size[2] * 2),
+            -dy(m.geom("loop2_top").size[0] * 2),
+            dz(-m.geom("loop2_front").size[2] * 2),
+        ], axis=0),
+        "loop3": d.geom("loop3_front").xpos - dz(m.geom("loop3_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop3_top").size[0]) * 2,
+            dz(m.geom("loop3_front").size[2] * 2),
+            -dy(m.geom("loop3_top").size[0] * 2),
+            dz(-m.geom("loop3_front").size[2] * 2),
+        ], axis=0),
+    }
 
 
 @ros_init.with_ros("cable_harness_baseline")
@@ -56,7 +89,7 @@ def main():
 
     viz = make_viz(scenario)
 
-    root = Path("results") / scenario.name
+    root = Path("results") / scenario.name + "_baseline"
     root.mkdir(exist_ok=True, parents=True)
 
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
@@ -77,38 +110,33 @@ def main():
     print(f"Saving movie to {mov_path}")
     mov.start(mov_path)
 
-    skeletons = load_skeletons(scenario.skeletons_path)
+    skeletons = get_cable_harness_skeletons(phy)
     log_skeletons(skeletons)
+
     grasp_rrt = GraspRRT()
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
-    traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val.noise_sigma,
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=cable_harness.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
     goal_idx = 0
 
     mppi.reset()
-    traps.reset_trap_detection()
 
+    end_loc = 0.98
     goals = [
-        ThreadingGoal(grasp_goal, skeletons, 'loop1', subgoal_locs[1][0], 'left', subgoal_locs[1], subgoal_hs[1],
-                      grasp_rrt, sdf, viz),
-        ThreadingGoal(grasp_goal, skeletons, 'loop2', subgoal_locs[1][0], 'left', subgoal_locs[1], subgoal_hs[1],
-                      grasp_rrt, sdf, viz),
-        ThreadingGoal(grasp_goal, skeletons, 'loop3', subgoal_locs[1][0], 'left', subgoal_locs[1], subgoal_hs[1],
-                      grasp_rrt, sdf, viz),
+        WeifuThreadingGoal(grasp_goal, skeletons, 'loop1', end_loc, sdf, viz),
+        WeifuThreadingGoal(grasp_goal, skeletons, 'loop2', end_loc, sdf, viz),
+        WeifuThreadingGoal(grasp_goal, skeletons, 'loop3', end_loc, sdf, viz),
         point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
     ]
     goal = goals[goal_idx]
-    traps = TrapDetection()  # This is used to replace the |P-P|>tolerance check
-    traps.reset_trap_detection()
 
     itr = 0
 
-    max_iters = 500
+    max_iters = 250
     viz.viz(phy)
     while True:
         if rospy.is_shutdown():
@@ -116,6 +144,7 @@ def main():
             break
 
         if itr > max_iters:
+            print(Fore.RED + "Max iterations reached!" + Fore.RESET)
             break
 
         goal.viz_goal(phy)
@@ -125,35 +154,35 @@ def main():
                 print(Fore.GREEN + "Goal reached!" + Fore.RESET)
                 break
         else:
-            disc_center = np.mean(goal.skel, axis=-1)
+            disc_center = np.mean(goal.skel[:4], axis=0)
             disc_normal = skeleton_field_dir(goal.skel, disc_center[None])[0] * 0.01
             disc_rad = 0.05  # TODO: compute the radius of the disc
 
-            if penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy, goal.loc):
-                is_stuck = traps.check_is_stuck(phy)
-            res, scene_msg = goal.plan_to_next_locs(phy)
-            if res:
-                if goal.satisfied_from_res(phy, res):
-                    print(Fore.GREEN + "SubGoal reached!" + Fore.RESET)
-                    mppi.reset()
-                    grasp_rrt.display_result(viz, res, scene_msg)
-                    goal_idx += 1
-                    strategy, locs = goals[goal_idx]
-                    qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
-                    # force the grippers to be closed, just like we do in `make_planning_scene()`
-                    pid_to_joint_config(phy, viz, qs[0], DEFAULT_SUB_TIME_S, is_planning=False, mov=mov)
-                    teleport_along_plan(phy, qs, viz, is_planning=False, mov=mov)
-                    # execute_grasp_plan(phy, qs, viz, is_planning=False, mov=mov, stop_on_contact=True)
-                    viz.viz(phy, is_planning=False)
-                    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
-                    release_and_settle(phy, strategy, viz, is_planning=False, mov=mov)
-                    grasp_goal.set_grasp_locs(locs)
+            if goal.satisfied(phy, disc_center, disc_normal, disc_rad):
+                mppi.reset()
 
+                strategy = [Strategies.STAY, Strategies.MOVE]
+                locs = np.array([-1, end_loc])
+                res, scene_msg = grasp_rrt.plan(phy, strategy, locs, viz)
+                if res.error_code.val == res.error_code.SUCCESS:
+                    print("Moving on to next goal")
+                    grasp_rrt.display_result(viz, res, scene_msg)
+                    qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
+                    teleport_to_planned_q(phy, qs[-1])
+                    goal.loc = end_loc
                     goal_idx += 1
-                    goal = goals[goal_idx]
-                    if goal_idx >= len(goals):
-                        print(Fore.GREEN + "Goal reached!" + Fore.RESET)
-                        break
+                else:
+                    print("Lowering grasp")
+                    goal.loc -= 0.01
+                activate_grasp(phy, 'right', goal.loc)
+                control_step(phy, np.zeros(phy.m.nu), sub_time_s=1.0, mov=mov)
+                viz.viz(phy, False)
+                goal = goals[goal_idx]
+                grasp_goal.set_grasp_locs(np.array([-1, goal.loc]))
+
+                if goal_idx >= len(goals):
+                    print(Fore.GREEN + "Task complete!" + Fore.RESET)
+                    break
 
         command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
         mppi_viz(viz, mppi, goal, phy, command, sub_time_s)

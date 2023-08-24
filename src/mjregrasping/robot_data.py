@@ -21,7 +21,6 @@ class RobotData:
     world_rope_eqs: List[str]
     tool_bodies: List[str]
     ik_tol: float
-    noise_sigma: np.ndarray
     workspace_bbox: np.ndarray
     q_home: np.ndarray
 
@@ -60,7 +59,6 @@ val = RobotData(
     tool_bodies=["drive50", "drive10"],
     camera_names=['left_hand', 'right_hand'],
     ik_tol=0.01,
-    noise_sigma=np.deg2rad(2),
     workspace_bbox=np.array([
         [0.7, 1.2],
         [-0.6, 0.6],
@@ -90,7 +88,6 @@ conq = RobotData(
     gripper_joint_names=['finger'],
     ik_tol=0.02,
     camera_names=['hand'],
-    noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
     workspace_bbox=np.array([
         [0, 1.5],
         [-1.0, 1.0],

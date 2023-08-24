@@ -133,7 +133,7 @@ def main():
 
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
         traps = TrapDetection()
-        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val.noise_sigma,
+        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=cable_harness.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
         goal_idx = 0
@@ -184,7 +184,7 @@ def main():
                         goal_idx += 1
                         goal = goals[goal_idx]
                         if goal_idx >= len(goals):
-                            print(Fore.GREEN + "Goal reached!" + Fore.RESET)
+                            print(Fore.GREEN + "Task complete!" + Fore.RESET)
                             break
 
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)

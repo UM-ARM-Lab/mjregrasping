@@ -76,7 +76,7 @@ class RegraspMPPI:
                                                                           viz=None)
 
         for cost_term_name, costs_for_term in zip(goal.cost_names(), costs_by_term.T):
-            rr.log_scalar(f'regrasp_goal/{cost_term_name}', np.mean(costs_for_term))
+            rr.log_scalar(f'mpc_costs/{cost_term_name}', np.mean(costs_for_term))
 
         # normalized cost is only used for visualization, so we avoid numerical issues
         cost_range = (self.cost.max() - self.cost.min())

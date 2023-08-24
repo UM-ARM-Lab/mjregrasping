@@ -1,4 +1,5 @@
 build
+imgs:
 results
 .idea
 __pycache__
@@ -9,5 +10,7 @@ MUJOCO_LOG.TXT
 outcmaes
 wandb
 *.pkl
+*.png
 *.swp
 *.blend1
+*.pth

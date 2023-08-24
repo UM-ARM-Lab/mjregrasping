@@ -71,7 +71,7 @@ def main():
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val.noise_sigma,
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
     grasp_rrt = GraspRRT()

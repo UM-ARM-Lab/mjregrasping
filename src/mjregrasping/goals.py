@@ -1,6 +1,6 @@
 from copy import deepcopy
 from time import perf_counter
-from typing import Dict
+from typing import Dict, Optional
 
 import numpy as np
 import pysdf_tools
@@ -21,6 +21,8 @@ from mjregrasping.physics import Physics
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MotionPlanResponse
+from tf.transformations import quaternion_from_matrix
+from visualization_msgs.msg import MarkerArray, Marker
 
 
 def as_floats(results):
@@ -252,7 +254,7 @@ class ThreadingGoal(ObjectPointGoalBase):
                  next_locs, next_h,
                  grasp_rrt: GraspRRT, sdf: pysdf_tools.SignedDistanceField, viz: Viz):
         self.skel = skeletons[skeleton_name]
-        goal_point = np.mean(self.skel, axis=0)
+        goal_point = np.mnean(self.skel, axis=0)
         super().__init__(goal_point, loc, viz)
 
         self.skeletons = skeletons
@@ -396,6 +398,178 @@ class ThreadingGoal(ObjectPointGoalBase):
         # self.viz.rviz.viz_scene(scene_msg)
         # self.grasp_rrt.display_result(self.viz, res, scene_msg)
         return res, scene_msg
+
+
+class WeifuThreadingGoal(ObjectPointGoalBase):
+
+    def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_name, loc: float,
+                 sdf: pysdf_tools.SignedDistanceField, viz: Viz):
+        """
+
+        Args:
+            grasp_goal:
+            skeletons:
+            skeleton_name:
+            loc: This is analogous to the first reference point in Weifu's method
+            next_tool_name:
+            next_locs:
+            next_h:
+            grasp_rrt:
+            sdf:
+            viz:
+        """
+        self.skel = skeletons[skeleton_name]
+        goal_point = np.mean(self.skel[:4], axis=0)
+        super().__init__(goal_point, loc, viz)
+
+        self.skeletons = skeletons
+        self.goal_dir = skeleton_field_dir(self.skel, self.goal_point[None])[0] * 0.01
+        self.sdf = sdf
+        self.grasp_goal = grasp_goal
+
+    def get_results(self, phy: Physics):
+        tools_pos, joint_positions, contact_cost, is_unstable = get_results_common(phy)
+        is_grasping = get_is_grasping(phy)
+        rope_points = get_rope_points(phy)
+        finger_qs = get_finger_qs(phy)
+        op_goal_body_idx, op_goal_offset = grasp_locations_to_indices_and_offsets(self.loc, phy)
+        keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
+
+        current_locs = get_grasp_locs(phy)
+
+        grasp_locs = self.grasp_goal.get_grasp_locs()
+
+        nongrasping_rope_contact_cost = get_nongrasping_rope_contact_cost(phy, grasp_locs)
+
+        grasp_xpos = grasp_locations_to_xpos(phy, grasp_locs)
+
+        return result(tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint,
+                      finger_qs, grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost)
+
+    def viz_goal(self, phy: Physics):
+        self.viz.arrow('goal_dir', self.goal_point, self.goal_dir, 'g')
+        xpos = grasp_locations_to_xpos(phy, [self.loc])[0]
+        self.viz.sphere('current_loc', xpos, 0.015, 'g')
+
+    def costs(self, results, u_sample):
+        (tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint, finger_qs,
+         grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost) = as_floats(results)
+
+        unstable_cost = is_unstable * hp['unstable_weight']
+
+        nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
+
+        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+                                                                               current_locs, grasp_locs,
+                                                                               grasp_xpos, tools_pos, rope_points)
+        grasp_finger_cost = sum(grasp_finger_cost)
+        grasp_pos_cost = sum(grasp_pos_cost)
+        grasp_near_cost = sum(grasp_near_cost)
+
+        gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
+        gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
+        gripper_to_goal_cost = sum(gripper_to_goal_cost)
+
+        smoothness_cost = get_smoothness_cost(u_sample)
+
+        contact_cost = sum(contact_cost)
+        unstable_cost = sum(unstable_cost)
+
+        no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
+        ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
+
+        keypoint_dist = self.keypoint_dist_to_goal(keypoint)[1:]
+        keypoint_cost = sum(keypoint_dist * hp['keypoint_weight'])
+
+        angle_cost = get_angle_cost(self.skel, self.loc, rope_points)
+
+        dist = np.clip(self.sdf.GetValueByCoordinates(*keypoint[0])[0], -1, 1)
+        sdf_cost = np.exp(-dist) * hp['weifu_sdf_weight']
+
+        torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
+
+        return (
+            contact_cost,
+            unstable_cost,
+            angle_cost,
+            keypoint_cost,
+            sdf_cost,
+            torso_cost,
+            grasp_finger_cost,
+            grasp_pos_cost,
+            grasp_near_cost,
+            nongrasping_rope_contact_cost,
+            gripper_to_goal_cost,
+            ever_not_grasping_cost,
+            smoothness_cost,
+        )
+
+    @staticmethod
+    def cost_names():
+        return [
+            "contact",
+            "unstable",
+            "threading_angle",
+            "threading_keypoint",
+            "threading_sdf",
+            "torso_cost",
+            "grasp_finger",
+            "grasp_pos",
+            "grasp_near",
+            "nongrasping_rope_contact",
+            "gripper_to_goal",
+            "ever_not_grasping",
+            "smoothness",
+        ]
+
+    def satisfied(self, phy: Physics, disc_center, disc_normal, disc_rad):
+        satisfied = penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy, self.loc, self.viz)
+        return satisfied
+
+
+def penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy: Physics, loc: float, viz: Optional[Viz]):
+    disc_normal = disc_normal / norm(disc_normal)
+    xpos = grasp_locations_to_xpos(phy, [loc])[0]
+    # project xpos into the place of the disc, defined by the disc center and normal
+    # https://math.stackexchange.com/questions/96061/how-to-project-a-point-onto-a-plane-in-3d
+    projected_xpos = xpos - np.dot(xpos - disc_center, disc_normal) * disc_normal
+    # check if the projected xpos is within the disc
+    dist = norm(projected_xpos - disc_center)
+    # also check if the origin xpos is on the positive half of the disc plane
+    satisfied = dist < disc_rad and np.dot(xpos - disc_center, disc_normal) > 0
+    if viz:
+        viz.sphere('projected_xpos', projected_xpos, 0.001, 'g' if satisfied else 'r')
+        disc_marker_msg = Marker()
+        disc_marker_msg.type = Marker.CYLINDER
+        disc_marker_msg.ns = 'disc'
+        disc_marker_msg.header.frame_id = 'world'
+        disc_marker_msg.pose.position.x = disc_center[0]
+        disc_marker_msg.pose.position.y = disc_center[1]
+        disc_marker_msg.pose.position.z = disc_center[2]
+        # create a quaternion such that the z axis is the normal
+        z = disc_normal
+        x = np.cross(z, np.random.randn(3))
+        x /= norm(x)
+        y = np.cross(z, x)
+        rot_mat = np.eye(4)
+        rot_mat[:3, 0] = x
+        rot_mat[:3, 1] = y
+        rot_mat[:3, 2] = z
+        quat = quaternion_from_matrix(rot_mat)
+        disc_marker_msg.pose.orientation.x = quat[0]
+        disc_marker_msg.pose.orientation.y = quat[1]
+        disc_marker_msg.pose.orientation.z = quat[2]
+        disc_marker_msg.pose.orientation.w = quat[3]
+        disc_marker_msg.scale.x = disc_rad * 2
+        disc_marker_msg.scale.y = disc_rad * 2
+        disc_marker_msg.scale.z = 0.001
+        disc_marker_msg.color.g = 1
+        disc_marker_msg.color.a = 0.2
+
+        disc_msg = MarkerArray()
+        disc_msg.markers.append(disc_marker_msg)
+        viz.markers_pub.publish(disc_msg)
+    return satisfied
 
 
 class PullThroughGoal(ThreadingGoal):

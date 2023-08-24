@@ -13,9 +13,9 @@
                 <geom name="attach2" size="0.02 0.02 0.02" rgba="1.0 0 0 1"/>
             </body>
             <body name="loop3" pos="0.07 -0.5 1">
-                <geom type="box" name="loop1_bottom" pos="0.06 0 0" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop1_front" pos="0.12 0 0.06" size="0.02 0.02 0.07" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop1_top" pos="0.06 0 0.12" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop3_bottom" pos="0.06 0 0" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop3_front" pos="0.12 0 0.06" size="0.02 0.02 0.07" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop3_top" pos="0.06 0 0.12" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
             </body>
 
             <body name="loop2" pos="0.07 0 1.1">
@@ -25,9 +25,9 @@
             </body>
 
             <body name="loop1" pos="0.07 0.4 0.9">
-                <geom type="box" name="loop3_bottom" pos="0.06 0 0" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop3_front" pos="0.12 0 0.06" size="0.02 0.02 0.07" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop3_top" pos="0.06 0 0.12" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop1_bottom" pos="0.06 0 0" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop1_front" pos="0.12 0 0.06" size="0.02 0.02 0.07" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop1_top" pos="0.06 0 0.12" size="0.08 0.02 0.02" rgba="0.5 0.5 1.0 1"/>
             </body>
         </body>
     </worldbody>

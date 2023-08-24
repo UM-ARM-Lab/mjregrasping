@@ -45,8 +45,9 @@ def cdcpd_helper(cdcpd_module: CDCPDModule, tracking_map: TrackingMap, depth: np
     # Y_emit_prior = torch.from_numpy(Y_emit_prior.reshape(-1, 1)).to(torch.double)
     # assert torch.all(~torch.isnan(Y_emit_prior))
 
-    model_input = CDCPDModuleArguments(tracking_map, seg_pc, gripper_info=grasped_points)
+    # model_input = CDCPDModuleArguments(tracking_map, seg_pc, gripper_info=grasped_points)
     # model_input.set_Y_emit_prior(Y_emit_prior)
+    model_input = CDCPDModuleArguments(tracking_map, seg_pc)
 
     cdcpd_module_arguments = cdcpd_module(model_input)
 
@@ -139,7 +140,7 @@ class CDCPDTorchNode:
         rope_end_pos = torch.tensor([0.5, 0.0, 1.0]).to(device)
 
         NUM_TRACKED_POINTS = 25
-        MAX_ROPE_LENGTH = .768
+        MAX_ROPE_LENGTH = 1.24
 
         USE_DEBUG_MODE = False
 
@@ -197,7 +198,7 @@ class CDCPDTorchNode:
         while True:
             with camera.capture(settings) as frame:
                 point_cloud = frame.point_cloud()
-                xyz = point_cloud.copy_data("xyz")
+                xyz_mm = point_cloud.copy_data("xyz")
                 rgba = point_cloud.copy_data("rgba")
 
             now = perf_counter()
@@ -205,11 +206,13 @@ class CDCPDTorchNode:
             print(f'dt: {dt:.4f}')
             last_t = now
 
-            xyz = xyz / 1000.0
+            xyz = xyz_mm / 1000.0
             depth = xyz[:, :, 2]
             xyz_flat = xyz.reshape(-1, 3)
-            valid_idxs = np.where(~np.isnan(xyz_flat).any(axis=1))[0]
-            xyz_flat = xyz_flat[valid_idxs]  # remove NaNs
+            # FIXME: hack
+            is_valid = ~np.isnan(xyz_flat).any(axis=1)
+            valid_idxs = np.where(is_valid)[0]
+            xyz_flat_filtered = xyz_flat[valid_idxs]  # remove NaNs
             rgb = rgba[:, :, :3]
             rgb_flat = rgb.reshape(-1, 3)
             rgb_flat = rgb_flat[valid_idxs]  # remove NaNs
@@ -218,14 +221,14 @@ class CDCPDTorchNode:
             self.rgb_pub.publish(ros_numpy.msgify(Image, rgb, encoding='rgb8'))
             self.depth_pub.publish(ros_numpy.msgify(Image, depth, encoding='32FC1'))
             # create record array with x, y, and z fields
-            pc = np.concatenate([xyz_flat, rgb_flat], axis=1).T
+            pc = np.concatenate([xyz_flat_filtered, rgb_flat], axis=1).T
             pc_msg = pc_np_to_pc_msg(pc, names='x,y,z,r,g,b', frame_id='world')  # FIXME: use camera frame
             self.pc_pub.publish(pc_msg)
 
             # run CDCPD
             # TODO: use learned segmentation
             hsv = cv2.cvtColor(rgb, cv2.COLOR_RGB2HSV)
-            mask = (hsv[:, :, 0]) <= 10 | (hsv[:, :, 0] >= 220)
+            mask = (hsv[:, :, 0]) <= 10 | (hsv[:, :, 0] >= 220) & (xyz[:, :, 0] > -0.25)
 
             seg_rgb = rgb.copy()
             seg_rgb[~mask] = 0
@@ -234,6 +237,8 @@ class CDCPDTorchNode:
 
             seg_xyz = xyz.copy()
             seg_xyz[~mask] = np.nan
+            seg_xyz = seg_xyz[:, 220:]
+            seg_rgb = seg_rgb[:, 220:]
             seg_pc = np.concatenate([seg_xyz, seg_rgb], axis=-1)
             seg_pc_flat = seg_pc.reshape(-1, 6).T
             seg_pc_flat = seg_pc_flat[:, ~np.isnan(seg_pc_flat).any(axis=0)]
