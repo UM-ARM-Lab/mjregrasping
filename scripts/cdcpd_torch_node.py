@@ -16,13 +16,14 @@ from zivid.experimental import calibration
 
 import ros_numpy
 import rospy
+from geometry_msgs.msg import Point
 from ros_numpy.point_cloud2 import merge_rgb_fields
 from sensor_msgs.msg import Image, PointCloud2
 from visualization_msgs.msg import MarkerArray, Marker
 
 
 def cdcpd_helper(cdcpd_module: CDCPDModule, tracking_map: TrackingMap, depth: np.ndarray, mask: np.ndarray,
-                 intrinsic: np.ndarray, grasped_points: GrippersInfo, segmented_pointcloud: np.ndarray, kvis=100.0):
+                 intrinsic: np.ndarray, grasped_points: GrippersInfo, seg_pc: torch.tensor, kvis=100.0):
     """
 
     Args:
@@ -32,19 +33,20 @@ def cdcpd_helper(cdcpd_module: CDCPDModule, tracking_map: TrackingMap, depth: np
         mask:
         intrinsic:
         grasped_points:
-        segmented_pointcloud: [3, N]
+        seg_pc: [3, N]
         kvis:
 
     Returns:
 
     """
-    verts = tracking_map.form_vertices_cloud()
-    verts_np = verts.detach().numpy()
-    Y_emit_prior = visibility_prior(verts_np, depth, mask, intrinsic[:3, :3], kvis)
-    Y_emit_prior = torch.from_numpy(Y_emit_prior.reshape(-1, 1)).to(torch.double)
+    # verts = tracking_map.form_vertices_cloud()
+    # verts_np = verts.detach().numpy()
+    # Y_emit_prior = visibility_prior(verts_np, depth, mask, intrinsic[:3, :3], kvis)
+    # Y_emit_prior = torch.from_numpy(Y_emit_prior.reshape(-1, 1)).to(torch.double)
+    # assert torch.all(~torch.isnan(Y_emit_prior))
 
-    model_input = CDCPDModuleArguments(tracking_map, segmented_pointcloud, gripper_info=grasped_points)
-    model_input.set_Y_emit_prior(Y_emit_prior)
+    model_input = CDCPDModuleArguments(tracking_map, seg_pc, gripper_info=grasped_points)
+    # model_input.set_Y_emit_prior(Y_emit_prior)
 
     cdcpd_module_arguments = cdcpd_module(model_input)
 
@@ -59,15 +61,15 @@ def cdcpd_helper(cdcpd_module: CDCPDModule, tracking_map: TrackingMap, depth: np
 
 def estimate_to_msg(current_estimate):
     current_estimate_msg = MarkerArray()
-    for i in range(len(current_estimate)):
+    for i, p in enumerate(current_estimate):
         marker = Marker()
         marker.header.frame_id = "world"
         marker.id = i
         marker.type = Marker.SPHERE
         marker.action = Marker.ADD
-        marker.pose.position.x = current_estimate[i][0]
-        marker.pose.position.y = current_estimate[i][1]
-        marker.pose.position.z = current_estimate[i][2]
+        marker.pose.position.x = p[0]
+        marker.pose.position.y = p[1]
+        marker.pose.position.z = p[2]
         marker.pose.orientation.x = 0.0
         marker.pose.orientation.y = 0.0
         marker.pose.orientation.z = 0.0
@@ -92,8 +94,8 @@ def estimate_to_msg(current_estimate):
     marker.color.r = 0.0
     marker.color.g = 1.0
     marker.color.b = 0.0
-    for i in range(len(current_estimate)):
-        marker.points.append(current_estimate[i])
+    for i, p in enumerate(current_estimate):
+        marker.points.append(Point(*p))
     current_estimate_msg.markers.append(marker)
     return current_estimate_msg
 
@@ -153,7 +155,7 @@ class CDCPDTorchNode:
         def_obj_config = RopeConfiguration(NUM_TRACKED_POINTS, MAX_ROPE_LENGTH, rope_start_pos, rope_end_pos)
         def_obj_config.initialize_tracking()
 
-        self.previous_estimate = def_obj_config.initial_.vertices_.detach().numpy()
+        self.previous_estimate = def_obj_config.initial_.vertices_.detach().numpy().T
         self.cdcpd_pred_pub.publish(estimate_to_msg(self.previous_estimate))
 
         self.tracking_map = TrackingMap()
@@ -197,6 +199,7 @@ class CDCPDTorchNode:
                 point_cloud = frame.point_cloud()
                 xyz = point_cloud.copy_data("xyz")
                 rgba = point_cloud.copy_data("rgba")
+
             now = perf_counter()
             dt = now - last_t
             print(f'dt: {dt:.4f}')
@@ -236,9 +239,9 @@ class CDCPDTorchNode:
             seg_pc_flat = seg_pc_flat[:, ~np.isnan(seg_pc_flat).any(axis=0)]
             self.segmented_pc_pub.publish(pc_np_to_pc_msg(seg_pc_flat, names='x,y,z,r,g,b', frame_id='world'))
 
-            seg_pc_flat = torch.from_numpy(seg_pc_flat)
+            seg_pc_cdcpd = torch.from_numpy(seg_pc_flat[:3, :]).double()  # CDCPD only wants XYZ, and as a torch tensor
             current_estimate = cdcpd_helper(self.cdcpd_module, self.tracking_map, depth, mask, self.intrinsics,
-                                            self.grasped_points, seg_pc_flat)
+                                            self.grasped_points, seg_pc_cdcpd)
             current_estimate_msg = estimate_to_msg(current_estimate)
             self.cdcpd_pred_pub.publish(current_estimate_msg)
 
