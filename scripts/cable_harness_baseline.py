@@ -27,52 +27,11 @@ from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rerun_visualizer import log_skeletons
-from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import cable_harness, setup_cable_harness
+from mjregrasping.scenarios import cable_harness, setup_cable_harness, get_cable_harness_skeletons
 from mjregrasping.teleport_to_plan import teleport_to_planned_q
 from mjregrasping.viz import make_viz
-
-
-def dx(x):
-    return np.array([x, 0, 0])
-
-
-def dy(y):
-    return np.array([0, y, 0])
-
-
-def dz(z):
-    return np.array([0, 0, z])
-
-
-def get_cable_harness_skeletons(phy: Physics):
-    d = phy.d
-    m = phy.m
-    return {
-        "loop1": d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop1_top").size[0]) * 2,
-            dz(m.geom("loop1_front").size[2] * 2),
-            -dy(m.geom("loop1_top").size[0] * 2),
-            dz(-m.geom("loop1_front").size[2] * 2),
-        ], axis=0),
-        "loop2": d.geom("loop2_front").xpos - dz(m.geom("loop2_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop2_top").size[0]) * 2,
-            dz(m.geom("loop2_front").size[2] * 2),
-            -dy(m.geom("loop2_top").size[0] * 2),
-            dz(-m.geom("loop2_front").size[2] * 2),
-        ], axis=0),
-        "loop3": d.geom("loop3_front").xpos - dz(m.geom("loop3_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop3_top").size[0]) * 2,
-            dz(m.geom("loop3_front").size[2] * 2),
-            -dy(m.geom("loop3_top").size[0] * 2),
-            dz(-m.geom("loop3_front").size[2] * 2),
-        ], axis=0),
-    }
 
 
 @ros_init.with_ros("cable_harness_baseline")
@@ -110,7 +69,6 @@ def main():
     print(f"Saving movie to {mov_path}")
     mov.start(mov_path)
 
-    skeletons = get_cable_harness_skeletons(phy)
     log_skeletons(skeletons)
 
     grasp_rrt = GraspRRT()

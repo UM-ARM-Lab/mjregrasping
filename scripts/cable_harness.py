@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import multiprocessing
+import pickle
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -18,7 +19,7 @@ from mjregrasping.goals import ThreadingGoal, GraspLocsGoal, ObjectPointGoal, Pu
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_utils import load_skeletons
+from mjregrasping.mjcf_scene_to_sdf import viz_slices
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
@@ -78,32 +79,34 @@ def main():
     hs, locs, phys, _ = load_cached_demo(args.demo)
     print("done.")
 
-    skeletons = load_skeletons(scenario.skeletons_path)
-    log_skeletons(skeletons)
     grasp_rrt = GraspRRT()
     subgoals = list(get_subgoals_by_h(phys, hs))
     subgoal_locs = [subgoal[0] for subgoal in subgoals]
     subgoal_hs = [subgoal[1] for subgoal in subgoals]
 
-    for seed in range(1, 10):
-        m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+    trials_root = Path("trial_data") / scenario.name
 
-        # Configure the model before we construct the data and physics object
-        randomize_scene(m, seed)
+    for i in range(10):
+        trial_path = trials_root / f"{scenario.name}_{i}.pkl"
+        with trial_path.open("rb") as f:
+            trial_info = pickle.load(f)
+        phy_path = trial_info['phy_path']
+        sdf_path = trial_info['sdf_path']
+        seed = trial_info['seed']
+        skeletons = trial_info['skeletons']
 
-        d = mujoco.MjData(m)
-        objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
-        phy = Physics(m, d, objects)
-
-        setup_cable_harness(phy, viz)
-        randomize_qpos(phy, seed, viz)
+        with phy_path.open("rb") as f:
+            phy = pickle.load(f)
 
         mujoco.mj_forward(phy.m, phy.d)
         viz.viz(phy)
 
-        sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
+        sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(sdf_path))
+        viz_slices(sdf)
+        log_skeletons(skeletons)
 
-        mov = MjMovieMaker(m)
+        continue
+        mov = MjMovieMaker(phy.m)
         now = int(time.time())
         mov_path = root / f'seed_{seed}_{now}.mp4'
         print(f"Saving movie to {mov_path}")
@@ -111,7 +114,6 @@ def main():
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
-        # TODO: compute skeletons from the model?
         goals = [
             ThreadingGoal(grasp_goal, skeletons, 'loop1', subgoal_locs[1][0], 'left', subgoal_locs[1], subgoal_hs[1],
                           grasp_rrt, sdf, viz),
@@ -133,7 +135,8 @@ def main():
 
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
         traps = TrapDetection()
-        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=cable_harness.noise_sigma,
+        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'],
+                           noise_sigma=cable_harness.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
         goal_idx = 0

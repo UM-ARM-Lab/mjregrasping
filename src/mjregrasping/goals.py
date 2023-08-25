@@ -254,7 +254,7 @@ class ThreadingGoal(ObjectPointGoalBase):
                  next_locs, next_h,
                  grasp_rrt: GraspRRT, sdf: pysdf_tools.SignedDistanceField, viz: Viz):
         self.skel = skeletons[skeleton_name]
-        goal_point = np.mnean(self.skel, axis=0)
+        goal_point = np.mean(self.skel, axis=0)
         super().__init__(goal_point, loc, viz)
 
         self.skeletons = skeletons

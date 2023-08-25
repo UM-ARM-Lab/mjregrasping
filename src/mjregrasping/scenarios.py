@@ -10,6 +10,7 @@ from mjregrasping.goals import ObjectPointGoal, ThreadingGoal, GraspLocsGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.physics import Physics
 from mjregrasping.robot_data import RobotData, conq, val
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
@@ -176,3 +177,43 @@ def setup_cable_harness(phy, viz):
         0.06,  # right gripper
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+
+
+def dx(x):
+    return np.array([x, 0, 0])
+
+
+def dy(y):
+    return np.array([0, y, 0])
+
+
+def dz(z):
+    return np.array([0, 0, z])
+
+
+def get_cable_harness_skeletons(phy: Physics):
+    d = phy.d
+    m = phy.m
+    return {
+        "loop1": d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop1_top").size[0]) * 2,
+            dz(m.geom("loop1_front").size[2] * 2),
+            -dy(m.geom("loop1_top").size[0] * 2),
+            dz(-m.geom("loop1_front").size[2] * 2),
+        ], axis=0),
+        "loop2": d.geom("loop2_front").xpos - dz(m.geom("loop2_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop2_top").size[0]) * 2,
+            dz(m.geom("loop2_front").size[2] * 2),
+            -dy(m.geom("loop2_top").size[0] * 2),
+            dz(-m.geom("loop2_front").size[2] * 2),
+        ], axis=0),
+        "loop3": d.geom("loop3_front").xpos - dz(m.geom("loop3_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop3_top").size[0]) * 2,
+            dz(m.geom("loop3_front").size[2] * 2),
+            -dy(m.geom("loop3_top").size[0] * 2),
+            dz(-m.geom("loop3_front").size[2] * 2),
+        ], axis=0),
+    }
