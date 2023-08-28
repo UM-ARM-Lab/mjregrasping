@@ -115,7 +115,7 @@ class MjReRun:
         mesh_file = mesh_file.stem + ".glb"
         if mesh_file is None:
             raise RuntimeError(f"Mesh {mesh_name} not found in XML file")
-        mesh_file = Path.home() / "mjregrasping_ws/src/mjregrasping/models/meshes" / mesh_file
+        mesh_file = Path.cwd() / "models" / "meshes" / mesh_file
         if not mesh_file.exists():
             raise RuntimeError(f"Mesh {mesh_file} not found on disk")
         with open(mesh_file, 'rb') as f:

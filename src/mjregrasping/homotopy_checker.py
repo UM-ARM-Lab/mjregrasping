@@ -10,7 +10,6 @@ import networkx as nx
 import numpy as np
 import rerun as rr
 from multiset import Multiset
-from pymjregrasping_cpp import get_first_order_homotopy_points
 
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
@@ -143,13 +142,13 @@ def create_graph_nodes(phy: Physics):
             if "attach" in eq.name:
                 graph.add_node(f'a{attach_i}', loc=loc, xpos=xpos, point_idx=point_idx)
                 attach_i += 1
-            if eq.name in phy.o.rd.rope_grasp_eqs:
+            elif eq.name in phy.o.rd.rope_grasp_eqs:
                 eq_name_idx = phy.o.rd.rope_grasp_eqs.index(eq.name)
                 graph.add_node(f'g{eq_name_idx}', loc=loc, xpos=xpos, point_idx=point_idx)
     return graph
 
 
-def add_edges(graph, rope_points, arm_points):
+def add_edges(graph, rope_points, arm_points, connect_via_floor=True):
     """
     Edges in the graph are added based on the following rules. All edges are bidirectional.
      1. base can connect to all other nodes
@@ -174,7 +173,7 @@ def add_edges(graph, rope_points, arm_points):
     Args:
         graph: networkx Graph representing the robot and fixed points 'connect' to the object
         rope_points: points representing the object (rope) [n_rope_points, 3]
-        arm_points: points tracing the robot arms [n_arms, n_points, 3]
+        arm_points: points tracing the robot arms from tip to base [n_arms, n_points, 3]
 
     Returns:
 
@@ -197,11 +196,15 @@ def add_edges(graph, rope_points, arm_points):
                 arm_idx = int(i[1])
                 graph.add_edge(i, j, edge_path=arm_points[arm_idx])
             elif i == 'b' and 'a' in j:
-                graph.add_edge(i, j,
-                               edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
+                if connect_via_floor:
+                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
+                else:
+                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, j_xpos]))
             elif 'a' in i and j == 'b':
-                graph.add_edge(i, j,
-                               edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
+                if connect_via_floor:
+                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, floorify(i_xpos), floorify(j_xpos), j_xpos]))
+                else:
+                    graph.add_edge(i, j, edge_path=np.stack([i_xpos, j_xpos]))
             elif 'g' in i and 'g' in j:
                 edge_rope_points = rope_points[from_to(i_point_idx, j_point_idx)]
                 graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
@@ -214,7 +217,7 @@ def add_edges(graph, rope_points, arm_points):
 
 
 def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
-                         collapse_empty_gripper_cycles, gripper_ids_in_h_signature):
+                         collapse_empty_gripper_cycles, gripper_ids_in_h_signature, connect_via_floor: bool = True):
     """
     This function computes the full h-signature of the current state.
     Two states are homologous if and only if they have the same h-signature.
@@ -225,20 +228,22 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
         skeletons: The skeletons of the obstacles in the environment.
         graph: The graph of the current state. This is a networkx DiGraph, where the nodes are the points on the rope,
             the base of the robot, and the tool bodies of the robot. The edges are the paths between the nodes.
-        rope_points: The points on the rope.
-        arm_points: points of the arms
+        rope_points: points representing the object (rope) [n_rope_points, 3]
+        arm_points: points tracing the robot arms from tip to base [n_arms, n_points, 3]
         collapse_empty_gripper_cycles: If True, then if there is a cycle between two grippers and the h-signature of
             the cycle is 0, then we remove one of the grippers and re-run the algorithm. You probably want to set this
             to False if you are planning hand-over-hand motions.
         gripper_ids_in_h_signature: If True, then the h-signature will include the ids of the grippers. You probably
             want to set this to True if you are planning hand-over-hand motions.
+        connect_via_floor: If True, then the base of the robot will be connected to the other nodes via the floor.
+            This only just things visually, and may be more intuitive. It does not matter for planning how you set this.
 
     Returns:
         The h-signature of the current state, and the loops and tool positions that were used to compute it.
 
     """
     while True:
-        add_edges(graph, rope_points, arm_points)
+        add_edges(graph, rope_points, arm_points, connect_via_floor)
 
         skeletons = deepcopy(skeletons)
 
@@ -280,14 +285,14 @@ def get_loops(graph, valid_cycles):
     for valid_cycle in valid_cycles:
         # Close the cycle by adding the first node to the end,
         # so that we can get the edge_path of edge from the last node back to the first node.
-        valid_cycle = valid_cycle + [valid_cycle[0]]
+        valid_cycle_closed = valid_cycle + [valid_cycle[0]]
         loop = []
-        for edge in pairwise(valid_cycle):
+        for edge in pairwise(valid_cycle_closed):
             edge_path = graph.get_edge_data(*edge)['edge_path']
             loop.extend(edge_path)
         loop.append(loop[0])
         loop = np.stack(loop)
-        loop_id = ','.join(sorted(valid_cycle[:-1]))
+        loop_id = ','.join(sorted(valid_cycle))
         loops.append(loop)
         loop_ids.append(loop_id)
     return loop_ids, loops

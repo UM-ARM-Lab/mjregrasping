@@ -95,3 +95,23 @@ conq = RobotData(
     ]),
     q_home=np.array([])
 )
+
+drones = RobotData(
+    base_link="drones",
+    tool_bodies=["drone1_claw", "drone2_claw", "drone3_claw"],
+    tool_sites=["drone1_claw", "drone2_claw", "drone3_claw"],
+    n_g=3,
+    rope_grasp_eqs=['drone1', 'drone2', 'drone3'],
+    # The rest are not used for computing the signature
+    allowed_robot_collision_geoms_names=[],
+    ignored_robot_self_collision_geoms_names=[],
+    gripper_geom_names=[],
+    gripper_joint_names=[],
+    gripper_actuator_names=[],
+    world_gripper_eqs=[],
+    world_rope_eqs=[],
+    camera_names=[],
+    ik_tol=0.01,
+    workspace_bbox=np.array([]),
+    q_home=np.array([])
+)

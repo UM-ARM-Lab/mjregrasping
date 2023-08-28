@@ -164,8 +164,12 @@ def check_new_cycle(cycle, valid_cycles):
 
 
 def floorify(xpos):
+    """
+    Sets the z coordinate to be below the floor. This is used to connect things that are connected via the floor,
+    such as the base of the robot and some other fixed point in the world.
+    """
     xpos = xpos.copy()
-    xpos[2] = -1
+    xpos[2] = -2
     return xpos
 
 

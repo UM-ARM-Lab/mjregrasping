@@ -6,9 +6,8 @@ import mujoco
 import numpy as np
 from transformations import quaternion_from_euler
 
-from mjregrasping.goals import ObjectPointGoal, ThreadingGoal, GraspLocsGoal
+from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
-from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.robot_data import RobotData, conq, val
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
@@ -19,8 +18,6 @@ from mjregrasping.settle import settle
 class Scenario:
     name: str
     xml_path: Path
-    skeletons_path: Optional[Path]
-    sdf_path: Path
     obstacle_name: str
     robot_data: RobotData
     rope_name: str
@@ -30,8 +27,6 @@ class Scenario:
 conq_hose = Scenario(
     name="ConqHose",
     xml_path=Path("models/conq_hose_scene.xml"),
-    skeletons_path=Path("models/hose_obstacles_skeleton.hjson"),
-    sdf_path=Path("sdfs/hose_obstacles.sdf"),
     obstacle_name="hose_obstacles",
     robot_data=conq,
     rope_name="rope",
@@ -41,8 +36,6 @@ conq_hose = Scenario(
 val_untangle = Scenario(
     name="Untangle",
     xml_path=Path("models/untangle_scene.xml"),
-    skeletons_path=Path("models/computer_rack_skeleton.hjson"),
-    sdf_path=Path("sdfs/computer_rack.sdf"),
     obstacle_name="computer_rack",
     robot_data=val,
     rope_name="rope",
@@ -52,10 +45,17 @@ val_untangle = Scenario(
 cable_harness = Scenario(
     name="CableHarness",
     xml_path=Path("models/cable_harness_scene.xml"),
-    skeletons_path=Path("models/cable_harness_skeleton.hjson"),
-    sdf_path=Path("sdfs/cable_harness_obstacles.sdf"),
     obstacle_name="cable_harness_obstacles",
     robot_data=val,
+    rope_name="rope",
+    noise_sigma=np.deg2rad(1)
+)
+
+drone_example = Scenario(
+    name="Drone",
+    xml_path=Path("models/drone_scene.xml"),
+    obstacle_name="drone_obstacles",
+    robot_data=drones,
     rope_name="rope",
     noise_sigma=np.deg2rad(1)
 )
