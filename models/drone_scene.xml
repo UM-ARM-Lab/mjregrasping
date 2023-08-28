@@ -1,0 +1,237 @@
+<mujoco model="computer_rack_scene">
+    <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
+    <option viscosity="0.01" timestep="0.01"/>
+    <include file="materials.xml"/>
+    <asset>
+        <mesh name="tree" file="tree.stl"/>
+        <mesh name="drone_frame" file="drone_frame.stl" scale="0.02 0.02 0.02"/>
+        <mesh name="claw" file="claw.stl" scale="0.02 0.02 0.02"/>
+    </asset>
+    <default>
+        <default class="rope">
+            <joint type="ball" damping="0.05" stiffness="0.05"/>
+            <geom size="0.05 0.543182" pos="0.543182 0 0" quat="0.707107 0 -0.707107 0" type="capsule" rgba="0.3 0.2 0.2 1"/>
+        </default>
+    </default>
+    <worldbody>
+        <light name="top" pos="0 -1 50" mode="trackcom" castshadow="false"/>
+        <body pos="0 0 -0.445" name="ground">
+            <geom type="plane" name="ground" size="20 20 0.01" material="grass"/>
+        </body>
+        <body name="tree" pos="8 0 0" euler="0 0 0.8">
+            <geom name="tree" type="mesh" mesh="tree" pos="0 0 -0.5" material="light-wood"/>
+        </body>
+        <body name="drones" pos="-4 0 12">
+            <body name="drone1" pos="5 5 0">
+                <geom name="drone1_body" type="mesh" mesh="drone_frame"/>
+                <body name="drone1_rope" quat="0.707141 0 0.707073 0">
+                    <body name="drone1_B_first">
+                        <joint name="drone1_J_first" class="rope"/>
+                        <geom name="drone1_G0" class="rope"/>
+                        <site name="drone1_S_first" pos="0 0 0" />
+                        <body name="drone1_B_1" pos="1.08 0 0">
+                            <joint name="drone1_J_1" class="rope"/>
+                            <geom name="drone1_G1" class="rope"/>
+                            <body name="drone1_B_2" pos="1.08 0 0">
+                                <joint name="drone1_J_2" class="rope"/>
+                                <geom name="drone1_G2" class="rope"/>
+                                <body name="drone1_B_3" pos="1.08 0 0">
+                                    <joint name="drone1_J_3" class="rope"/>
+                                    <geom name="drone1_G3" class="rope"/>
+                                    <body name="drone1_B_4" pos="1.08 0 0">
+                                        <joint name="drone1_J_4" class="rope"/>
+                                        <geom name="drone1_G4" class="rope"/>
+                                        <body name="drone1_B_5" pos="1.08 0 0">
+                                            <joint name="drone1_J_5" class="rope"/>
+                                            <geom name="drone1_G5" class="rope"/>
+                                            <body name="drone1_B_6" pos="1.08 0 0">
+                                                <joint name="drone1_J_6" class="rope"/>
+                                                <geom name="drone1_G6" class="rope"/>
+                                                <body name="drone1_B_7" pos="1.08 0 0">
+                                                    <joint name="drone1_J_7" class="rope"/>
+                                                    <geom name="drone1_G7" class="rope"/>
+                                                    <body name="drone1_B_8" pos="1.08 0 0">
+                                                        <joint name="drone1_J_8" class="rope"/>
+                                                        <geom name="drone1_G8" class="rope"/>
+                                                        <body name="drone1_B_9" pos="1.08 0 0">
+                                                            <joint name="drone1_J_9" class="rope"/>
+                                                            <geom name="drone1_G9" class="rope"/>
+                                                            <body name="drone1_claw" pos="1.0 0 0">
+                                                                <geom name="drone1_claw" type="mesh" mesh="claw"/>
+                                                            </body>
+                                                        </body>
+                                                    </body>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="drone2" pos="5 -5 0">
+                <geom name="drone2_body" type="mesh" mesh="drone_frame"/>
+                <body name="drone2_rope" quat="0.707141 0 0.707073 0">
+                    <body name="drone2_B_first">
+                        <joint name="drone2_J_first" class="rope"/>
+                        <geom name="drone2_G0" class="rope"/>
+                        <site name="drone2_S_first" pos="0 0 0" />
+                        <body name="drone2_B_1" pos="1.08 0 0">
+                            <joint name="drone2_J_1" class="rope"/>
+                            <geom name="drone2_G1" class="rope"/>
+                            <body name="drone2_B_2" pos="1.08 0 0">
+                                <joint name="drone2_J_2" class="rope"/>
+                                <geom name="drone2_G2" class="rope"/>
+                                <body name="drone2_B_3" pos="1.08 0 0">
+                                    <joint name="drone2_J_3" class="rope"/>
+                                    <geom name="drone2_G3" class="rope"/>
+                                    <body name="drone2_B_4" pos="1.08 0 0">
+                                        <joint name="drone2_J_4" class="rope"/>
+                                        <geom name="drone2_G4" class="rope"/>
+                                        <body name="drone2_B_5" pos="1.08 0 0">
+                                            <joint name="drone2_J_5" class="rope"/>
+                                            <geom name="drone2_G5" class="rope"/>
+                                            <body name="drone2_B_6" pos="1.08 0 0">
+                                                <joint name="drone2_J_6" class="rope"/>
+                                                <geom name="drone2_G6" class="rope"/>
+                                                <body name="drone2_B_7" pos="1.08 0 0">
+                                                    <joint name="drone2_J_7" class="rope"/>
+                                                    <geom name="drone2_G7" class="rope"/>
+                                                    <body name="drone2_B_8" pos="1.08 0 0">
+                                                        <joint name="drone2_J_8" class="rope"/>
+                                                        <geom name="drone2_G8" class="rope"/>
+                                                        <body name="drone2_B_9" pos="1.08 0 0">
+                                                            <joint name="drone2_J_9" class="rope"/>
+                                                            <geom name="drone2_G9" class="rope"/>
+                                                            <body name="drone2_claw" pos="1.0 0 0">
+                                                                <geom name="drone2_claw" type="mesh" mesh="claw"/>
+                                                            </body>
+                                                        </body>
+                                                    </body>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="drone3" pos="-5 -5 0">
+                <geom name="drone3_body" type="mesh" mesh="drone_frame"/>
+                <body name="drone3_rope" quat="0.707141 0 0.707073 0">
+                    <body name="drone3_B_first">
+                        <joint name="drone3_J_first" class="rope"/>
+                        <geom name="drone3_G0" class="rope"/>
+                        <site name="drone3_S_first" pos="0 0 0" />
+                        <body name="drone3_B_1" pos="1.08 0 0">
+                            <joint name="drone3_J_1" class="rope"/>
+                            <geom name="drone3_G1" class="rope"/>
+                            <body name="drone3_B_2" pos="1.08 0 0">
+                                <joint name="drone3_J_2" class="rope"/>
+                                <geom name="drone3_G2" class="rope"/>
+                                <body name="drone3_B_3" pos="1.08 0 0">
+                                    <joint name="drone3_J_3" class="rope"/>
+                                    <geom name="drone3_G3" class="rope"/>
+                                    <body name="drone3_B_4" pos="1.08 0 0">
+                                        <joint name="drone3_J_4" class="rope"/>
+                                        <geom name="drone3_G4" class="rope"/>
+                                        <body name="drone3_B_5" pos="1.08 0 0">
+                                            <joint name="drone3_J_5" class="rope"/>
+                                            <geom name="drone3_G5" class="rope"/>
+                                            <body name="drone3_B_6" pos="1.08 0 0">
+                                                <joint name="drone3_J_6" class="rope"/>
+                                                <geom name="drone3_G6" class="rope"/>
+                                                <body name="drone3_B_7" pos="1.08 0 0">
+                                                    <joint name="drone3_J_7" class="rope"/>
+                                                    <geom name="drone3_G7" class="rope"/>
+                                                    <body name="drone3_B_8" pos="1.08 0 0">
+                                                        <joint name="drone3_J_8" class="rope"/>
+                                                        <geom name="drone3_G8" class="rope"/>
+                                                        <body name="drone3_B_9" pos="1.08 0 0">
+                                                            <joint name="drone3_J_9" class="rope"/>
+                                                            <geom name="drone3_G9" class="rope"/>
+                                                            <body name="drone3_claw" pos="1.0 0 0">
+                                                                <geom name="drone3_claw" type="mesh" mesh="claw"/>
+                                                            </body>
+                                                        </body>
+                                                    </body>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+            <body name="drone4" pos="-5 5 0">
+                <geom name="drone4_body" type="mesh" mesh="drone_frame"/>
+                <body name="drone4_rope" quat="0.707141 0 0.707073 0">
+                    <body name="drone4_B_first">
+                        <joint name="drone4_J_first" class="rope"/>
+                        <geom name="drone4_G0" class="rope"/>
+                        <site name="drone4_S_first" pos="0 0 0" />
+                        <body name="drone4_B_1" pos="1.08 0 0">
+                            <joint name="drone4_J_1" class="rope"/>
+                            <geom name="drone4_G1" class="rope"/>
+                            <body name="drone4_B_2" pos="1.08 0 0">
+                                <joint name="drone4_J_2" class="rope"/>
+                                <geom name="drone4_G2" class="rope"/>
+                                <body name="drone4_B_3" pos="1.08 0 0">
+                                    <joint name="drone4_J_3" class="rope"/>
+                                    <geom name="drone4_G3" class="rope"/>
+                                    <body name="drone4_B_4" pos="1.08 0 0">
+                                        <joint name="drone4_J_4" class="rope"/>
+                                        <geom name="drone4_G4" class="rope"/>
+                                        <body name="drone4_B_5" pos="1.08 0 0">
+                                            <joint name="drone4_J_5" class="rope"/>
+                                            <geom name="drone4_G5" class="rope"/>
+                                            <body name="drone4_B_6" pos="1.08 0 0">
+                                                <joint name="drone4_J_6" class="rope"/>
+                                                <geom name="drone4_G6" class="rope"/>
+                                                <body name="drone4_B_7" pos="1.08 0 0">
+                                                    <joint name="drone4_J_7" class="rope"/>
+                                                    <geom name="drone4_G7" class="rope"/>
+                                                    <body name="drone4_B_8" pos="1.08 0 0">
+                                                        <joint name="drone4_J_8" class="rope"/>
+                                                        <geom name="drone4_G8" class="rope"/>
+                                                        <body name="drone4_B_9" pos="1.08 0 0">
+                                                            <joint name="drone4_J_9" class="rope"/>
+                                                            <geom name="drone4_G9" class="rope"/>
+                                                            <body name="drone4_claw" pos="1.0 0 0">
+                                                                <geom name="drone4_claw" type="mesh" mesh="claw"/>
+                                                            </body>
+                                                        </body>
+                                                    </body>
+                                                </body>
+                                            </body>
+                                        </body>
+                                    </body>
+                                </body>
+                            </body>
+                        </body>
+                    </body>
+                </body>
+            </body>
+        </body>
+        <body name="B0_11" pos="-10 0 0.1">
+            <freejoint/>
+            <composite type="cloth" count="22 22 1" spacing="0.55" flatinertia="0.01">
+                <joint kind="main" damping="0.005"/>
+                <skin material="cream-plaster" texcoord="true" inflate="0.05" subgrid="4" rgba="0.5 0.5 1.0 1.0"/>
+                <geom type="capsule" size="0.015 0.1" rgba=".8 .2 .1 1"/>
+            </composite>
+        </body>
+    </worldbody>
+    <equality>
+        <connect name="drone1" body1="drone1_claw" body2="B0_0" solref="0.01 1" anchor="0 0 0" active="false"/>
+        <connect name="drone2" body1="drone2_claw" body2="B0_0" solref="0.01 1" anchor="0 0 0" active="false"/>
+        <connect name="drone3" body1="drone3_claw" body2="B0_0" solref="0.01 1" anchor="0 0 0" active="false"/>
+        <connect name="drone4" body1="drone4_claw" body2="B0_0" solref="0.01 1" anchor="0 0 0" active="true"/>
+    </equality>
+</mujoco>
