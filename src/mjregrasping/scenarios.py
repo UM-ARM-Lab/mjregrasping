@@ -9,7 +9,7 @@ from transformations import quaternion_from_euler
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.robot_data import RobotData, conq, val
+from mjregrasping.robot_data import RobotData, conq, val, drones
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
 
@@ -42,20 +42,21 @@ val_untangle = Scenario(
     noise_sigma=np.deg2rad(2)
 )
 
-cable_harness = Scenario(
-    name="CableHarness",
-    xml_path=Path("models/cable_harness_scene.xml"),
-    obstacle_name="cable_harness_obstacles",
+val_pulling = Scenario(
+    name="Pulling",
+    xml_path=Path("models/pulling_scene.xml"),
+    obstacle_name="obstacles",
     robot_data=val,
     rope_name="rope",
     noise_sigma=np.deg2rad(1)
 )
 
-drone_example = Scenario(
-    name="Drone",
-    xml_path=Path("models/drone_scene.xml"),
-    obstacle_name="drone_obstacles",
-    robot_data=drones,
+
+cable_harness = Scenario(
+    name="CableHarness",
+    xml_path=Path("models/cable_harness_scene.xml"),
+    obstacle_name="cable_harness_obstacles",
+    robot_data=val,
     rope_name="rope",
     noise_sigma=np.deg2rad(1)
 )

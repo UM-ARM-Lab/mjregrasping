@@ -27,20 +27,19 @@ from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_vi
 from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import val_untangle, setup_untangle
 from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import make_viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
-@ros_init.with_ros("untangle")
+@ros_init.with_ros("pulling")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    rr.init('untangle')
+    rr.init('pulling')
     rr.connect()
 
-    scenario = val_untangle
+    scenario = val_pulling
     viz = make_viz(scenario)
 
     root = Path("results") / scenario.name
@@ -56,7 +55,7 @@ def main():
     viz.viz(phy)
 
     skeletons = {}
-    setup_untangle(phy, viz)
+    # setup_pulling(phy, viz)
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
     # Subtract a small amount from the radius so the rope is more clearly "inside" the goal region
@@ -70,13 +69,12 @@ def main():
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=scenario.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
     grasp_rrt = GraspRRT()
 
-    cc = None
-    planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons, cc)
+    planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons, None)
 
     goal.viz_goal(phy)
 
