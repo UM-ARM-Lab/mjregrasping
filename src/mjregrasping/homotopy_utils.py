@@ -169,7 +169,7 @@ def floorify(xpos):
     such as the base of the robot and some other fixed point in the world.
     """
     xpos = xpos.copy()
-    xpos[2] = -2
+    xpos[2] = -0.8
     return xpos
 
 

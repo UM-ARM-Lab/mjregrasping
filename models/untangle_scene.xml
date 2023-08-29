@@ -19,7 +19,7 @@
         <body name="mycamera">
             <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4"/>
         </body>
-        <light name="top" pos="0 0 105" mode="trackcom"/>
+        <light name="overhead1" pos="0 0 10" mode="trackcom"/>
         <body name="goal">
             <geom name="goal" class="visual" type="sphere" pos="-0.04 0.60 0.805" size="0.05" rgba="1 0 1 0.3"/>
         </body>

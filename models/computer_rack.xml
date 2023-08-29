@@ -2,21 +2,22 @@
     <worldbody>
         <body name="computer_rack" pos="0 0.9 -0.445" quat="0.707 0 0 0.707">
             <body name="wall">
-                <geom name="wall" type="box" pos="-0.2 0.7 0.975" size="0.01 0.25 1" rgba="0.1 0.1 0.1 1"/>
+                <geom name="wall" type="box" pos="0 0.7 0.975" size="5 0.01 1" rgba="0.8 0.8 0.8 1"/>
+                <geom name="wall2" type="box" pos="0.6 0 0.975" size="0.01 5 1" rgba="0.8 0.8 0.8 1"/>
             </body>
             <body name="attach" pos="0 0.25 0.55">
                 <geom name="rack_attach" type="box" size="0.005 0.005 0.005" rgba="0.5 0 0 1"/>
             </body>
             <body name="rack1">
-                <geom name="rack1_bottom" type="box" size="0.25 0.4 0.03" material="dark-wood"/>
+                <geom name="rack1_bottom" type="box" size="0.25 0.4 0.03" material="dark-wood" rgba="0.2 0.2 0.2 1.0"/>
                 <geom name="rack1_post1" type="box" pos="-0.25 -0.38 0.15" size="0.04 0.04 0.25" material="metal"/>
                 <geom name="rack1_post2" type="box" pos="-0.25 0.38 0.15" size="0.04 0.04 0.25" material="metal"/>
                 <geom name="rack1_post3" type="box" pos="0.25 -0.38 0.15" size="0.04 0.04 0.25" material="metal"/>
                 <geom name="rack1_post4" type="box" pos="0.25 0.38 0.15" size="0.04 0.04 0.25" material="metal"/>
             </body>
             <body name="rack2" pos="0 0 0.5">
-                <geom name="rack2_bottom" type="box" size="0.25 0.4 0.03" material="dark-wood"/>
-                <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.42 0.05" material="dark-wood"/>
+                <geom name="rack2_bottom" type="box" size="0.25 0.4 0.03" material="dark-wood" rgba="0.3 0.3 0.3 1.0"/>
+                <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.42 0.05" material="dark-wood" rgba="0.4 0.4 0.4 1.0"/>
                 <geom name="rack2_post1" type="box" pos="-0.25 -0.38 0.15" size="0.04 0.04 0.25" material="metal"/>
                 <geom name="rack2_post2" type="box" pos="-0.25 0.38 0.15" size="0.04 0.04 0.25" material="metal"/>
                 <geom name="rack2_post3" type="box" pos="0.25 -0.38 0.15" size="0.04 0.04 0.25" material="metal"/>

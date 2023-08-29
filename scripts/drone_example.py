@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-import matplotlib.pyplot as plt
+
 import mujoco
 import networkx as nx
 import numpy as np
-import rerun as rr
+from matplotlib import pyplot as plt
+from vedo import Line
 
 import rospy
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_checker import get_full_h_signature, create_graph_nodes
-from mjregrasping.movie import MjRenderer
+from mjregrasping.mjvedo import MjVedo
 from mjregrasping.mujoco_object import MjObject
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
-from mjregrasping.rerun_visualizer import MjReRun, log_skeletons
 from mjregrasping.robot_data import drones
 
 
@@ -20,15 +20,9 @@ def main():
     rospy.init_node("drone_example")
 
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
-    rr.init('drone_example')
-    rr.connect()
 
     xml_path = 'models/drone_scene.xml'
-    mjrr = MjReRun(xml_path)
-
-    m = mujoco.MjModel.from_xml_path(xml_path)
-
-    r = MjRenderer(m)
+    mjvedo = MjVedo(xml_path)
 
     m = mujoco.MjModel.from_xml_path(xml_path)
 
@@ -37,7 +31,7 @@ def main():
     mujoco.mj_forward(phy.m, phy.d)
     skeletons = get_tree_skeletons(phy)
     graph, h, loops = get_h_for_drones(phy, skeletons)
-    viz_h(mjrr, phy, skeletons, graph, h, loops)
+    viz_h(mjvedo, phy, skeletons, graph, h, loops)
 
     # Release and move away from the pipe
     m.eq('drone1').active = False
@@ -46,9 +40,8 @@ def main():
     objects = MjObjects(m, 'obstacles', drones, "rope")
     phy = Physics(m, mujoco.MjData(m), objects)
     mujoco.mj_forward(phy.m, phy.d)
-    skeletons = get_tree_skeletons(phy)
     graph, h, loops = get_h_for_drones(phy, skeletons)
-    viz_h(mjrr, phy, skeletons, graph, h, loops)
+    viz_h(mjvedo, phy, skeletons, graph, h, loops)
 
     # Grasp the end, on the other side of the tree
     m.eq('drone1').active = True
@@ -59,9 +52,9 @@ def main():
     objects = MjObjects(m, 'obstacles', drones, "rope")
     phy = Physics(m, mujoco.MjData(m), objects)
     mujoco.mj_forward(phy.m, phy.d)
-    skeletons = get_tree_skeletons(phy)
     graph, h, loops = get_h_for_drones(phy, skeletons)
-    viz_h(mjrr, phy, skeletons, graph, h, loops)
+
+    viz_h(mjvedo, phy, skeletons, graph, h, loops)
 
 
 def get_tree_skeletons(phy):
@@ -79,14 +72,17 @@ def get_tree_skeletons(phy):
     return skeletons
 
 
-def viz_h(mjrr, phy, skeletons, graph, h, loops):
+def viz_h(mjvedo, phy, skeletons, graph, h, loops):
     print(h)
 
-    mjrr.viz(phy, False, detailed=True)
-    log_skeletons(skeletons)
+    for name, skel in skeletons.items():
+        mjvedo.plotter += Line(skel, lw=3)
 
-    for i, loop_i in enumerate(loops):
-        rr.log_line_strip(f'loop/{i}', loop_i, stroke_width=0.1)
+    mjvedo.viz(phy)
+    mjvedo.fade(phy, ['tree', 'rope', 'drone1_rope', 'drone2_rope', 'drone3_rope'])
+    mjvedo.spin(n_spins=1, seconds_per_spin=3)
+
+    mjvedo.close()
 
     plt.figure()
     nx.draw(graph, with_labels=True, font_weight='bold')
