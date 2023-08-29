@@ -1,0 +1,9 @@
+<mujoco model="computer_rack_scene">
+    <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
+    <include file="materials.xml"/>
+    <include file="cc_sphere.xml"/>
+    <include file="real_obs.xml"/>
+    <worldbody>
+        <light name="top" pos="0 -1 15" mode="trackcom"/>
+    </worldbody>
+</mujoco>

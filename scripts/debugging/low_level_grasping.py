@@ -60,7 +60,7 @@ def main():
     tool_idx = 0
     phy = Physics(m, d, objects)
 
-    # val = RealValCommander(phy.o.robot)
+    val = RealValCommander(phy.o.robot)
 
     # TODO this is too slow. We either need to use a lower res grid or do something completely different.
     #  what if we just used the BG points and instead of computing a full SDF, we just say that gradient points towards
@@ -162,7 +162,7 @@ def main():
         control_step(phy, ctrl, 0.02)
 
         # send commands to the robot
-        # val.send_vel_command(phy.m, ctrl)
+        val.send_vel_command(phy.m, ctrl)
 
         viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
         viz.arrow("v", tool_site_pos, v_in_world, 'w')
@@ -175,7 +175,7 @@ def main():
             print("Grasp successful!")
             break
 
-    # val.stop()
+    val.stop()
 
 
 def get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos, rope_points_in_tool, sdf_np, sdf_grad_np,

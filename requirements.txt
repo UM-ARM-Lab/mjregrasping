@@ -1,4 +1,5 @@
 bayesian-optimization
+pymanopt
 cffi
 colorama
 hjson

@@ -24,7 +24,7 @@ Settings:
     Filters:
       Cluster:
         Removal:
-          Enabled: yes
+          Enabled: no
           MaxNeighborDistance: 7
           MinArea: 500
       Experimental:
@@ -50,7 +50,7 @@ Settings:
       Outlier:
         Removal:
           Enabled: yes
-          Threshold: 20
+          Threshold: 100
       Reflection:
         Removal:
           Enabled: yes
