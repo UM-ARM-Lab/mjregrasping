@@ -14,7 +14,8 @@ class TrapDetection:
 
     def __init__(self):
         self.state_history = Buffer(hp['state_history_size'])
-        self.max_dq = None
+        self.frac_dq = 1
+        self.max_dq = 0
         self.reset_trap_detection()
 
     def reset_trap_detection(self):
@@ -32,10 +33,10 @@ class TrapDetection:
             # taking min with max_max_dq means if we moved a really large amount, we cap it so that our
             # trap detection isn't thrown off.
             self.max_dq = min(max(self.max_dq, dq), hp['max_max_dq'])
-            frac_dq = dq / self.max_dq
-            rr.log_scalar('trap_detection/frac_dq', frac_dq, color=[255, 0, 255])
+            self.frac_dq = dq / self.max_dq
+            rr.log_scalar('trap_detection/frac_dq', self.frac_dq, color=[255, 0, 255])
             rr.log_scalar('trap_detection/threshold', hp['frac_dq_threshold'], color=[255, 0, 0])
 
-            return frac_dq < hp['frac_dq_threshold']
+            return self.frac_dq < hp['frac_dq_threshold']
         else:
             return False

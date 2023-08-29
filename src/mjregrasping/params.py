@@ -13,8 +13,10 @@ hp = {
     "next_xpos_sdf_weight":            0.1,
     "weifu_sdf_weight":                1.0,  # For baseline
     "torso_weight":                    0.1,
+    "reachability_weight":             0.1,
     "grasp_pos_weight":                1.0,
     "grasp_near_weight":               1.0,
+    "trap_weight":                     50.0,
     "grasp_finger_weight":             0.5,
     "grasp_loc_diff_thresh":           0.025,  # A percentage of rope length
     "smoothness_weight":               0.02,

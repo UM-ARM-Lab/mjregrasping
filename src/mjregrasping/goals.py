@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import deepcopy, copy
 from time import perf_counter
 from typing import Dict, Optional
 
@@ -9,7 +9,7 @@ from numpy.linalg import norm
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, \
     get_nongrasping_rope_contact_cost, get_regrasp_costs
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_locations_to_xpos
-from mjregrasping.grasp_strategies import get_strategy
+from mjregrasping.grasp_strategies import get_strategy, Strategies
 from mjregrasping.grasping import get_is_grasping, get_grasp_locs, get_finger_qs
 from mjregrasping.grasp_and_settle import grasp_and_settle
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
@@ -99,6 +99,7 @@ class MPPIGoal:
 
     def viz_sphere(self, position, radius):
         self.viz.sphere(ns='goal', position=position, radius=radius, color=[1, 0, 1, 0.5], idx=0, frame_id='world')
+        self.viz.tf(translation=position, quat_xyzw=[0, 0, 0, 1], parent='world', child='goal')
 
     def viz_result(self, phy: Physics, result, idx: int, scale, color):
         raise NotImplementedError()
@@ -247,13 +248,20 @@ class ObjectPointGoal(ObjectPointGoalBase):
         self.viz_sphere(self.goal_point, self.goal_radius)
 
 
+def perturb_locs(strategy, locs):
+    next_locs = locs + np.random.randn() * 0.03
+    next_locs = np.clip(next_locs, 0, 1)
+    next_locs = np.where([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy], next_locs, locs)
+    return next_locs
+
+
 class ThreadingGoal(ObjectPointGoalBase):
 
     def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_name, loc: float, next_tool_name: str,
                  next_locs, next_h,
                  grasp_rrt: GraspRRT, sdf: pysdf_tools.SignedDistanceField, viz: Viz):
         self.skel = skeletons[skeleton_name]
-        goal_point = np.mnean(self.skel, axis=0)
+        goal_point = np.mean(self.skel[:4], axis=0)
         super().__init__(goal_point, loc, viz)
 
         self.skeletons = skeletons
@@ -384,19 +392,22 @@ class ThreadingGoal(ObjectPointGoalBase):
         return satisfied
 
     def plan_to_next_locs(self, phy: Physics):
-        current_locs = get_grasp_locs(phy)
-        strategy = get_strategy(current_locs, self.next_locs)
+        next_locs = copy(self.next_locs)
+        for _ in range(5):
+            current_locs = get_grasp_locs(phy)
+            strategy = get_strategy(current_locs, next_locs)
 
-        t0 = perf_counter()
-        res, scene_msg = self.grasp_rrt.plan(phy, strategy, self.next_locs, viz=self.viz, allowed_planning_time=1.0)
-        plan_found = res.error_code.val == res.error_code.SUCCESS
-        print(f'dt: {perf_counter() - t0:.4f}, {plan_found=}')
-        if not plan_found:
-            return None, None
+            t0 = perf_counter()
+            res, scene_msg = self.grasp_rrt.plan(phy, strategy, next_locs, viz=self.viz, allowed_planning_time=1.0)
+            plan_found = res.error_code.val == res.error_code.SUCCESS
+            print(f'dt: {perf_counter() - t0:.4f}, {plan_found=}')
+            if plan_found:
+                return res, scene_msg
 
-        # self.viz.rviz.viz_scene(scene_msg)
-        # self.grasp_rrt.display_result(self.viz, res, scene_msg)
-        return res, scene_msg
+            # perturb the next locs a little
+            next_locs = perturb_locs(strategy, next_locs)
+
+        return None, None
 
 
 class WeifuThreadingGoal(ObjectPointGoalBase):
@@ -585,6 +596,14 @@ class PullThroughGoal(ThreadingGoal):
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
+        strategy = get_strategy(current_locs[0], self.next_locs)
+        is_new = np.array([[s == Strategies.NEW_GRASP for s in strategy]])
+        # Anything closer than 0.3m is considered reachable, anything further than 1.3m is considered unreachable
+        # and the cost scales linearly between those two distances.
+        dists_to_base = np.clip(norm(next_xpos, axis=-1), 0.3, 1.3)
+        next_reachability = np.sum(dists_to_base * is_new)
+        next_reachability_cost = next_reachability * hp['reachability_weight']
+
         gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
 
@@ -620,11 +639,31 @@ class PullThroughGoal(ThreadingGoal):
             grasp_finger_cost,
             grasp_pos_cost,
             grasp_near_cost,
+            next_reachability_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
             smoothness_cost,
         )
+
+    @staticmethod
+    def cost_names():
+        return [
+            "contact",
+            "unstable",
+            "threading_angle",
+            "threading_keypoint",
+            "threading_sdf",
+            "torso_cost",
+            "grasp_finger",
+            "grasp_pos",
+            "grasp_near",
+            "next_reachability",
+            "nongrasping_rope_contact",
+            "gripper_to_goal",
+            "ever_not_grasping",
+            "smoothness",
+        ]
 
 
 def point_goal_from_geom(grasp_goal: GraspLocsGoal, phy: Physics, geom: str, loc: float, viz: Viz):

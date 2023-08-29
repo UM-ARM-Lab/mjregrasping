@@ -56,6 +56,7 @@ def make_vg(phy: Physics, res, extends_2d, origin_point):
     occupied_value = pysdf_tools.COLLISION_CELL(1)
     grid = pysdf_tools.CollisionMapGrid(origin_transform, 'world', res, *shape, oob_value)
     points = []
+    ignore = phy.o.robot.geom_names + phy.o.rope.geom_names
     for x_i, y_i, z_i in list(np.ndindex(*shape)):
         xyz = idx_to_point_from_origin_point(np.array([x_i, y_i, z_i]), res, origin_point)
         set_cc_sphere_pos(phy, xyz)
@@ -64,8 +65,9 @@ def make_vg(phy: Physics, res, extends_2d, origin_point):
         for c in phy.d.contact:
             geom1_name = phy.m.geom(c.geom1).name
             geom2_name = phy.m.geom(c.geom2).name
-            cc = geom1_name == 'cc_sphere' or geom2_name == 'cc_sphere'
-            if c.dist < 0 and cc:
+            is_cc_sphere = geom1_name == 'cc_sphere' or geom2_name == 'cc_sphere'
+            is_valid = not (geom1_name in ignore or geom2_name in ignore)
+            if c.dist < 0 and is_cc_sphere and is_valid:
                 grid.SetValue(x_i, y_i, z_i, occupied_value)
                 points.append(xyz)
                 break

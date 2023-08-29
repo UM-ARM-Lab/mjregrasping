@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ET
 from copy import deepcopy
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 
 import mujoco
 import numpy as np
@@ -283,6 +283,11 @@ class MjRViz:
 
     def viz_scene(self, scene_msg: PlanningScene):
         self.scene_pub.publish(scene_msg)
+
+    def skeletons(self, skeletons: Dict):
+        for k, skel in skeletons.items():
+            plot_lines_rviz(self.pub, skel, k)
+
 
 
 def plot_spheres_rviz(

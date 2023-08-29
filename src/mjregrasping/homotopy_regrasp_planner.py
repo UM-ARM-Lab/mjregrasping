@@ -1,6 +1,6 @@
 import itertools
-from dataclasses import dataclass
 import multiprocessing as mp
+from dataclasses import dataclass
 from functools import partial
 from time import perf_counter
 from typing import Dict, Optional, List
@@ -8,21 +8,21 @@ from typing import Dict, Optional, List
 import numpy as np
 import rerun as rr
 from matplotlib import cm
-from pymjregrasping_cpp import get_first_order_homotopy_points, seedOmpl
+from pymjregrasping_cpp import seedOmpl
 
-from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.goal_funcs import get_rope_points, locs_eq
 from mjregrasping.goals import ObjectPointGoal
+from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
-from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
-from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration, get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rrt import GraspRRT
+from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
 
@@ -56,7 +56,7 @@ def _timeit(f):
     return __timeit
 
 
-def rr_log_costs(entity_path, entity_paths, values, colors, strategy, locs):
+def rr_log_costs(entity_path, entity_paths, values, colors):
     for path_i, v_i, color_i in zip(entity_paths, values, colors):
         rr.log_scalar(f'{entity_path}/{path_i}', v_i, color=color_i)
     rr.log_scalar(f'{entity_path}/total', sum(values), color=[1, 1, 1, 1.0])
@@ -64,14 +64,11 @@ def rr_log_costs(entity_path, entity_paths, values, colors, strategy, locs):
 
 class HomotopyRegraspPlanner:
 
-    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict,
-                 collision_checker: CollisionChecker, seed=0):
+    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
         self.op_goal = op_goal
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
-        self.cc = collision_checker
         self.true_h_blacklist = []
-        self.first_order_blacklist = []
 
         self.rrt_rng = np.random.RandomState(seed)
         self.grasp_rrt = grasp_rrt
@@ -86,16 +83,6 @@ class HomotopyRegraspPlanner:
                 break
         if new:
             self.true_h_blacklist.append(current_true_h)
-
-        current_path = get_rope_points(phy)
-        new = True
-        for blacklisted_path in self.first_order_blacklist:
-            sln = get_first_order_homotopy_points(self.in_collision, blacklisted_path, current_path)
-            if len(sln) > 0:
-                new = False
-                break
-        if new:
-            self.first_order_blacklist.append(current_path)
 
     def simulate_sampled_grasps(self, phy, viz, viz_execution=False):
         grasps_inputs = self.sample_grasp_inputs(phy)
@@ -158,7 +145,7 @@ class HomotopyRegraspPlanner:
         strategy = sim_grasp.strategy
 
         # If there is no significant change in the grasp, that's high cost
-        same_locs = abs(initial_locs - candidate_locs) < hp['grasp_loc_diff_thresh']
+        same_locs = locs_eq(initial_locs - candidate_locs)
         not_stay = strategy != Strategies.STAY
         if np.any(same_locs & not_stay):
             cost = 10 * BIG_PENALTY
@@ -180,13 +167,6 @@ class HomotopyRegraspPlanner:
                 homotopy_cost = BIG_PENALTY
                 break
 
-        first_order_cost = 0
-        for blacklisted_rope_points in self.first_order_blacklist:
-            first_order_sln = get_first_order_homotopy_points(self.in_collision, blacklisted_rope_points,
-                                                              rope_points_plan)
-            if len(first_order_sln) > 0:
-                first_order_cost += hp['first_order_weight']  # FIXME: separate this cost term for easier debugging
-
         geodesics_cost = get_geodesic_dist(candidate_locs, self.op_goal) * hp['geodesic_weight']
 
         prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
@@ -200,7 +180,6 @@ class HomotopyRegraspPlanner:
             dq_cost,
             homotopy_cost,
             geodesics_cost,
-            # first_order_cost,
         ])
 
         # Visualize the path the tools should take for the candidate_locs and candidate_dxpos
@@ -217,30 +196,23 @@ class HomotopyRegraspPlanner:
                 color = cm.Greens(1 - min(cost, 1000) / 1000)
                 viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=color)
                 rr.log_extension_components(f'homotopy/{tool_name}_path', ext={'locs': candidate_locs})
-        rr_log_costs(
-            entity_path='homotopy_costs',
-            entity_paths=[
-                'homotopy_costs/dq_cost',
-                'homotopy_costs/homotopy_cost',
-                'homotopy_costs/geodesics_cost',
-            ],
-            values=[
-                dq_cost,
-                homotopy_cost,
-                geodesics_cost,
-            ],
-            colors=[
-                [0.5, 0.5, 0, 1.0],
-                [0, 1, 0, 1.0],
-                [1, 0, 0, 1.0],
-            ], strategy=strategy, locs=candidate_locs)
+        rr_log_costs(entity_path='homotopy_costs', entity_paths=[
+            'homotopy_costs/dq_cost',
+            'homotopy_costs/homotopy_cost',
+            'homotopy_costs/geodesics_cost',
+        ], values=[
+            dq_cost,
+            homotopy_cost,
+            geodesics_cost,
+        ], colors=[
+            [0.5, 0.5, 0, 1.0],
+            [0, 1, 0, 1.0],
+            [1, 0, 0, 1.0],
+        ])
         # print(candidate_locs, cost)
         # rr.log_text_entry(f'homotopy_costs', f'{candidate_locs} {strategy} {cost}')
 
         return cost
-
-    def in_collision(self, p):
-        return self.cc.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
 
 
 def simulate_grasps_parallel(grasps_inputs, phy, rng):
@@ -274,12 +246,13 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
 
     if not grasp_rrt.is_state_valid(phy_plan):
-        # the RRT will fail here, so first try to perturb the qpos of the robot to get it out of collision
+        # the RRT may fail in this case, so first try to perturb the qpos of the robot to get it out of collision
         for i in range(10):
             qpos = phy_plan.d.qpos
-            # TODO: would be better to look up the jiggle_fraction ros param and use that
-            #  although why isn't the jiggle fraction fixing this problem in the first place?
-            qpos[phy_plan.o.robot.qpos_indices] += np.deg2rad(rng.uniform(-2, 2, size=len(phy_plan.o.robot.qpos_indices)))
+            # TODO: would be better to look up the jiggle_fraction ros param and use that.
+            #  Although why isn't the FixStartStateAdapter fixing this problem in the first place?
+            qpos[phy_plan.o.robot.qpos_indices] += np.deg2rad(
+                rng.uniform(-2, 2, size=len(phy_plan.o.robot.qpos_indices)))
             valid = grasp_rrt.is_state_valid(phy_plan)
             if valid:
                 break
@@ -302,20 +275,6 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     # TODO: also use RRT to plan the dxpos motions
 
     return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
-
-
-def line_collision_free(cc: CollisionChecker, tools_paths):
-    # dxpos has shape [n_g, T, 3]
-    # and we want to figure out if the straight line path between each dxpos is collision free
-    lengths = np.linalg.norm(tools_paths[:, 1:] - tools_paths[:, :-1], axis=-1)
-    for i, lengths_i in enumerate(lengths):
-        for t in range(tools_paths.shape[1] - 1):
-            for d in np.arange(0, lengths_i[t], cc.get_resolution() / 2):
-                p = tools_paths[i, t] + d / lengths_i[t] * (tools_paths[i, t + 1] - tools_paths[i, t])
-                in_collision = cc.is_collision(p, allowable_penetration=AllowablePenetration.HALF_CELL)
-                if in_collision:
-                    return False
-    return True
 
 
 def get_tool_paths(candidate_pos, candidate_dxpos):

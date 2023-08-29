@@ -1,5 +1,7 @@
 from enum import Enum, auto
 
+from mjregrasping.goal_funcs import locs_eq
+
 
 class Strategies(Enum):
     NEW_GRASP = auto()
@@ -13,7 +15,7 @@ def get_strategy(current_locs, next_locs):
     for current_loc_i, next_loc_i in zip(current_locs, next_locs):
         if current_loc_i == -1 and next_loc_i != -1:
             strategy.append(Strategies.NEW_GRASP)
-        elif current_loc_i == next_loc_i:
+        elif locs_eq(current_loc_i, next_loc_i):
             strategy.append(Strategies.STAY)
         elif current_loc_i != -1 and next_loc_i == -1:
             strategy.append(Strategies.RELEASE)

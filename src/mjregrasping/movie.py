@@ -46,13 +46,15 @@ class MjRenderer:
         self.cam = cam
         self.rgb = np.zeros([h, w, 3], dtype=np.uint8)
         self.depth = np.zeros([h, w], dtype=np.float32)
+        self.opt = mujoco.MjvOption()
+        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONSTRAINT] = 1
 
     def render(self, d: mujoco.MjData, depth=False):
         """ Render the current mujoco scene and store the resulting image """
         catmask = mujoco.mjtCatBit.mjCAT_ALL
         mujoco.mjv_updateScene(self.m,
                                d,
-                               opt=mujoco.MjvOption(),
+                               opt=self.opt,
                                pert=None,
                                cam=self.cam,
                                catmask=catmask,

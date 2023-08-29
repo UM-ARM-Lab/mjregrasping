@@ -51,6 +51,8 @@ def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, 
         stopped = np.rad2deg(np.max(abs_qvel)) < stopped_tol
         if reached and stopped:
             return
+        elif stopped:
+            break
 
         q_prev = q_current
 

@@ -62,7 +62,7 @@ def main():
     grasp_rrt = GraspRRT()
     for state_path in states_paths:
         for seed in range(1, 5):
-            planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons, cc, seed=seed)
+            planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons, seed=seed)
             d = load_data_and_eq(m, state_path, True)
             phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 

@@ -2,15 +2,10 @@
 """"
 Based on "An Online Method for Tight-tolerance Insertion Tasks for String and Rope" by Wang, Berenson, and Balkcom, 2015
 """
-import argparse
 import multiprocessing
-import time
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
-import mujoco
 import numpy as np
-import pysdf_tools
 import rerun as rr
 from colorama import Fore
 
@@ -21,66 +16,19 @@ from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_g
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, activate_grasp
 from mjregrasping.homotopy_utils import skeleton_field_dir
-from mjregrasping.movie import MjMovieMaker
-from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.trials import load_trial, save_metrics
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
-from mjregrasping.rerun_visualizer import log_skeletons
-from mjregrasping.robot_data import val
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import cable_harness, setup_cable_harness
+from mjregrasping.scenarios import cable_harness
 from mjregrasping.teleport_to_plan import teleport_to_planned_q
 from mjregrasping.viz import make_viz
-
-
-def dx(x):
-    return np.array([x, 0, 0])
-
-
-def dy(y):
-    return np.array([0, y, 0])
-
-
-def dz(z):
-    return np.array([0, 0, z])
-
-
-def get_cable_harness_skeletons(phy: Physics):
-    d = phy.d
-    m = phy.m
-    return {
-        "loop1": d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop1_top").size[0]) * 2,
-            dz(m.geom("loop1_front").size[2] * 2),
-            -dy(m.geom("loop1_top").size[0] * 2),
-            dz(-m.geom("loop1_front").size[2] * 2),
-        ], axis=0),
-        "loop2": d.geom("loop2_front").xpos - dz(m.geom("loop2_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop2_top").size[0]) * 2,
-            dz(m.geom("loop2_front").size[2] * 2),
-            -dy(m.geom("loop2_top").size[0] * 2),
-            dz(-m.geom("loop2_front").size[2] * 2),
-        ], axis=0),
-        "loop3": d.geom("loop3_front").xpos - dz(m.geom("loop3_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop3_top").size[0]) * 2,
-            dz(m.geom("loop3_front").size[2] * 2),
-            -dy(m.geom("loop3_top").size[0] * 2),
-            dz(-m.geom("loop3_front").size[2] * 2),
-        ], axis=0),
-    }
 
 
 @ros_init.with_ros("cable_harness_baseline")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
-
-    parser = argparse.ArgumentParser()
-    args = parser.parse_args()
 
     rr.init('cable_harness_baseline')
     rr.connect()
@@ -89,115 +37,96 @@ def main():
 
     viz = make_viz(scenario)
 
-    root = Path("results") / scenario.name + "_baseline"
-    root.mkdir(exist_ok=True, parents=True)
-
-    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
-    d = mujoco.MjData(m)
-    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
-    phy = Physics(m, d, objects)
-
-    sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
-    mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
-
-    setup_cable_harness(phy, viz)
-
-    mov = MjMovieMaker(m)
-    now = int(time.time())
-    seed = 1
-    mov_path = root / f'seed_{seed}_{now}.mp4'
-    print(f"Saving movie to {mov_path}")
-    mov.start(mov_path)
-
-    skeletons = get_cable_harness_skeletons(phy)
-    log_skeletons(skeletons)
-
     grasp_rrt = GraspRRT()
 
-    grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
+    for i in range(10):
+        phy, sdf, skeletons, mov, metrics_path = load_trial(i, scenario, viz)
 
-    pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=cable_harness.noise_sigma,
-                       temp=hp['temp'])
-    num_samples = hp['n_samples']
-    goal_idx = 0
+        grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
-    mppi.reset()
+        pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
+        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=i, horizon=hp['horizon'],
+                           noise_sigma=cable_harness.noise_sigma,
+                           temp=hp['temp'])
+        num_samples = hp['n_samples']
+        goal_idx = 0
 
-    end_loc = 0.98
-    goals = [
-        WeifuThreadingGoal(grasp_goal, skeletons, 'loop1', end_loc, sdf, viz),
-        WeifuThreadingGoal(grasp_goal, skeletons, 'loop2', end_loc, sdf, viz),
-        WeifuThreadingGoal(grasp_goal, skeletons, 'loop3', end_loc, sdf, viz),
-        point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
-    ]
-    goal = goals[goal_idx]
+        mppi.reset()
 
-    itr = 0
+        end_loc = 0.98
+        goals = [
+            WeifuThreadingGoal(grasp_goal, skeletons, 'loop1', end_loc, sdf, viz),
+            WeifuThreadingGoal(grasp_goal, skeletons, 'loop2', end_loc, sdf, viz),
+            WeifuThreadingGoal(grasp_goal, skeletons, 'loop3', end_loc, sdf, viz),
+            point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
+        ]
+        goal = goals[goal_idx]
 
-    max_iters = 250
-    viz.viz(phy)
-    while True:
-        if rospy.is_shutdown():
-            mov.close()
-            break
+        itr = 0
 
-        if itr > max_iters:
-            print(Fore.RED + "Max iterations reached!" + Fore.RESET)
-            break
-
-        goal.viz_goal(phy)
-
-        if isinstance(goal, ObjectPointGoal):
-            if goal.satisfied(phy):
-                print(Fore.GREEN + "Goal reached!" + Fore.RESET)
-                break
-        else:
-            disc_center = np.mean(goal.skel[:4], axis=0)
-            disc_normal = skeleton_field_dir(goal.skel, disc_center[None])[0] * 0.01
-            disc_rad = 0.05  # TODO: compute the radius of the disc
-
-            if goal.satisfied(phy, disc_center, disc_normal, disc_rad):
-                mppi.reset()
-
-                strategy = [Strategies.STAY, Strategies.MOVE]
-                locs = np.array([-1, end_loc])
-                res, scene_msg = grasp_rrt.plan(phy, strategy, locs, viz)
-                if res.error_code.val == res.error_code.SUCCESS:
-                    print("Moving on to next goal")
-                    grasp_rrt.display_result(viz, res, scene_msg)
-                    qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
-                    teleport_to_planned_q(phy, qs[-1])
-                    goal.loc = end_loc
-                    goal_idx += 1
-                else:
-                    print("Lowering grasp")
-                    goal.loc -= 0.01
-                activate_grasp(phy, 'right', goal.loc)
-                control_step(phy, np.zeros(phy.m.nu), sub_time_s=1.0, mov=mov)
-                viz.viz(phy, False)
-                goal = goals[goal_idx]
-                grasp_goal.set_grasp_locs(np.array([-1, goal.loc]))
-
-                if goal_idx >= len(goals):
-                    print(Fore.GREEN + "Task complete!" + Fore.RESET)
-                    break
-
-        command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
-        mppi_viz(viz, mppi, goal, phy, command, sub_time_s)
-
-        control_step(phy, command, sub_time_s, mov=mov)
         viz.viz(phy)
+        success = False
+        while True:
+            if rospy.is_shutdown():
+                mov.close()
+                break
 
-        results = goal.get_results(phy)
-        do_grasp_dynamics(phy, results)
+            if itr > scenario.max_iters:
+                print(Fore.RED + "Max iterations reached!" + Fore.RESET)
+                break
 
-        mppi.roll()
+            goal.viz_goal(phy)
 
-        itr += 1
+            if isinstance(goal, ObjectPointGoal):
+                if goal.satisfied(phy):
+                    print(Fore.GREEN + "Goal reached!" + Fore.RESET)
+                    break
+            else:
+                disc_center = np.mean(goal.skel[:4], axis=0)
+                disc_normal = skeleton_field_dir(goal.skel, disc_center[None])[0] * 0.01
+                disc_rad = 0.05  # TODO: compute the radius of the disc
 
-    mov.close()
+                if goal.satisfied(phy, disc_center, disc_normal, disc_rad):
+                    mppi.reset()
+
+                    strategy = [Strategies.STAY, Strategies.MOVE]
+                    locs = np.array([-1, end_loc])
+                    res, scene_msg = grasp_rrt.plan(phy, strategy, locs, viz)
+                    if res.error_code.val == res.error_code.SUCCESS:
+                        print("Moving on to next goal")
+                        grasp_rrt.display_result(viz, res, scene_msg)
+                        qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
+                        teleport_to_planned_q(phy, qs[-1])
+                        goal.loc = end_loc
+                        goal_idx += 1
+                    else:
+                        print("Lowering grasp")
+                        goal.loc -= 0.01
+                    activate_grasp(phy, 'right', goal.loc)
+                    control_step(phy, np.zeros(phy.m.nu), sub_time_s=1.0, mov=mov)
+                    viz.viz(phy, False)
+                    goal = goals[goal_idx]
+                    grasp_goal.set_grasp_locs(np.array([-1, goal.loc]))
+
+                    if goal_idx >= len(goals):
+                        print(Fore.GREEN + "Task complete!" + Fore.RESET)
+                        success = True
+                        break
+
+            command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
+            mppi_viz(viz, mppi, goal, phy, command, sub_time_s)
+
+            control_step(phy, command, sub_time_s, mov=mov)
+            viz.viz(phy)
+
+            results = goal.get_results(phy)
+            do_grasp_dynamics(phy, results)
+
+            mppi.roll()
+
+            itr += 1
+
+        save_metrics(metrics_path, mov, itr=itr, success=success, time=phy.d.time)
 
 
 if __name__ == "__main__":

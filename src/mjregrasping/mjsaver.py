@@ -9,6 +9,12 @@ DEFAULT_PATH = Path("states/data_and_eq.pkl")
 
 
 def save_data_and_eq(phy: Physics, path=DEFAULT_PATH):
+    data_and_eq = get_save_data_and_eq(phy)
+    with path.open("wb") as f:
+        pickle.dump(data_and_eq, f)
+
+
+def get_save_data_and_eq(phy):
     data_and_eq = {
         'data': phy.d,
         'eq':   {},
@@ -16,13 +22,12 @@ def save_data_and_eq(phy: Physics, path=DEFAULT_PATH):
     for eq_idx in range(phy.m.neq):
         eq = phy.m.eq(eq_idx)
         data_and_eq['eq'][eq_idx] = {
-            'name': eq.name,
+            'name':   eq.name,
             'active': eq.active.copy(),
             'data':   eq.data.copy(),
             'obj2id': eq.obj2id.copy(),
         }
-    with path.open("wb") as f:
-        pickle.dump(data_and_eq, f)
+    return data_and_eq
 
 
 def load_data_and_eq(m: mujoco.MjModel, path=DEFAULT_PATH, forward=True):

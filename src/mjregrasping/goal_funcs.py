@@ -162,9 +162,13 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
 
 
 def check_should_be_open(current_grasp_locs, current_is_grasping, desired_locs, desired_is_grasping):
-    wrong_loc = abs(current_grasp_locs - desired_locs) > hp['grasp_loc_diff_thresh']
+    wrong_loc = ~locs_eq(current_grasp_locs, desired_locs)
     desired_open = np.logical_or(
         np.logical_and(np.logical_and(wrong_loc, desired_is_grasping), current_is_grasping),
         np.logical_not(desired_is_grasping)
     )
     return desired_open
+
+
+def locs_eq(locs_a, locs_b):
+    return abs(locs_a - locs_b) < hp['grasp_loc_diff_thresh']

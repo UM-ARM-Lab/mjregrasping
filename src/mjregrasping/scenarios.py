@@ -9,7 +9,8 @@ from transformations import quaternion_from_euler
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
-from mjregrasping.robot_data import RobotData, conq, val, drones
+from mjregrasping.physics import Physics
+from mjregrasping.robot_data import RobotData, conq, val
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.settle import settle
 
@@ -18,47 +19,49 @@ from mjregrasping.settle import settle
 class Scenario:
     name: str
     xml_path: Path
+    skeletons_path: Optional[Path]
+    sdf_path: Path
     obstacle_name: str
     robot_data: RobotData
     rope_name: str
     noise_sigma: Union[np.ndarray, float]
+    max_iters: int
 
 
 conq_hose = Scenario(
     name="ConqHose",
     xml_path=Path("models/conq_hose_scene.xml"),
+    skeletons_path=Path("models/hose_obstacles_skeleton.hjson"),
+    sdf_path=Path("sdfs/hose_obstacles.sdf"),
     obstacle_name="hose_obstacles",
     robot_data=conq,
     rope_name="rope",
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
+    max_iters=250,
 )
 
 val_untangle = Scenario(
     name="Untangle",
     xml_path=Path("models/untangle_scene.xml"),
+    skeletons_path=Path("models/computer_rack_skeleton.hjson"),
+    sdf_path=Path("sdfs/computer_rack.sdf"),
     obstacle_name="computer_rack",
     robot_data=val,
     rope_name="rope",
-    noise_sigma=np.deg2rad(2)
+    noise_sigma=np.deg2rad(2),
+    max_iters=250,
 )
-
-val_pulling = Scenario(
-    name="Pulling",
-    xml_path=Path("models/pulling_scene.xml"),
-    obstacle_name="obstacles",
-    robot_data=val,
-    rope_name="rope",
-    noise_sigma=np.deg2rad(1)
-)
-
 
 cable_harness = Scenario(
     name="CableHarness",
     xml_path=Path("models/cable_harness_scene.xml"),
+    skeletons_path=Path("models/cable_harness_skeleton.hjson"),
+    sdf_path=Path("sdfs/cable_harness_obstacles.sdf"),
     obstacle_name="cable_harness_obstacles",
     robot_data=val,
     rope_name="rope",
-    noise_sigma=np.deg2rad(1)
+    noise_sigma=np.deg2rad(1),
+    max_iters=250,
 )
 
 
@@ -171,9 +174,112 @@ def setup_cable_harness(phy, viz):
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
     q = np.array([
         -0.68, 0.24,  # torso
-        -0.4, 0.0, 0, 0.4, 0.8, 0.2, 3.14159,  # left arm
+        -0.4, 0.0, 0, 0.4, 0.8, 0.2, 1,  # left arm
         0,  # left gripper
         0.4, 0.0, 0, -0.13, 0, -0.0, -0.5,  # right arm
         0.06,  # right gripper
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+
+
+def dx(x):
+    return np.array([x, 0, 0])
+
+
+def dy(y):
+    return np.array([0, y, 0])
+
+
+def dz(z):
+    return np.array([0, 0, z])
+
+
+def get_cable_harness_skeletons(phy: Physics):
+    d = phy.d
+    m = phy.m
+    return {
+        "loop1": d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop1_top").size[0]) * 2,
+            dz(m.geom("loop1_front").size[2] * 2),
+            -dy(m.geom("loop1_top").size[0] * 2),
+            dz(-m.geom("loop1_front").size[2] * 2),
+        ], axis=0),
+        "loop2": d.geom("loop2_front").xpos - dz(m.geom("loop2_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop2_top").size[0]) * 2,
+            dz(m.geom("loop2_front").size[2] * 2),
+            -dy(m.geom("loop2_top").size[0] * 2),
+            dz(-m.geom("loop2_front").size[2] * 2),
+        ], axis=0),
+        "loop3": d.geom("loop3_front").xpos - dz(m.geom("loop3_front").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("loop3_top").size[0]) * 2,
+            dz(m.geom("loop3_front").size[2] * 2),
+            -dy(m.geom("loop3_top").size[0] * 2),
+            dz(-m.geom("loop3_front").size[2] * 2),
+        ], axis=0),
+    }
+
+
+def get_untangle_skeletons(phy: Physics):
+    d = phy.d
+    m = phy.m
+    return {
+        "loop1": d.geom("rack1_post1").xpos - dz(m.geom("rack1_post1").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("rack1_bottom").size[0]) * 2,
+            dz(m.geom("rack1_post1").size[2] * 2),
+            -dy(m.geom("rack1_bottom").size[0] * 2),
+            dz(-m.geom("rack1_post1").size[2] * 2),
+        ], axis=0),
+        "loop2": d.geom("rack1_post2").xpos - dz(m.geom("rack1_post2").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("rack1_bottom").size[0]) * 2,
+            dz(m.geom("rack1_post2").size[2] * 2),
+            -dy(m.geom("rack1_bottom").size[0] * 2),
+            dz(-m.geom("rack1_post2").size[2] * 2),
+        ], axis=0),
+        "loop3": d.geom("rack1_post1").xpos - dz(m.geom("rack1_post1").size[2]) + np.cumsum([
+            np.zeros(3),
+            -dx(m.geom("rack1_bottom").size[1]) * 2,
+            dz(m.geom("rack1_post1").size[2] * 2),
+            dx(m.geom("rack1_bottom").size[1] * 2),
+            dz(-m.geom("rack1_post1").size[2] * 2),
+        ], axis=0),
+        "loop4": d.geom("rack1_post3").xpos - dz(m.geom("rack1_post3").size[2]) + np.cumsum([
+            np.zeros(3),
+            -dx(m.geom("rack1_bottom").size[1]) * 2,
+            dz(m.geom("rack1_post3").size[2] * 2),
+            dx(m.geom("rack1_bottom").size[1] * 2),
+            dz(-m.geom("rack1_post3").size[2] * 2),
+        ], axis=0),
+        # now again for rack2
+        "loop5": d.geom("rack2_post1").xpos - dz(m.geom("rack2_post1").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("rack2_bottom").size[0]) * 2,
+            dz(m.geom("rack2_post1").size[2] * 2),
+            -dy(m.geom("rack2_bottom").size[0] * 2),
+            dz(-m.geom("rack2_post1").size[2] * 2),
+        ], axis=0),
+        "loop6": d.geom("rack2_post2").xpos - dz(m.geom("rack2_post2").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("rack2_bottom").size[0]) * 2,
+            dz(m.geom("rack2_post2").size[2] * 2),
+            -dy(m.geom("rack2_bottom").size[0] * 2),
+            dz(-m.geom("rack2_post2").size[2] * 2),
+        ], axis=0),
+        "loop7": d.geom("rack2_post1").xpos - dz(m.geom("rack2_post1").size[2]) + np.cumsum([
+            np.zeros(3),
+            -dx(m.geom("rack2_bottom").size[1]) * 2,
+            dz(m.geom("rack2_post1").size[2] * 2),
+            dx(m.geom("rack2_bottom").size[1] * 2),
+        ], axis=0),
+        "loop8": d.geom("rack2_post3").xpos - dz(m.geom("rack2_post3").size[2]) + np.cumsum([
+            np.zeros(3),
+            -dx(m.geom("rack2_bottom").size[1]) * 2,
+            dz(m.geom("rack2_post3").size[2] * 2),
+            dx(m.geom("rack2_bottom").size[1] * 2),
+            dz(-m.geom("rack2_post3").size[2] * 2),
+        ], axis=0),
+    }
