@@ -10,10 +10,9 @@ from arc_utilities import ros_init
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics, get_q
-from mjregrasping.trials import save_trial
-from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.scenarios import val_untangle, get_untangle_skeletons, setup_untangle
+from mjregrasping.trials import save_trial
 from mjregrasping.viz import make_viz, Viz
 
 
@@ -24,9 +23,9 @@ def randomize_rack(m: mujoco.MjModel, rng: np.random.RandomState):
     # shrink the computer rack in the X axis
     # h will be the half-size in X of the bottom/top geoms of the rack
     h = rng.uniform(0.2, 0.45)
-    m.geom("rack1_bottom").size[1] = h
+    m.geom("rack1_bottom").size[1] = h + m.geom("rack1_post1").size[1] - 0.001
     m.geom("rack2_bottom").size[1] = h
-    m.geom("rack2_top").size[1] = h + m.geom("rack1_post1").size[1]
+    m.geom("rack2_top").size[1] = h + m.geom("rack1_post1").size[1] - 0.001
     m.geom("rack1_post1").pos[1] = -h
     m.geom("rack1_post2").pos[1] = h
     m.geom("rack1_post3").pos[1] = -h
@@ -51,11 +50,8 @@ def randomize_rack(m: mujoco.MjModel, rng: np.random.RandomState):
     m.geom("box1").pos[1] = rng.uniform(box1_y0, box1_y1)
 
     # place the computer on the rack
-    c_x0 = x0 + m.geom("case").size[0] / 2
-    c_x1 = x1 - m.geom("case").size[0] / 2
     c_y0 = y0 + m.geom("case").size[1] / 2
     c_y1 = y1 - m.geom("case").size[1] / 2
-    m.body("computer").pos[0] = rng.uniform(c_x0, c_x1)
     m.body("computer").pos[1] = rng.uniform(c_y0, c_y1)
 
 
@@ -93,7 +89,7 @@ def main():
         viz.viz(phy, False)
 
         skeletons = get_untangle_skeletons(phy)
-        log_skeletons(skeletons)
+        viz.skeletons(skeletons)
 
         setup_untangle(phy, viz)
         randomize_qpos(phy, rng, viz)

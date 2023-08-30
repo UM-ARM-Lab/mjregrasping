@@ -1,11 +1,9 @@
 # noinspection PyUnresolvedReferences
 from mjregrasping.cfg import ParamsConfig
 
-from dynamic_reconfigure.encoding import Config
-from dynamic_reconfigure.server import Server
-
 # These values are considered const by convention
 hp = {
+    "n_grasp_samples":                 18,
     "horizon":                         15,
     "n_samples":                       50,
     "temp":                            0.15,
@@ -34,7 +32,8 @@ hp = {
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
     "gripper_to_goal_weight":          0.2,
-    "robot_dq_weight":                 0.3,
+    "robot_dq_weight":                 0.5,
+    "rope_dq_weight":                  5.0,
     "max_contact_cost":                1,
     "max_expected_contacts":           6,
     "contact_cost":                    3.0,
@@ -62,20 +61,3 @@ hp = {
         "n_init": 6,
     }
 }
-
-
-class Params:
-
-    def __init__(self):
-        self.srv = Server(ParamsConfig, self.callback)
-        self.config = self.srv.update_configuration({})
-
-    def callback(self, new_config: Config, _):
-        self.config = new_config
-        return new_config
-
-    def update(self):
-        self.config = self.srv.update_configuration(self.config)
-
-    def __getattr__(self, item):
-        return getattr(self.config, item)

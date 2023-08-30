@@ -1,13 +1,10 @@
 import itertools
-import multiprocessing as mp
 from dataclasses import dataclass
-from functools import partial
 from time import perf_counter
 from typing import Dict, Optional, List
 
 import numpy as np
 import rerun as rr
-from matplotlib import cm
 from pymjregrasping_cpp import seedOmpl
 
 from mjregrasping.goal_funcs import get_rope_points, locs_eq
@@ -20,7 +17,6 @@ from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.viz import Viz
@@ -29,6 +25,7 @@ from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
 
 @dataclass
 class SimGraspCandidate:
+    phy0: Physics
     phy: Physics
     strategy: List[Strategies]
     res: MotionPlanResponse
@@ -100,7 +97,7 @@ class HomotopyRegraspPlanner:
         grasps_inputs = []
         is_grasping = get_is_grasping(phy)
         for strategy in get_all_strategies_from_phy(phy):
-            for i in range(20):
+            for i in range(hp['n_grasp_samples']):
                 if i == 0:
                     sample_loc = self.op_goal.loc
                 elif i == 1:
@@ -125,18 +122,36 @@ class HomotopyRegraspPlanner:
                 grasps_inputs.append(SimGraspInput(strategy, candidate_locs, candidate_dxpos))
         return grasps_inputs
 
-    def get_best(self, sim_grasps, viz: Optional[Viz], log_loops=False) -> SimGraspCandidate:
-        best_cost = np.inf
-        best_sim_grasp = None
+    def get_best(self, sim_grasps, viz: Optional[Viz]) -> SimGraspCandidate:
+        costs_lists = []
+        total_costs = []
         for sim_grasp in sim_grasps:
-            cost_i = self.cost(sim_grasp, viz=viz, log_loops=log_loops)
-            if cost_i < best_cost:
-                best_cost = cost_i
-                best_sim_grasp = sim_grasp
+            costs = self.costs(sim_grasp)
+            cost_i = sum(costs)
+            costs_lists.append(costs)
+            total_costs.append(cost_i)
+
+        sorted_idxs = np.argsort(total_costs)
+        sorted_cost_lists = [costs_lists[i] for i in sorted_idxs]
+        sorted_grasps = [sim_grasps[i] for i in sorted_idxs]
+        best_sim_grasp = sorted_grasps[0]
+
+        if not viz:
+            return best_sim_grasp
+
+        for i, (sim_grasp, costs_list) in enumerate(zip(sorted_grasps, sorted_cost_lists)):
+            rr.set_time_sequence('regrasp_planner', i)
+            viz.viz(sim_grasp.phy, is_planning=True)
+            cost_i = sum(costs_list)
+            rr.log_tensor('homotopy_costs', [BIG_PENALTY, cost_i] + list(costs_list))
+            cost_names = ["penalty", "dq", "drope", "homotopy", "geodesic"]
+            msg = " ".join([f"{name}: {cost:.2f}" for name, cost in zip(cost_names, costs_list)])
+            rr.log_tensor('homotopy_costs', msg)
 
         return best_sim_grasp
 
-    def cost(self, sim_grasp: SimGraspCandidate, viz: Optional[Viz], log_loops=False):
+    def costs(self, sim_grasp: SimGraspCandidate):
+        phy0 = sim_grasp.phy0
         initial_locs = sim_grasp.initial_locs
         phy_plan = sim_grasp.phy
         candidate_locs = sim_grasp.locs
@@ -145,19 +160,19 @@ class HomotopyRegraspPlanner:
         strategy = sim_grasp.strategy
 
         # If there is no significant change in the grasp, that's high cost
-        same_locs = locs_eq(initial_locs - candidate_locs)
+        same_locs = locs_eq(initial_locs, candidate_locs)
         not_stay = strategy != Strategies.STAY
         if np.any(same_locs & not_stay):
             cost = 10 * BIG_PENALTY
             # print(candidate_locs, cost)
             # rr.log_text_entry(f'homotopy_costs', f'TOO CLOSE {candidate_locs} {strategy} {cost}')
-            return cost
+            return cost, 0, 0, 0, 0
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
             cost = 10 * BIG_PENALTY
             # print(candidate_locs, cost)
             # rr.log_text_entry(f'homotopy_costs', f'NO PLAN {candidate_locs} {strategy} {cost}')
-            return cost
+            return cost, 0, 0, 0, 0
 
         homotopy_cost = 0
         h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
@@ -176,57 +191,15 @@ class HomotopyRegraspPlanner:
             dq += np.linalg.norm(np.array(plan_pos) - np.array(prev_plan_pos))
         dq_cost = np.clip(dq, 0, BIG_PENALTY / 2) * hp['robot_dq_weight']
 
-        cost = sum([
-            dq_cost,
-            homotopy_cost,
-            geodesics_cost,
-        ])
+        rope_points0 = get_rope_points(phy0)
+        drope = np.linalg.norm(rope_points_plan - rope_points0, axis=-1).mean()
+        drope_cost = np.clip(drope, 0, BIG_PENALTY / 2) * hp['rope_dq_weight']
 
-        # Visualize the path the tools should take for the candidate_locs and candidate_dxpos
-        if log_loops:
-            rr.log_cleared(f'loops_plan', recursive=True)
-        for i, l in enumerate(loops_plan):
-            rr.log_line_strip(f'loops_plan/{i}', l, stroke_width=0.02)
-            rr.log_extension_components(f'loops_plan/{i}', ext={'candidate_locs': f'{candidate_locs}'})
-        if viz:
-            viz.viz(sim_grasp.phy, is_planning=True)
-            log_skeletons(self.skeletons, stroke_width=0.01, color=[0, 1.0, 0, 1.0])
-            rr.log_cleared(f'homotopy', recursive=True)
-            for tool_name, path in zip(phy_plan.o.rd.tool_sites, sim_grasp.tool_paths):
-                color = cm.Greens(1 - min(cost, 1000) / 1000)
-                viz.lines(path, f'homotopy/{tool_name}_path', idx=0, scale=0.02, color=color)
-                rr.log_extension_components(f'homotopy/{tool_name}_path', ext={'locs': candidate_locs})
-        rr_log_costs(entity_path='homotopy_costs', entity_paths=[
-            'homotopy_costs/dq_cost',
-            'homotopy_costs/homotopy_cost',
-            'homotopy_costs/geodesics_cost',
-        ], values=[
-            dq_cost,
-            homotopy_cost,
-            geodesics_cost,
-        ], colors=[
-            [0.5, 0.5, 0, 1.0],
-            [0, 1, 0, 1.0],
-            [1, 0, 0, 1.0],
-        ])
-        # print(candidate_locs, cost)
-        # rr.log_text_entry(f'homotopy_costs', f'{candidate_locs} {strategy} {cost}')
+        return 0, dq_cost, drope_cost, homotopy_cost, geodesics_cost
 
-        return cost
-
-
-def simulate_grasps_parallel(grasps_inputs, phy, rng):
-    # NOTE: this is actually slower than the serial version, not sure why,
-    #  but recreating the GraspRRT object is definitely part of the problem
-    _target = partial(simulate_grasp_parallel, phy, rng)
-    with mp.Pool(mp.cpu_count()) as p:
-        sim_grasps = p.map(_target, grasps_inputs)
-        return sim_grasps
-
-
-def simulate_grasp_parallel(phy: Physics, grasp_input: SimGraspInput, rng):
-    grasp_rrt = GraspRRT()
-    return simulate_grasp(grasp_rrt, phy, None, grasp_input, rng, viz_execution=False)
+    def cost(self, sim_grasp: SimGraspCandidate):
+        costs = self.costs(sim_grasp)
+        return sum(costs)
 
 
 def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, rng,
@@ -259,7 +232,9 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     res, scene_msg = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
     if res.error_code.val != MoveItErrorCodes.SUCCESS:
-        return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
+        return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths,
+                                 initial_locs)
+    print(f"plan has {len(res.trajectory.joint_trajectory.points)} points")
 
     if viz_execution:
         grasp_rrt.display_result(viz, res, scene_msg)
@@ -273,8 +248,7 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
 
     # TODO: also use RRT to plan the dxpos motions
-
-    return SimGraspCandidate(phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
+    return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
 
 
 def get_tool_paths(candidate_pos, candidate_dxpos):

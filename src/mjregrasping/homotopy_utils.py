@@ -165,7 +165,7 @@ def check_new_cycle(cycle, valid_cycles):
 
 def floorify(xpos):
     xpos = xpos.copy()
-    xpos[2] = -1
+    xpos[2] = -0.8
     return xpos
 
 

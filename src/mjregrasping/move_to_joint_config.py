@@ -21,7 +21,7 @@ def execute_grasp_plan(phy: Physics, qs, viz: Viz, is_planning: bool, mov: Optio
 def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, is_planning: bool = False,
                         mov: Optional[MjMovieMaker] = None, reached_tol=1.0, stopped_tol=0.5, stop_on_contact=False):
     q_prev = get_q(phy)
-    for i in range(60):
+    for i in range(75):
         if viz:
             viz.viz(phy, is_planning)
         q_current = get_q(phy)
@@ -51,7 +51,7 @@ def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, 
         stopped = np.rad2deg(np.max(abs_qvel)) < stopped_tol
         if reached and stopped:
             return
-        elif stopped:
+        elif stopped and i > 10:
             break
 
         q_prev = q_current

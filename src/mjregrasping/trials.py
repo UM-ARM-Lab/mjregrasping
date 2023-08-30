@@ -5,6 +5,7 @@ from pathlib import Path
 
 import mujoco
 import pysdf_tools
+from mujoco import GLContext
 
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.scenarios import Scenario
@@ -26,7 +27,7 @@ def save_trial(i, phy, scenario, sdf_path, skeletons):
         pickle.dump(trial_info, f)
 
 
-def load_trial(i: int, scenario: Scenario, viz):
+def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     trials_root = Path("trial_data") / scenario.name
     trial_path = trials_root / f"{scenario.name}_{i}.pkl"
     with trial_path.open("rb") as f:
@@ -45,7 +46,7 @@ def load_trial(i: int, scenario: Scenario, viz):
         sdf = None
     viz.skeletons(skeletons)
 
-    mov = MjMovieMaker(phy.m)
+    mov = MjMovieMaker(gl_ctx, phy.m)
 
     now = int(time.time())
 
@@ -53,15 +54,7 @@ def load_trial(i: int, scenario: Scenario, viz):
     results_root.mkdir(exist_ok=True, parents=True)
 
     mov_path = results_root / f'{scenario.name}_{now}_{i}.mp4'
-    print(f"Saving movie to {mov_path}")
+    print(f"Saving output to {mov_path}")
     mov.start(mov_path)
 
-    metrics_path = results_root / f'{scenario.name}_{now}_{i}.json'
-
-    return phy, sdf, skeletons, mov, metrics_path
-
-
-def save_metrics(metrics_path: Path, mov: MjMovieMaker, **metrics):
-    mov.close()
-    with metrics_path.open('w') as f:
-        json.dump(metrics, f, indent=2)
+    return phy, sdf, skeletons, mov

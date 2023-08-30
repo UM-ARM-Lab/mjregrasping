@@ -1,40 +1,53 @@
+import json
 from copy import deepcopy
+from pathlib import Path
 
+import glfw
 import imageio
 import mujoco
 import numpy as np
+from mujoco import GLContext
 from mujoco._structs import _MjModelCameraViews
 
 
 class MjMovieMaker:
-    def __init__(self, m: mujoco.MjModel, w=1280, h=720):
+    def __init__(self, gl_ctx: GLContext, m: mujoco.MjModel):
         """ Initialize a movie maker for a mujoco model """
         self.m = m
-        self.r = MjRenderer(m, w, h)
+        self.r = MjRenderer(gl_ctx, m)
         self.writer = None
+        self.qpos_path = None
+        self.metrics_path = None
+        self.qpos_list = []
 
     def render(self, d: mujoco.MjData):
-        """ Render the current mujoco scene and store the resulting image """
+        """ Render the current mujoco scene and store the resulting image and qpos """
+        self.qpos_list.append(d.qpos)
         self.writer.append_data(self.r.render(d))
 
-    def start(self, filename):
-        """ Reset the movie maker """
+    def start(self, filename: Path):
+        """ Set up the writer and filenames  """
         fps = int(1 / self.m.opt.timestep)
+        self.qpos_path = filename.parent / f"{filename.stem}_qpos.npy"
+        self.metrics_path = filename.parent / f"{filename.stem}_metrics.json"
         self.writer = imageio.get_writer(filename, fps=fps)
 
-    def close(self):
-        """ Save the movie as a .mp4 file """
+    def close(self, metrics):
+        """ Finish the movie file and save the qpos data as .npy """
         self.writer.close()
+        with self.qpos_path.open('wb') as f:
+            np.save(f, np.array(self.qpos_list))
+        with self.metrics_path.open('w') as f:
+            json.dump(metrics, f, indent=2)
 
 
 class MjRenderer:
-    def __init__(self, m: mujoco.MjModel, w=1280, h=720, cam: mujoco.MjvCamera = None):
+    def __init__(self, gl_ctx: GLContext, m: mujoco.MjModel, cam: mujoco.MjvCamera = None):
         """ Initialize a movie maker for a mujoco model """
-        self.m = m
+        w, h = glfw.get_window_size(gl_ctx._context)
         self.w = w
         self.h = h
-        self.gl_ctx = mujoco.GLContext(w, h)
-        self.gl_ctx.make_current()
+        self.m = m
         self.con = mujoco.MjrContext(m, 1)
         self.scene = mujoco.MjvScene(m, maxgeom=500)
         self.scene.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
@@ -47,7 +60,6 @@ class MjRenderer:
         self.rgb = np.zeros([h, w, 3], dtype=np.uint8)
         self.depth = np.zeros([h, w], dtype=np.float32)
         self.opt = mujoco.MjvOption()
-        # self.opt.flags[mujoco.mjtVisFlag.mjVIS_CONSTRAINT] = 1
 
     def render(self, d: mujoco.MjData, depth=False):
         """ Render the current mujoco scene and store the resulting image """

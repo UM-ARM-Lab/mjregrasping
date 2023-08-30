@@ -35,7 +35,7 @@ class BaselineRegraspPlanner(HomotopyRegraspPlanner):
             if loc_i != -1:
                 self.trap_locs.append(loc_i)
 
-    def cost(self, sim_grasp: SimGraspCandidate, viz: Optional[Viz], log_loops=False):
+    def cost(self, sim_grasp: SimGraspCandidate):
         initial_locs = sim_grasp.initial_locs
         phy_plan = sim_grasp.phy
         candidate_locs = sim_grasp.locs

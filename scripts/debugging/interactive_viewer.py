@@ -22,7 +22,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import control_step, limit_actuator_windup, slow_when_eqs_bad
-from mjregrasping.scenarios import cable_harness, setup_cable_harness
+from mjregrasping.scenarios import threading, setup_threading
 from mjregrasping.viz import make_viz
 from ros_numpy import numpify, msgify
 
@@ -112,7 +112,7 @@ class InteractiveControls(QMainWindow):
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
     rospy.init_node("interactive_viewer")
-    scenario = cable_harness
+    scenario = threading
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     rr.init("viewer")
@@ -123,7 +123,7 @@ def main():
     # state_path = Path("states/CableHarness/init0.pkl")
     # d = load_data_and_eq(m, state_path, True)
     phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-    setup_cable_harness(phy, viz)
+    setup_threading(phy, viz)
 
 
     left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)

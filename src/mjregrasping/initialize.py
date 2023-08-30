@@ -4,7 +4,6 @@ import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.rviz import MjRViz
-from mjregrasping.params import Params
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.viz import Viz
 
@@ -25,6 +24,4 @@ def initialize(node_name, xml_path):
     mujoco.mj_forward(m, d)
     mjviz.viz(m, d)
 
-    p = Params()
-
-    return m, d, Viz(rviz=mjviz, mjrr=MjReRun(), tfw=tfw, p=p)
+    return m, d, Viz(rviz=mjviz, mjrr=MjReRun())

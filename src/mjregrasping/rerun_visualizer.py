@@ -148,7 +148,11 @@ class MjReRun:
                 color = list(to_rgba("y"))
                 color[-1] = 0.4
                 points = get_eq_points(phy, eq, eq_constraint_idx)
-                entity_path = "/".join(filter(None, ["eqs", entity_prefix, eq.name]))
+                entity_path = "eqs"
+                if entity_prefix is not None and entity_prefix != "":
+                    entity_path += "/" + entity_path
+                if eq.name != "":
+                    entity_path += "/" + eq.name
                 rr.log_line_strip(entity_path, points, color=color)
 
     def sdf(self, sdf):

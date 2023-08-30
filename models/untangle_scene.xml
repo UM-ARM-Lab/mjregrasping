@@ -20,9 +20,6 @@
             <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4"/>
         </body>
         <light name="overhead1" pos="0 0 10" mode="trackcom"/>
-        <body name="goal">
-            <geom name="goal" class="visual" type="sphere" pos="-0.04 0.60 0.805" size="0.05" rgba="1 0 1 0.3"/>
-        </body>
     </worldbody>
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>

@@ -39,4 +39,6 @@ class TrapDetection:
 
             return self.frac_dq < hp['frac_dq_threshold']
         else:
+            rr.log_scalar('trap_detection/frac_dq', 1, color=[255, 0, 255])
+            rr.log_scalar('trap_detection/threshold', hp['frac_dq_threshold'], color=[255, 0, 0])
             return False

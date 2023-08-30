@@ -8,6 +8,7 @@ multiset
 networkx
 numpy
 pip>=23.1.0
+pymanopt
 rerun-sdk
 tqdm
 transformations

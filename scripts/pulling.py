@@ -135,7 +135,7 @@ def main():
 
         for k in range(n_warmstart):
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
-            mppi_viz(viz, mppi, goal, phy, command, sub_time_s)
+            mppi_viz(mppi, goal, phy, command, sub_time_s)
 
         control_step(phy, command, sub_time_s, mov=mov)
         viz.viz(phy)

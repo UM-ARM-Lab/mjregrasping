@@ -206,10 +206,7 @@ def do_grasp_dynamics(phy, results):
 
     return did_new_grasp
 
-def mppi_viz(viz: Viz, mppi: RegraspMPPI, goal: MPPIGoal, phy: Physics, command: np.ndarray, sub_time_s: float):
-    if not viz.p.mppi_rollouts:
-        return
-
+def mppi_viz(mppi: RegraspMPPI, goal: MPPIGoal, phy: Physics, command: np.ndarray, sub_time_s: float):
     sorted_traj_indices = np.argsort(mppi.cost)
 
     i = None

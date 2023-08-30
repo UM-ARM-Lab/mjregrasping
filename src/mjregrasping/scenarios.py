@@ -19,8 +19,6 @@ from mjregrasping.settle import settle
 class Scenario:
     name: str
     xml_path: Path
-    skeletons_path: Optional[Path]
-    sdf_path: Path
     obstacle_name: str
     robot_data: RobotData
     rope_name: str
@@ -31,8 +29,6 @@ class Scenario:
 conq_hose = Scenario(
     name="ConqHose",
     xml_path=Path("models/conq_hose_scene.xml"),
-    skeletons_path=Path("models/hose_obstacles_skeleton.hjson"),
-    sdf_path=Path("sdfs/hose_obstacles.sdf"),
     obstacle_name="hose_obstacles",
     robot_data=conq,
     rope_name="rope",
@@ -43,8 +39,6 @@ conq_hose = Scenario(
 val_untangle = Scenario(
     name="Untangle",
     xml_path=Path("models/untangle_scene.xml"),
-    skeletons_path=Path("models/computer_rack_skeleton.hjson"),
-    sdf_path=Path("sdfs/computer_rack.sdf"),
     obstacle_name="computer_rack",
     robot_data=val,
     rope_name="rope",
@@ -52,11 +46,9 @@ val_untangle = Scenario(
     max_iters=250,
 )
 
-cable_harness = Scenario(
-    name="CableHarness",
+threading = Scenario(
+    name="Threading",
     xml_path=Path("models/cable_harness_scene.xml"),
-    skeletons_path=Path("models/cable_harness_skeleton.hjson"),
-    sdf_path=Path("sdfs/cable_harness_obstacles.sdf"),
     obstacle_name="cable_harness_obstacles",
     robot_data=val,
     rope_name="rope",
@@ -146,7 +138,7 @@ def make_conq_hose_goal(viz):
     return goal
 
 
-def setup_cable_harness(phy, viz):
+def setup_threading(phy, viz):
     rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
     rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
     phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
@@ -194,7 +186,7 @@ def dz(z):
     return np.array([0, 0, z])
 
 
-def get_cable_harness_skeletons(phy: Physics):
+def get_threading_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
     return {
@@ -228,30 +220,30 @@ def get_untangle_skeletons(phy: Physics):
     return {
         "loop1": d.geom("rack1_post1").xpos - dz(m.geom("rack1_post1").size[2]) + np.cumsum([
             np.zeros(3),
-            dy(m.geom("rack1_bottom").size[0]) * 2,
+            dy(m.geom("rack2_bottom").size[0]) * 2,
             dz(m.geom("rack1_post1").size[2] * 2),
-            -dy(m.geom("rack1_bottom").size[0] * 2),
+            -dy(m.geom("rack2_bottom").size[0] * 2),
             dz(-m.geom("rack1_post1").size[2] * 2),
         ], axis=0),
         "loop2": d.geom("rack1_post2").xpos - dz(m.geom("rack1_post2").size[2]) + np.cumsum([
             np.zeros(3),
-            dy(m.geom("rack1_bottom").size[0]) * 2,
+            dy(m.geom("rack2_bottom").size[0]) * 2,
             dz(m.geom("rack1_post2").size[2] * 2),
-            -dy(m.geom("rack1_bottom").size[0] * 2),
+            -dy(m.geom("rack2_bottom").size[0] * 2),
             dz(-m.geom("rack1_post2").size[2] * 2),
         ], axis=0),
         "loop3": d.geom("rack1_post1").xpos - dz(m.geom("rack1_post1").size[2]) + np.cumsum([
             np.zeros(3),
-            -dx(m.geom("rack1_bottom").size[1]) * 2,
+            -dx(m.geom("rack2_bottom").size[1]) * 2,
             dz(m.geom("rack1_post1").size[2] * 2),
-            dx(m.geom("rack1_bottom").size[1] * 2),
+            dx(m.geom("rack2_bottom").size[1] * 2),
             dz(-m.geom("rack1_post1").size[2] * 2),
         ], axis=0),
         "loop4": d.geom("rack1_post3").xpos - dz(m.geom("rack1_post3").size[2]) + np.cumsum([
             np.zeros(3),
-            -dx(m.geom("rack1_bottom").size[1]) * 2,
+            -dx(m.geom("rack2_bottom").size[1]) * 2,
             dz(m.geom("rack1_post3").size[2] * 2),
-            dx(m.geom("rack1_bottom").size[1] * 2),
+            dx(m.geom("rack2_bottom").size[1] * 2),
             dz(-m.geom("rack1_post3").size[2] * 2),
         ], axis=0),
         # now again for rack2
@@ -274,6 +266,7 @@ def get_untangle_skeletons(phy: Physics):
             -dx(m.geom("rack2_bottom").size[1]) * 2,
             dz(m.geom("rack2_post1").size[2] * 2),
             dx(m.geom("rack2_bottom").size[1] * 2),
+            dz(-m.geom("rack2_post1").size[2] * 2),
         ], axis=0),
         "loop8": d.geom("rack2_post3").xpos - dz(m.geom("rack2_post3").size[2]) + np.cumsum([
             np.zeros(3),

@@ -9,7 +9,6 @@ import rerun as rr
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.ik import position_jacobian
-from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rviz import MjRViz
@@ -24,8 +23,7 @@ def main():
     xml_path = "models/pull_scene.xml"
     tfw = TF2Wrapper()
     mjviz = MjRViz(xml_path, tfw)
-    p = Params()
-    viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path), tfw=tfw, p=p)
+    viz = Viz(rviz=mjviz, mjrr=MjReRun(xml_path))
 
     m = mujoco.MjModel.from_xml_path(xml_path)
     d = mujoco.MjData(m)

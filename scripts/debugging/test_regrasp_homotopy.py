@@ -16,13 +16,12 @@ from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.movie import MjRenderer
 from mjregrasping.mujoco_objects import MjObjects
-from mjregrasping.params import Params
 from mjregrasping.physics import Physics
 from mjregrasping.rerun_visualizer import MjReRun
 from mjregrasping.rerun_visualizer import log_skeletons
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.rviz import MjRViz
-from mjregrasping.scenarios import val_untangle, make_untangle_goal, cable_harness
+from mjregrasping.scenarios import threading
 from mjregrasping.sdf_collision_checker import SDFCollisionChecker
 from mjregrasping.viz import Viz
 
@@ -33,14 +32,13 @@ def main():
     rr.init('test_regrasp_homotopy')
     rr.connect()
 
-    scenario = cable_harness
+    scenario = threading
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
 
     tfw = TF2Wrapper()
     mjviz = MjRViz(scenario.xml_path, tfw)
-    p = Params()
 
-    viz = Viz(rviz=mjviz, mjrr=MjReRun(scenario.xml_path), tfw=tfw, p=p)
+    viz = Viz(rviz=mjviz, mjrr=MjReRun(scenario.xml_path))
     phy = Physics(m, mujoco.MjData(m),
                   objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     mujoco.mj_forward(phy.m, phy.d)
@@ -87,7 +85,7 @@ def main():
             print(f'planning time: {t1 - t0:.3f}s')
             best_grasp = planner.get_best(sim_grasps, viz=None)
 
-            costs = [planner.cost(g, None) for g in sim_grasps]
+            costs = [planner.cost(g) for g in sim_grasps]
             print(f'grasp planning: {t1 - t0:.3f}s {best_grasp.locs=:}')
 
             # visualize the grasps in order of cost
@@ -108,7 +106,7 @@ def main():
             # Update blacklist and recompute cost
             planner.update_blacklists(phy)
             best_grasp = planner.get_best(sim_grasps, viz=None)
-            costs = [planner.cost(g, None) for g in sim_grasps]
+            costs = [planner.cost(g) for g in sim_grasps]
             print(f'after blacklisting: {best_grasp.locs=:}')
 
             sorted_i = np.argsort(costs)[::-1]

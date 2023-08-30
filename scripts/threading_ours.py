@@ -21,7 +21,7 @@ from mjregrasping.trials import load_trial, save_metrics
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import cable_harness
+from mjregrasping.scenarios import threading
 from mjregrasping.teleport_to_plan import teleport_along_plan
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.viz import make_viz
@@ -34,7 +34,7 @@ def main():
     rr.init('cable_harness')
     rr.connect()
 
-    scenario = cable_harness
+    scenario = threading
 
     grasp_rrt = GraspRRT()
     subgoal_locs = [
@@ -91,7 +91,7 @@ def main():
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
         traps = TrapDetection()
         mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=i, horizon=hp['horizon'],
-                           noise_sigma=cable_harness.noise_sigma,
+                           noise_sigma=threading.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
         goal_idx = 0
@@ -144,7 +144,7 @@ def main():
                         goal = goals[goal_idx]
 
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
-            mppi_viz(viz, mppi, goal, phy, command, sub_time_s)
+            mppi_viz(mppi, goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s, mov=mov)
             viz.viz(phy)

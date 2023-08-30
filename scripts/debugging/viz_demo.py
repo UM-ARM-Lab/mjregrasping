@@ -10,7 +10,7 @@ import rospy
 from mjregrasping.mjsaver import load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
-from mjregrasping.scenarios import cable_harness
+from mjregrasping.scenarios import threading
 from mjregrasping.viz import make_viz
 
 
@@ -23,7 +23,7 @@ def main():
 
     assert args.demo.is_dir()
 
-    scenario = cable_harness
+    scenario = threading
 
     rr.init("viewer")
     rr.connect()

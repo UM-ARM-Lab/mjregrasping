@@ -14,7 +14,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.trials import save_trial
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-from mjregrasping.scenarios import cable_harness, setup_cable_harness, get_cable_harness_skeletons
+from mjregrasping.scenarios import threading, setup_threading, get_threading_skeletons
 from mjregrasping.viz import make_viz, Viz
 
 
@@ -41,7 +41,7 @@ def main():
     rr.init('randomize_cable_harness')
     rr.connect()
 
-    scenario = cable_harness
+    scenario = threading
 
     viz = make_viz(scenario)
 
@@ -59,14 +59,14 @@ def main():
         objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)
 
-        setup_cable_harness(phy, viz)
+        setup_threading(phy, viz)
         randomize_qpos(phy, rng, viz)
 
         sdf_path = root / f"{scenario.name}_{i}.sdf"
 
         get_sdf(sdf_path, phy, 0.01, xmin=-0.95, xmax=0.95, ymin=0.2, ymax=0.85, zmin=-0.45, zmax=1.1)
 
-        skeletons = get_cable_harness_skeletons(phy)
+        skeletons = get_threading_skeletons(phy)
 
         save_trial(i, phy, scenario, sdf_path, skeletons)
 
