@@ -2,6 +2,7 @@
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 
+import mujoco
 import numpy as np
 import rerun as rr
 from colorama import Fore
@@ -15,7 +16,7 @@ from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.params import hp
-from mjregrasping.trials import load_trial, save_metrics
+from mjregrasping.trials import load_trial
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.rrt import GraspRRT
@@ -66,7 +67,7 @@ def main():
 
     viz = make_viz(scenario)
     for i in range(1, 10):
-        phy, sdf, skeletons, mov, metrics_path = load_trial(i, gl_ctx, scenario, viz)
+        phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 

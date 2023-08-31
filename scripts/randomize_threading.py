@@ -34,11 +34,11 @@ def randomize_qpos(phy: Physics, rng: np.random.RandomState, viz: Optional[Viz])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
 
 
-@ros_init.with_ros("randomize_cable_harness")
+@ros_init.with_ros("randomize_threading")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    rr.init('randomize_cable_harness')
+    rr.init('randomize_threading')
     rr.connect()
 
     scenario = threading

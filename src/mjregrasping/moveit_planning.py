@@ -25,7 +25,8 @@ def make_planning_scene(phy: Physics):
         scene_msg.robot_state.joint_state.position[i] = hp['finger_q_pregrasp']
 
     # Collision objects
-    for geom_id in phy.o.obstacle.geom_indices:
+    geom_indices = phy.o.obstacle.geom_indices.tolist() + [phy.m.geom("floor").id]
+    for geom_id in geom_indices:
         geom_bodyid = phy.m.geom_bodyid[geom_id]
         geom_name = phy.m.geom(geom_id).name
         parent_name, child_name = get_parent_child_names(geom_bodyid, phy.m)
@@ -59,8 +60,24 @@ def make_planning_scene(phy: Physics):
             prim.dimensions = [geom_size[0] * 2, geom_size[1] * 2, geom_size[2] * 2]
             co.primitives.append(prim)
             co.primitive_poses.append(prim_pose)
+        elif geom_type == mjtGeom.mjGEOM_SPHERE:
+            prim.type = SolidPrimitive.SPHERE
+            prim.dimensions = [geom_size[0]]
+            co.primitives.append(prim)
+            co.primitive_poses.append(prim_pose)
+        elif geom_type == mjtGeom.mjGEOM_CYLINDER:
+            prim.type = SolidPrimitive.CYLINDER
+            prim.dimensions = [geom_size[0], geom_size[1] * 2]
+            co.primitives.append(prim)
+            co.primitive_poses.append(prim_pose)
+        elif geom_type == mjtGeom.mjGEOM_PLANE:
+            # approximate with a large box
+            prim.type = SolidPrimitive.BOX
+            prim.dimensions = [10, 10, 0.01]
+            co.primitives.append(prim)
+            co.primitive_poses.append(prim_pose)
         else:
-            rospy.loginfo_once(f"Unsupported geom type {geom_type}")
+            rospy.loginfo_once(f"Unsupported geom type {geom_type} when converting to planning scene.")
             continue
 
         scene_msg.world.collision_objects.append(co)

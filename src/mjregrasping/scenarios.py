@@ -48,8 +48,8 @@ val_untangle = Scenario(
 
 threading = Scenario(
     name="Threading",
-    xml_path=Path("models/cable_harness_scene.xml"),
-    obstacle_name="cable_harness_obstacles",
+    xml_path=Path("models/threading_scene.xml"),
+    obstacle_name="obstacles",
     robot_data=val,
     rope_name="rope",
     noise_sigma=np.deg2rad(1),
@@ -157,18 +157,10 @@ def setup_threading(phy, viz):
     activate_grasp(phy, 'right', 0.93)
     settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
     q = np.array([
-        -0.6, 0.1,  # torso
+        -0.3, 0.0,  # torso
         -0.2, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
         0,  # left gripper
-        -0.1, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
-        0.06,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-    q = np.array([
-        -0.68, 0.24,  # torso
-        -0.4, 0.0, 0, 0.4, 0.8, 0.2, 1,  # left arm
-        0,  # left gripper
-        0.4, 0.0, 0, -0.13, 0, -0.0, -0.5,  # right arm
+        -0.1, 0.0, 0, 0.0, 0, -0.0, -1.7,  # right arm
         0.06,  # right gripper
     ])
     pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)

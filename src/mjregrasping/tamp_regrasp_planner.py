@@ -1,8 +1,8 @@
 """
-This baseline is inspired by TAMPC
+This baseline is inspired by task and motion planning methods (Not to be confused with TAMPC)
 
- - traps are points in 3D, with no action, corresponding to the location of the grasped points on the rope.
- - trap cost is thus the total distance between the candidate grasp locations and the trap locations
+The idea is that to evaluate the cost of a feasibile grasp,
+we simply run our MPPI planner for a fixed horizon and take the final/accumulated cost.
 """
 from typing import Dict, Optional
 
@@ -23,7 +23,7 @@ from mjregrasping.viz import Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
-class BaselineRegraspPlanner(HomotopyRegraspPlanner):
+class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
     def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
         super().__init__(op_goal, grasp_rrt, skeletons, seed)

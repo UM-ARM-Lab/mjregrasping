@@ -218,17 +218,6 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
     # release and settle for any moving grippers
     release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
 
-    if not grasp_rrt.is_state_valid(phy_plan):
-        # the RRT may fail in this case, so first try to perturb the qpos of the robot to get it out of collision
-        for i in range(10):
-            qpos = phy_plan.d.qpos
-            # TODO: would be better to look up the jiggle_fraction ros param and use that.
-            #  Although why isn't the FixStartStateAdapter fixing this problem in the first place?
-            qpos[phy_plan.o.robot.qpos_indices] += np.deg2rad(
-                rng.uniform(-2, 2, size=len(phy_plan.o.robot.qpos_indices)))
-            valid = grasp_rrt.is_state_valid(phy_plan)
-            if valid:
-                break
     res, scene_msg = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
     if res.error_code.val != MoveItErrorCodes.SUCCESS:

@@ -57,31 +57,15 @@ def main():
         control_step(phy, ctrl, 0.1)
         viz.viz(phy)
 
-    errors = 0
-    for i in range(25):
-        phy_i = phy.copy_all()
+    # from mjregrasping.grasp_strategies import Strategies
+    # strategy = [Strategies.NEW_GRASP, Strategies.STAY]
+    # candidate_locs = np.array([0.99, 0.93])
+    #
+    # print('is valid?', grasp_rrt.is_state_valid(phy))
+    # res, scene_msg = grasp_rrt.plan(phy, strategy, candidate_locs, viz)
+    # print(res.error_code.val)
+    # grasp_rrt.display_result(viz, res, scene_msg)
 
-        from mjregrasping.grasp_strategies import Strategies
-        strategy = [Strategies.NEW_GRASP, Strategies.STAY]
-        candidate_locs = np.array([0.99, 0.93])
-
-        res, scene_msg = grasp_rrt.plan(phy_i, strategy, candidate_locs, viz, pos_noise=0.05)
-        print(len(res.trajectory.joint_trajectory.points))
-        grasp_rrt.display_result(viz, res, scene_msg)
-
-        qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
-        if len(qs) == 0:
-            continue
-
-        execute_grasp_plan(phy_i, qs, viz, is_planning=False, mov=None)
-
-        final_q = get_q(phy_i)
-        error = np.abs(final_q - qs[-1]).max()
-        if error > np.deg2rad(3):
-            errors += 1
-            print("Error!")
-
-    return
     grasps_inputs = planner.sample_grasp_inputs(phy)
     t0 = perf_counter()
     sim_grasps = planner.simulate_grasps(grasps_inputs, phy, viz=viz, viz_execution=True)
@@ -89,7 +73,7 @@ def main():
     print(f'planning time: {t1 - t0:.3f}s')
     best_grasp = planner.get_best(sim_grasps, viz=None)
 
-    costs = [planner.cost(g) for g in sim_grasps]
+    costs = [planner.costs(g) for g in sim_grasps]
     print(f'grasp planning: {t1 - t0:.3f}s {best_grasp.locs=:}')
 
     # visualize the grasps in order of cost

@@ -1,6 +1,6 @@
-<mujoco model="cable_harness_obstacles">
+<mujoco model="obstacles">
     <worldbody>
-        <body name="cable_harness_obstacles" pos="0 0.7 -0.6" euler="0 0 4.7123">
+        <body name="obstacles" pos="0 0.7 -0.6" euler="0 0 4.7123">
             <body name="wall">
                 <geom type="box" name="wall" size="0.05 1 1" pos="0 0 1" material="cream-plaster"/>
             </body>

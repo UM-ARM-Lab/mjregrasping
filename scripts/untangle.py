@@ -7,7 +7,6 @@ import numpy as np
 import rerun as rr
 from colorama import Fore
 
-import rospy
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
@@ -20,7 +19,7 @@ from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trap_detection import TrapDetection
-from mjregrasping.trials import load_trial, save_metrics
+from mjregrasping.trials import load_trial
 from mjregrasping.viz import make_viz
 from moveit_msgs.msg import MoveItErrorCodes
 

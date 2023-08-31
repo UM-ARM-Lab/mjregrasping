@@ -6,15 +6,12 @@ Panels:
       Expanded:
         - /TF1/Frames1
         - /debug markers1/Namespaces1
-        - /mujoco1
         - /mujoco1/Namespaces1
         - /MotionPlanning1/Scene Geometry1
         - /MotionPlanning1/Scene Robot1
         - /MotionPlanning1/Planned Path1
         - /PlanningScene1/Scene Geometry1
         - /PlanningScene1/Scene Robot1
-        - /Trajectory1
-        - /CDCPD1
       Splitter Ratio: 0.574999988079071
     Tree Height: 840
   - Class: rviz/Selection
@@ -77,98 +74,13 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /all
       Name: mujoco
       Namespaces:
-        cable_harness_obstacles/attach1/attach1: true
-        cable_harness_obstacles/attach2/attach2: true
-        cable_harness_obstacles/loop1/loop1_bottom: true
-        cable_harness_obstacles/loop1/loop1_front: true
-        cable_harness_obstacles/loop1/loop1_top: true
-        cable_harness_obstacles/loop2/loop2_bottom: true
-        cable_harness_obstacles/loop2/loop2_front: true
-        cable_harness_obstacles/loop2/loop2_top: true
-        cable_harness_obstacles/loop3/loop3_bottom: true
-        cable_harness_obstacles/loop3/loop3_front: true
-        cable_harness_obstacles/loop3/loop3_top: true
-        cable_harness_obstacles/wall/wall: false
-        cc_sphere/cc_sphere/cc_sphere: true
-        floor/floor/floor: true
-        goal/goal/goal: true
-        rope/B_1/G1: true
-        rope/B_1/G1b1: true
-        rope/B_1/G1b2: true
-        rope/B_2/G2: true
-        rope/B_2/G2b1: true
-        rope/B_2/G2b2: true
-        rope/B_3/G3: true
-        rope/B_3/G3b1: true
-        rope/B_3/G3b2: true
-        rope/B_4/G4: true
-        rope/B_4/G4b1: true
-        rope/B_4/G4b2: true
-        rope/B_5/G5: true
-        rope/B_5/G5b1: true
-        rope/B_5/G5b2: true
-        rope/B_6/G6: true
-        rope/B_6/G6b1: true
-        rope/B_6/G6b2: true
-        rope/B_7/G7: true
-        rope/B_7/G7b1: true
-        rope/B_7/G7b2: true
-        rope/B_8/G8: true
-        rope/B_8/G8b1: true
-        rope/B_8/G8b2: true
-        rope/B_9/G9: true
-        rope/B_9/G9b1: true
-        rope/B_9/G9b2: true
-        rope/B_first/G0: true
-        rope/B_first/G0b1: true
-        rope/B_first/G0b2: true
-        rope/B_last/G10: true
-        rope/B_last/G10b1: true
-        rope/B_last/G10b2: true
-        val_base/drive1/drive1_mesh: true
-        val_base/drive10/drive7_housing_mesh: true
-        val_base/drive2/joint2_mesh: true
-        val_base/drive3/joint3_mesh: true
-        val_base/drive4/drive4_mesh: true
-        val_base/drive41/drive41_mesh: true
-        val_base/drive42/drive42_mesh: true
-        val_base/drive43/drive43_mesh: true
-        val_base/drive44/drive44_mesh: true
-        val_base/drive45/drive45_mesh: true
-        val_base/drive46/drive46_mesh: true
-        val_base/drive47/drive47_mesh: true
-        val_base/drive5/drive5_mesh: true
-        val_base/drive50/drive47_housing_mesh: true
-        val_base/drive56/Drive56_mesh: true
-        val_base/drive57/drive57_mesh: true
-        val_base/drive6/drive6_mesh: true
-        val_base/drive7/drive7_mesh: true
-        val_base/left_d405/left_d405_mount: true
-        val_base/left_finger_pad/left_finger_pad: true
-        val_base/left_finger_pad2/left_finger_pad2: true
-        val_base/leftforearm/left_forearm_bracket: true
-        val_base/leftgripper/leftgripper: true
-        val_base/leftgripper2/leftgripper2: true
-        val_base/leftshoulder/left_shoulder_bracket: true
-        val_base/lefttube/lefttube_mesh: true
-        val_base/leftwrist/left_wrist_mesh: true
-        val_base/right_d405/right_d405_mount: true
-        val_base/right_finger_pad/right_finger_pad: true
-        val_base/right_finger_pad2/right_finger_pad2: true
-        val_base/rightforearm/right_forearm_bracket: true
-        val_base/rightgripper/rightgripper: true
-        val_base/rightgripper2/rightgripper2: true
-        val_base/rightshoulder/right_shoulder_bracket: true
-        val_base/righttube/righttube_mesh: true
-        val_base/rightwrist/rightwrist_mesh: true
-        val_base/stand/stand: true
-        val_base/torso/torso: true
+        {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: false
       Marker Topic: /planning
@@ -192,27 +104,18 @@ Visualization Manager:
       Name: contacts
       Namespaces:
         G0_wall: true
+        G10_loop1_front: true
+        G10_loop1_top: true
         G10_right_finger_pad: true
         G10_right_finger_pad2: true
-        G10_rightgripper: true
         G10_rightgripper2: true
-        G10_wall: true
         G1_wall: true
         G2_wall: true
         G3_wall: true
         G4_wall: true
-        drive1_mesh_drive43_mesh: true
         floor_G4: true
         floor_G5: true
-        left_finger_pad_left_finger_pad2: true
-        leftgripper_leftgripper2: true
-        loop1_bottom_left_finger_pad: true
-        loop1_bottom_left_finger_pad2: true
-        loop1_bottom_leftgripper: true
-        loop1_bottom_leftgripper2: true
-        loop1_front_left_finger_pad: true
-        wall_left_finger_pad: true
-        wall_left_finger_pad2: true
+        floor_G6: true
       Queue Size: 100
       Value: true
     - Acceleration_Scaling_Factor: 0.1
@@ -348,12 +251,248 @@ Visualization Manager:
           Expand Link Details: false
           Expand Tree: false
           Link Tree Style: Links in Alphabetic Order
+          base:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive1:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive10:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive2:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive3:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive4:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive41:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive42:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive43:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive44:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive45:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive46:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive47:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive5:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive50:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          drive56:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive57:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive6:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          drive7:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_left:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          end_effector_right:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          hdt_michigan_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          left_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          lefttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          leftwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          mount:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          pedestal_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          right_tool:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightforearm:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper2_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightgripper_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightshoulder:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          righttube:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          rightwrist:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          robot_root:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          torso:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zed2i_baro_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_base_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_camera_center:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+            Value: true
+          zed2i_left_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_left_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_mag_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_right_camera_optical_frame:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_left_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
+          zed2i_temp_right_link:
+            Alpha: 1
+            Show Axes: false
+            Show Trail: false
         Robot Alpha: 0.6000000238418579
-        Show Robot Collision: false
+        Show Robot Collision: true
         Show Robot Visual: false
       Value: false
     - Class: moveit_rviz_plugin/Trajectory
-      Color Enabled: false
+      Color Enabled: true
       Enabled: true
       Interrupt Display: true
       Links:
@@ -606,7 +745,7 @@ Visualization Manager:
       Show Robot Collision: true
       Show Robot Visual: false
       Show Trail: false
-      State Display Time: 0.05s
+      State Display Time: 3x
       Trail Step Size: 1
       Trajectory Topic: /display_planned_path
       Use Sim Time: false
@@ -1002,7 +1141,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 0.7604073882102966
+      Distance: 2.1424102783203125
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -1010,17 +1149,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: 0.44653546810150146
-        Y: 0.5842066407203674
-        Z: 0.3372059464454651
+        X: 0.36610573530197144
+        Y: 0.6026018261909485
+        Z: 0.15488578379154205
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: -0.00020348839461803436
+      Pitch: 0.4247969388961792
       Target Frame: anim_camera
-      Yaw: 1.5237845182418823
+      Yaw: 4.696966171264648
     Saved: ~
 Window Geometry:
   Displays:

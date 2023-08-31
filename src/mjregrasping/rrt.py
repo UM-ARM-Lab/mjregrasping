@@ -21,19 +21,15 @@ class GraspRRT:
         self.rrt = RRTPlanner()
         # For some reason, I can fix the RRT collision issues by setting these params
         client = Client("/ompl")
-        client.update_configuration({
-            "maximum_waypoint_distance": 0.1,
-        })
+        client.update_configuration({"maximum_waypoint_distance": 0.1})
+        self.fix_start_rng = np.random.RandomState(0)
 
     def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
              pos_noise=0.05):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
-        # Visualize the goals
-        # if viz:
-        #     for i, v in enumerate(goals.values()):
-        #         viz.sphere(f'goal_positions/{i}', v, 0.05, [0, 1, 0, 0.2])
+        self.fix_start_state_in_place(phy_plan)
 
         scene_msg = make_planning_scene(phy_plan)
         res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time,
@@ -47,6 +43,14 @@ class GraspRRT:
     def is_state_valid(self, phy: Physics):
         scene_msg = make_planning_scene(phy)
         return self.rrt.is_state_valid(scene_msg)
+
+    def fix_start_state_in_place(self, phy: Physics):
+        for i in range(10):
+            valid = self.is_state_valid(phy)
+            if valid:
+                break
+            phy.d.qpos[phy.o.robot.qpos_indices] += np.deg2rad(
+                self.fix_start_rng.uniform(-2, 2, size=len(phy.o.robot.qpos_indices)))
 
 
 def plan_to_grasp(candidate_locs, phy_plan, strategy):
