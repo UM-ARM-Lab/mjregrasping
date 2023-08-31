@@ -74,7 +74,7 @@ def main():
 
     pc_pub = rospy.Publisher('grasp_pc', PointCloud2, queue_size=1)
 
-    tool_idx = 1
+    tool_idx = 0
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
     joint_indices_for_tool = np.array([
