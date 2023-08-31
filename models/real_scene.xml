@@ -1,0 +1,27 @@
+<mujoco model="untangle">
+    <default>
+        <joint stiffness="0.5"/>
+        <geom friction="0.01"/>
+        <default class="visual">
+            <!--             any geom with the class "visual" will not collide with anything -->
+            <geom contype="0" conaffinity="0" group="2"/>
+        </default>
+    </default>
+    <include file="materials.xml"/>
+    <include file="val.xml"/>
+    <include file="real_obs.xml"/>
+    <include file="floor.xml"/>
+    <include file="rope.xml"/>
+    <include file="cc_sphere.xml"/>
+    <include file="val_eq_constraints.xml"/>
+    <worldbody>
+        <!-- used for recording what happens in the simulation -->
+        <body name="mycamera">
+            <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4"/>
+        </body>
+        <light name="overhead1" pos="0 0 10" mode="trackcom"/>
+    </worldbody>
+    <equality>
+        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
+    </equality>
+</mujoco>

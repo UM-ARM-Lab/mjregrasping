@@ -18,6 +18,8 @@ from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics, get_parent_child_names
 from mjregrasping.homotopy_utils import make_ring_mat
 from moveit_msgs.msg import PlanningScene
+from ros_numpy.point_cloud2 import merge_rgb_fields
+from sensor_msgs.msg import PointCloud2
 from std_msgs.msg import ColorRGBA
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -478,3 +480,22 @@ class MujocoXmlMeshParser:
                 if name == mesh_name:
                     return file
         return None
+
+
+def pc_np_to_pc_msg(pc, names, frame_id):
+    """
+
+    Args:
+        pc: [M, N] array where M is probably either 3 or 6
+        names: strings of comma separated names of the fields in pc, e.g. 'x,y,z' or 'x,y,z,r,g,b'
+        frame_id: string
+
+    Returns:
+        PointCloud2 message
+
+    """
+    pc_rec = np.rec.fromarrays(pc, names=names)
+    if 'r' in names:
+        pc_rec = merge_rgb_fields(pc_rec)
+    pc_msg = ros_numpy.msgify(PointCloud2, pc_rec, stamp=rospy.Time.now(), frame_id=frame_id)
+    return pc_msg

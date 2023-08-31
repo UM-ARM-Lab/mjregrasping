@@ -76,14 +76,3 @@ def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
 def get_gripper_ctrl_indices(phy):
     return [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
 
-
-def rescale_ctrl(phy, ctrl):
-    vmin = phy.m.actuator_ctrlrange[:, 0]
-    vmax = phy.m.actuator_ctrlrange[:, 1]
-    if np.any(ctrl > vmax):
-        offending_joint = np.argmax(ctrl)
-        ctrl = ctrl / np.max(ctrl) * vmax[offending_joint]
-    if np.any(ctrl < vmin):
-        offending_joint = np.argmin(ctrl)
-        ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
-    return ctrl

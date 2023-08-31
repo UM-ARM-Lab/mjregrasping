@@ -208,7 +208,7 @@
                                                                       rgba="0.9 0.9 0.9 1"/>
                                                                 <camera mode="fixed" name="right_hand" euler="1.22 0 0" pos="0.01 0 0.03"/>
                                                                 <!-- The default camera frame is weird, so we use this site instead -->
-                                                                <site name="right_hand_cam" euler="1.22 3.14159 3.14159" pos="0.01 0 0.03"
+                                                                <site name="right_hand_cam" euler="-1.93 0 3.1415" pos="0.01 0 0.03"
                                                                       size="0.001"/>
                                                                 <light name="right_hand" mode="fixed" dir="0 1 -0.35" pos="0 0 0.03"/>
                                                             </body>

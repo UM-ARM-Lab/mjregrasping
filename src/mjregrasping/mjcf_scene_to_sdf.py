@@ -55,18 +55,25 @@ def mjcf_scene_to_sdf(model_filename: pathlib.Path, res: float, xmin: float, xma
     args_filename = outdir / (nickname + "_args.txt")
     args_dict = {
         'model_filename': model_filename.as_posix(),
-        'res':            res,
-        'xmin':           xmin,
-        'xmax':           xmax,
-        'ymin':           ymin,
-        'ymax':           ymax,
-        'zmin':           zmin,
-        'zmax':           zmax,
+        'res': res,
+        'xmin': xmin,
+        'xmax': xmax,
+        'ymin': ymin,
+        'ymax': ymax,
+        'zmin': zmin,
+        'zmax': zmax,
     }
     with args_filename.open("w") as args_f:
         hjson.dump(args_dict, args_f)
 
-    get_sdf(outfilename, phy, res, xmin, xmax, ymin, ymax, zmin, zmax)
+    extent = get_extent(xmax, xmin, ymax, ymin, zmax, zmin)
+    position = np.mean(extent, axis=1)
+    half_size = (extent[:, 1] - extent[:, 0]) / 2
+    t0 = perf_counter()
+    rr.log_obb('extent', half_size=half_size, position=position)
+    print(f'Computing VoxelGrid: {perf_counter() - t0:.3f}')
+
+    save_sdf(outfilename, phy, res, xmin, xmax, ymin, ymax, zmin, zmax)
     print(f"Saved to {outfilename}")
 
     # Visualize slices of the SDF in rerun:
@@ -75,21 +82,27 @@ def mjcf_scene_to_sdf(model_filename: pathlib.Path, res: float, xmin: float, xma
     return outfilename
 
 
-def get_sdf(outfilename: pathlib.Path, phy: Physics, res: float, xmin: float, xmax: float, ymin: float, ymax: float,
+def get_extent(xmax, xmin, ymax, ymin, zmax, zmin):
+    extent = np.array([[xmin, xmax], [ymin, ymax], [zmin, zmax]])
+    return extent
+
+
+def save_sdf(outfilename: pathlib.Path, phy: Physics, res: float, xmin: float, xmax: float, ymin: float, ymax: float,
+             zmin: float, zmax: float):
+    sdf = get_sdf(phy, res, xmin, xmax, ymin, ymax, zmin, zmax)
+    sdf.SaveToFile(str(outfilename), True)
+
+
+def get_sdf(phy: Physics, res: float, xmin: float, xmax: float, ymin: float, ymax: float,
             zmin: float, zmax: float):
     origin_point = np.array([xmin, ymin, zmin]) + res / 2  # center  of the voxel [0,0,0]
     res = np.array([res])
-    extent = np.array([[xmin, xmax], [ymin, ymax], [zmin, zmax]])
-    position = np.mean(extent, axis=1)
-    half_size = (extent[:, 1] - extent[:, 0]) / 2
-    rr.log_obb('extent', half_size=half_size, position=position)
-    t0 = perf_counter()
+    extent = get_extent(xmax, xmin, ymax, ymin, zmax, zmin)
     vg, points = make_vg(phy, res, extent, origin_point)
-    print(f'Computing VoxelGrid: {perf_counter() - t0:.3f}')
     oob_value = pysdf_tools.COLLISION_CELL(-10000)
     sdf_result = vg.ExtractSignedDistanceField(oob_value.occupancy, False, False)
     sdf: pysdf_tools.SignedDistanceField = sdf_result[0]
-    sdf.SaveToFile(str(outfilename), True)
+    return sdf
 
 
 def viz_slices(sdf):

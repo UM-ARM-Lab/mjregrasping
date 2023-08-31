@@ -7,7 +7,6 @@ import zivid
 from arm_segmentation.predictor import Predictor
 from cdcpd_torch.core.deformable_object_configuration import RopeConfiguration
 from cdcpd_torch.core.tracking_map import TrackingMap
-from cdcpd_torch.core.visibility_prior import visibility_prior
 from cdcpd_torch.data_utils.types.grippers import GrippersInfo, GripperInfoSingle
 from cdcpd_torch.modules.cdcpd_module_arguments import CDCPDModuleArguments
 from cdcpd_torch.modules.cdcpd_network import CDCPDModule
@@ -18,7 +17,7 @@ from zivid.experimental import calibration
 import ros_numpy
 import rospy
 from geometry_msgs.msg import Point
-from ros_numpy.point_cloud2 import merge_rgb_fields
+from mjregrasping.rviz import pc_np_to_pc_msg
 from sensor_msgs.msg import Image, PointCloud2
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -111,25 +110,6 @@ def estimate_to_msg(current_estimate):
         marker.points.append(Point(*p))
     current_estimate_msg.markers.append(marker)
     return current_estimate_msg
-
-
-def pc_np_to_pc_msg(pc, names, frame_id):
-    """
-
-    Args:
-        pc: [M, N] array where M is probably either 3 or 6
-        names: strings of comma separated names of the fields in pc, e.g. 'x,y,z' or 'x,y,z,r,g,b'
-        frame_id: string
-
-    Returns:
-        PointCloud2 message
-
-    """
-    pc_rec = np.rec.fromarrays(pc, names=names)
-    if 'r' in names:
-        pc_rec = merge_rgb_fields(pc_rec)
-    pc_msg = ros_numpy.msgify(PointCloud2, pc_rec, stamp=rospy.Time.now(), frame_id=frame_id)
-    return pc_msg
 
 
 class CDCPDTorchNode:

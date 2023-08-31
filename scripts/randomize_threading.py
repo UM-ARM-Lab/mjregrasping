@@ -8,7 +8,7 @@ import numpy as np
 import rerun as rr
 
 from arc_utilities import ros_init
-from mjregrasping.mjcf_scene_to_sdf import get_sdf
+from mjregrasping.mjcf_scene_to_sdf import save_sdf
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics, get_q
@@ -64,7 +64,7 @@ def main():
 
         sdf_path = root / f"{scenario.name}_{i}.sdf"
 
-        get_sdf(sdf_path, phy, 0.01, xmin=-0.95, xmax=0.95, ymin=0.2, ymax=0.85, zmin=-0.45, zmax=1.1)
+        save_sdf(sdf_path, phy, 0.01, xmin=-0.95, xmax=0.95, ymin=0.2, ymax=0.85, zmin=-0.45, zmax=1.1)
 
         skeletons = get_threading_skeletons(phy)
 

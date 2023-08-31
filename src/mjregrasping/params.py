@@ -23,8 +23,8 @@ hp = {
     "nearby_locs_weight":              10,
     "unstable_weight":                 100,
     "ever_not_grasping_weight":        5.0,
-    "finger_q_open":                   0.3,
-    "finger_q_closed":                 0.06,
+    "finger_q_open":                   0.55,  # was 0.3 in sim before gripper angle changed
+    "finger_q_closed":                 0.20,  # was 0.06
     "finger_q_pregrasp":               0.12,
     "state_history_size":              8,
     "warmstart":                       8,

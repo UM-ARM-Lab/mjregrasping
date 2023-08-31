@@ -1,31 +1,43 @@
 from pathlib import Path
+import open3d as o3d
+from PIL import Image
+from time import time
+from time import perf_counter
 
+import cv2
+import matplotlib.pyplot as plt
 import mujoco
 import numpy as np
 import pymanopt
+import pyrealsense2 as rs
 import pysdf_tools
 import rerun as rr
 import torch
+from arm_segmentation.predictor import Predictor
 from matplotlib import cm
 from pymanopt.manifolds import SpecialOrthogonalGroup
 
+import ros_numpy
+import rospy
 from arc_utilities import ros_init
+from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.jacobian_ctrl import get_jacobian_ctrl
-from mjregrasping.mjsaver import load_data_and_eq, save_data_and_eq
-from mjregrasping.movie import MjRenderer, MjRGBD
+from mjregrasping.movie import MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
-from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw, transform_points
+from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, rescale_ctrl
+from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
-from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
-from mjregrasping.scenarios import val_untangle, setup_untangle
+from mjregrasping.rollout import control_step
+from mjregrasping.rviz import plot_points_rviz
+from mjregrasping.scenarios import val_untangle
 from mjregrasping.sdf_autograd import point_to_idx as point_to_idx_torch
 from mjregrasping.sdf_autograd import sdf_lookup
 from mjregrasping.viz import make_viz, Viz
 from mjregrasping.voxelgrid import point_to_idx as point_to_idx_np
-from sdf_tools.utils_3d import get_gradient
+from ros_numpy.point_cloud2 import merge_rgb_fields
+from sensor_msgs.msg import PointCloud2
 
 
 def batch_rotate_and_translate(points, mat, pos=None):
@@ -35,10 +47,17 @@ def batch_rotate_and_translate(points, mat, pos=None):
     return new_p
 
 
+def val_dedup(x):
+    """ removes the duplicated gripper values, which are at indices 10 and 19 """
+    return np.concatenate([x[:10], x[11:19], x[20:]])
+
+
 @ros_init.with_ros("low_level_grasping")
 def main():
     np.set_printoptions(precision=5, suppress=True, linewidth=200)
     scenario = val_untangle
+    scenario.xml_path = Path("models/real_scene.xml")
+    scenario.obstacle_name = "obstacles"
 
     rr.init('low_level_grasping')
     rr.connect()
@@ -50,65 +69,81 @@ def main():
 
     d = mujoco.MjData(m)
     phy = Physics(m, d, objects)
-    setup_untangle(phy, viz)
-    # from mjregrasping.mjsaver import save_data_and_eq
-    # save_data_and_eq(phy, Path(f"states/grasp/on_surface_right.pkl"))
-
-    # d = load_data_and_eq(m, path=Path("states/grasp/on_surface_left.pkl"))
-    # d = load_data_and_eq(m, path=Path("states/grasp/free_space_right.pkl"))
-    # d = load_data_and_eq(m, path=Path("states/grasp/on_surface_right.pkl"))
-    tool_idx = 0
-    phy = Physics(m, d, objects)
 
     val = RealValCommander(phy.o.robot)
 
-    # TODO this is too slow. We either need to use a lower res grid or do something completely different.
-    #  what if we just used the BG points and instead of computing a full SDF, we just say that gradient points towards
-    #  the camera for any points "behind" an observed BG point. This basically grids up the R3 into "cones"?
-    sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(scenario.sdf_path))
-    sdf_np = np.array(sdf.GetRawData(), dtype=np.float64)
-    sdf_np = sdf_np.reshape([sdf.GetNumXCells(), sdf.GetNumYCells(), sdf.GetNumZCells()])
-    print("Computing gradient...")
-    sdf_grad_np = get_gradient(sdf, dtype=np.float64)
-    sdf_origin_np = sdf.GetOriginTransform().translation().astype(np.float64)
-    sdf_res_np = sdf.GetResolution()
+    pc_pub = rospy.Publisher('grasp_pc', PointCloud2, queue_size=1)
 
-    mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
-
+    tool_idx = 1
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
+    joint_indices_for_tool = np.array([
+        [2, 3, 4, 5, 6, 7, 8, 9],
+        [11, 12, 13, 14, 15, 16, 17, 18],
+    ])
+    act_indices_for_tool = np.array([
+        [2, 3, 4, 5, 6, 7, 8, 9],
+        [10, 11, 12, 13, 14, 15, 16, 17],
+    ])
+    joint_indices = joint_indices_for_tool[tool_idx]
+    act_indices = act_indices_for_tool[tool_idx]
+    FAR_THRESHOLD = 0.3
+    res = 0.002
+
+    serial_numbers = [
+        '128422270394',  # left
+        '126122270471',  # right
+    ]
+    config = rs.config()
+    config.enable_device(serial_numbers[tool_idx])
+    pipe = rs.pipeline()
+    pipe.start(config)
 
     v_scale = 0.05
+    w_scale = 0.1
+    jnt_lim_avoidance = 0.01
     max_v_norm = 0.03
-    gripper_kp = 5.0
+    gripper_kp = 0.2
 
-    gripper_ctrl_indices = [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
-    tool_frame_name = f'{phy.o.rd.tool_sites[tool_idx]}_site'
+    tool_frame_name = phy.o.rd.tool_sites[tool_idx]
 
     camera_name = phy.o.rd.camera_names[tool_idx]
     camera_site_name = f'{camera_name}_cam'
-    hand_mcam = phy.m.camera(camera_name)
-    hand_vcam = mujoco.MjvCamera()
-    hand_vcam.type = mujoco.mjtCamera.mjCAMERA_FIXED
-    hand_vcam.fixedcamid = hand_mcam.id
+    camera_frame = camera_site_name
 
-    hand_r = MjRenderer(phy.m, cam=hand_vcam)
-    hand_rgbd = MjRGBD(hand_mcam, hand_r)
+    predictor = Predictor("model.pth")
+    tfw = TF2Wrapper()
 
-    t = 0
-    while True:
-        # TODO: use learned instance segmentation here
-        depth, rgb, rope_mask = mj_get_rgbd_and_rope_mask(d, hand_r, phy)
+    last_t = perf_counter()
+    for idx in range(50):
+        t = perf_counter()
+        dt = t - last_t
+        print(f"{dt=:.3f}")
 
-        rr.log_image("img/rgb", rgb)
-        rr.log_image("img/depth", np.clip(depth, 0, 1))
-        rr.log_image("img/rope_mask", rope_mask * 255)
+        # Set mujoco state to match the real robot
+        update_mujoco_qpos(phy, val)
 
-        # v in pixel space is x in camera space
-        # u in pixel space is y in camera space
-        rope_points_in_cam = get_masked_points(hand_rgbd, depth, rope_mask)
+        points_rgb, points_xyz, rgb = read_realsense(FAR_THRESHOLD, pipe)
+
+        if len(points_xyz) == 0:
+            print("No points found!")
+            continue
+
+        publish_pointcloud(camera_frame, pc_pub, points_rgb, points_xyz)
+
+        combined_mask = get_mask(predictor, rgb)
+
+        fig = plt.figure()
+        plt.imshow(rgb)
+        plt.imshow(combined_mask, alpha=0.3)
+        viz.fig(fig)
+        plt.close(fig)
+
+        points_xyz_masked = simple_hsv_mask(points_rgb, points_xyz)
+        rope_points_in_cam = points_xyz_masked
+
+        rope_points_in_cam = filter_by_volume(rope_points_in_cam)
 
         dcam_site = phy.d.site(camera_site_name)
 
@@ -116,160 +151,184 @@ def main():
         tool_site_pos = tool_site.xpos
 
         rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
-        from mjregrasping.rviz import plot_points_rviz
-        plot_points_rviz(viz.markers_pub, rope_points_in_tool[::100], idx=0, frame_id='right_tool_site',
-                         label='rope points in tool', s=0.1)
-        viz.viz(phy)
 
         gripper_q = phy.d.qpos[gripper_q_indices[tool_idx]]
-        # TODO: generalize getting a set of surface points for the gripper given tool_idx
-        finger_tips_in_world = []
-        for g_name in np.array(phy.o.rd.allowed_robot_collision_geoms_names).reshape(2, -1)[tool_idx]:
-            finger_tips_in_world.append(phy.d.geom(g_name).xpos)
-        finger_tips_in_world = np.array(finger_tips_in_world)
-        finger_tips_in_tool = transform_points(np.eye(3), np.zeros(3), tool_site.xmat.reshape(3, 3), tool_site.xpos,
-                                               finger_tips_in_world)
 
-        if t % 5 == 0:
-            from time import perf_counter
-            t0 = perf_counter()
-            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos,
-                                                                  rope_points_in_tool, sdf_np, sdf_grad_np,
-                                                                  sdf_origin_np, sdf_res_np, tool_frame_name,
-                                                                  phy=None, viz=None)
-            print(f'Computing grasp took {perf_counter() - t0:.3f} seconds')
+        grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool)
 
         radius = 0.01
         grasp_z_in_tool = grasp_mat_in_tool[:, 2]
         skeleton = make_ring_skeleton(grasp_pos_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
 
-        v_in_tool = get_v_in_tool(max_v_norm, skeleton, v_scale)
+        v_in_tool = get_v_in_tool(skeleton, v_scale, max_v_norm)
         v_in_world = tool2world_mat @ v_in_tool
 
-        ctrl, w_in_tool = get_jacobian_ctrl(phy, tool_site, grasp_mat_in_tool, v_in_tool)
+        ctrl, w_in_tool = get_jacobian_ctrl(phy, tool_site, grasp_mat_in_tool, v_in_tool, joint_indices,
+                                            w_scale=w_scale, jnt_lim_avoidance=jnt_lim_avoidance)
 
-        # grippers
+        # control gripper speed based on whether the tool has converged to the grasp pose
         lin_speed = np.linalg.norm(v_in_tool)
         ang_speed = np.linalg.norm(w_in_tool)
         gripper_q_mix = np.clip(12 * lin_speed + 0.3 * ang_speed, 0, 1)
         desired_gripper_q = gripper_q_mix * hp['finger_q_open'] + (1 - gripper_q_mix) * hp['finger_q_closed']
         gripper_gripper_vel = gripper_kp * (desired_gripper_q - gripper_q)
-        ctrl[gripper_ctrl_indices[tool_idx]] = gripper_gripper_vel
+        ctrl[-1] = gripper_gripper_vel
 
         # rescale to respect velocity limits
-        ctrl = rescale_ctrl(phy, ctrl)
+        ctrl = rescale_ctrl(phy, ctrl, act_indices)
 
-        control_step(phy, ctrl, 0.02)
+        full_ctrl = np.zeros(phy.m.nu)
+        full_ctrl[act_indices] = ctrl
 
         # send commands to the robot
-        val.send_vel_command(phy.m, ctrl)
+        val.send_vel_command(phy.m, full_ctrl)
 
+        plot_points_rviz(viz.markers_pub, rope_points_in_cam, idx=0, frame_id=camera_frame, label='rope_in_cam', s=0.2)
+        plot_points_rviz(viz.markers_pub, rope_points_in_tool, idx=0, frame_id=tool_site_name,
+                         label='rope points in tool', s=0.1)
         viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
         viz.arrow("v", tool_site_pos, v_in_world, 'w')
         q_wxyz = np.zeros(4)
         mujoco.mju_mat2Quat(q_wxyz, grasp_mat_in_tool.flatten())
-        viz.tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
-        viz.viz(phy)
+        tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
 
         if is_grasp_complete(gripper_q, desired_gripper_q):
+            val.stop()
             print("Grasp successful!")
             break
 
+        last_t = t
+
+    pipe.stop()
     val.stop()
 
 
-def get_best_grasp(finger_tips_in_tool, tool2world_mat, tool_site_pos, rope_points_in_tool, sdf_np, sdf_grad_np,
-                   sdf_origin_np, sdf_res_np, tool_frame_name, phy=None, viz=None):
-    # Hyperparameters
-    sdf_weight = 0.02
-    sdf_exp = 50
-    align_weight = 0.1
+def filter_by_volume(rope_points_in_cam):
+    # convert rope_points_in_cam to open3d pointcloud so we can do clustering and stuff
+    pcd = o3d.geometry.PointCloud()
+    pcd.points = o3d.utility.Vector3dVector(rope_points_in_cam)
+    # cluster the points
+    min_points = 50
+    labels = np.array(pcd.cluster_dbscan(eps=0.02, min_points=min_points, print_progress=False))
+    max_label = labels.max()
+    # colors = plt.get_cmap("tab20")(labels / (max_label if max_label > 0 else 1))
+    # colors[labels < 0] = 0
+    # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
+    # o3d.visualization.draw_geometries([pcd])
+    # Score each cluster by the volume and aspect ratio of its bounding box
+    best_cluster = None
+    best_cluster_pcd = None
+    best_volume = 0
+    for label in range(max_label + 1):
+        cluster_mask = labels == label
+        cluster_points = rope_points_in_cam[cluster_mask]
+        cluster_pcd = o3d.geometry.PointCloud()
+        cluster_pcd.points = o3d.utility.Vector3dVector(cluster_points)
+        try:
+            bbox = cluster_pcd.get_oriented_bounding_box()
+            bbox_volume = bbox.volume()
+            if bbox_volume > best_volume:
+                best_volume = bbox_volume
+                best_cluster = cluster_points
+                best_cluster_pcd = cluster_pcd
+        except RuntimeError:
+            pass  # Qhull precision error
+    # o3d.visualization.draw_geometries([best_cluster_pcd])
+    return best_cluster
 
-    # Context needed to compute the cost
-    finger_tips_in_tool_torch = torch.from_numpy(finger_tips_in_tool)
-    tool2world_mat_torch = torch.from_numpy(tool2world_mat)
-    tool_site_pos_torch = torch.from_numpy(tool_site_pos)
-    sdf_torch = torch.from_numpy(sdf_np)
-    sdf_grad_torch = torch.from_numpy(sdf_grad_np)
-    sdf_origin = torch.tensor(sdf_origin_np, dtype=torch.float64)
-    sdf_res = torch.tensor(sdf_res_np, dtype=torch.float64)
+
+def get_mask(predictor, rgb):
+    predictions = predictor.predict(rgb)
+    combined_mask = np.zeros(rgb.shape[:2], dtype=bool)
+    for p in predictions:
+        if p['class'] == 'red_cable':
+            binary_mask = p['mask'] > 0.5
+            combined_mask = combined_mask | binary_mask
+    return combined_mask
+
+
+def publish_pointcloud(camera_frame, pc_pub, points_rgb, points_xyz):
+    r, g, b = points_rgb.T
+    points_xyzrgb_rec = np.rec.fromarrays([*points_xyz.T, r, g, b], names='x,y,z,r,g,b')
+    points_xyzrgb_rec = merge_rgb_fields(points_xyzrgb_rec)
+    pc_msg = ros_numpy.msgify(PointCloud2, points_xyzrgb_rec, stamp=rospy.Time.now(), frame_id=camera_frame)
+    pc_pub.publish(pc_msg)
+
+
+def read_realsense(FAR_THRESHOLD, pipe):
+    frames = pipe.wait_for_frames()
+    align = rs.align(rs.stream.color)
+    aligned_frames = align.process(frames)
+    rgb_frame = aligned_frames.first(rs.stream.color)
+    rgb = np.asanyarray(rgb_frame.get_data())
+    depth_frame = aligned_frames.get_depth_frame()
+    # save for training
+    # now = int(time())
+    # Image.fromarray(rgb).save(f"imgs/rgb_{now}.png")
+    pc = rs.pointcloud()
+    pc.map_to(rgb_frame)
+    points_frame = pc.calculate(depth_frame)
+    points_xyz = np.asanyarray(points_frame.get_vertices()).view(np.float32).reshape(-1, 3)
+    points_rgb_uvs_float = np.asanyarray(points_frame.get_texture_coordinates()).view(np.float32).reshape(-1, 2)
+    points_rgb_uvs_float = (points_rgb_uvs_float * rgb.shape[:2][::-1] + 0.5).astype(np.uint32)
+    # remove points that are all zero or too far away
+    point_dists = np.linalg.norm(points_xyz, axis=1)
+    is_valid = ~np.all(points_xyz == 0, axis=1) & (point_dists < FAR_THRESHOLD)
+    points_xyz = points_xyz[is_valid]
+    points_rgb_uvs_float = points_rgb_uvs_float[is_valid]
+    points_rgb = rgb[points_rgb_uvs_float[:, 1], points_rgb_uvs_float[:, 0]]
+    return points_rgb, points_xyz, rgb
+
+
+def update_mujoco_qpos(phy, val):
+    js = val.get_latest_joint_state()
+    for name, pos in zip(js.name, js.position):
+        joint = phy.m.joint(name)
+        mj_qpos_idx = joint.qposadr[0]
+        phy.d.qpos[mj_qpos_idx] = pos
+    phy.d.act = val_dedup(js.position)
+    mujoco.mj_forward(phy.m, phy.d)
+
+
+def simple_hsv_mask(points_rgb, points_xyz):
+    points_hsv = cv2.cvtColor(points_rgb[None], cv2.COLOR_RGB2HSV)[0]
+    mask_indices = np.where((points_hsv[:, 0] < 10) & (points_hsv[:, 1] > 50))[0]
+    points_xyz_masked = points_xyz[mask_indices]
+    return points_xyz_masked
+
+
+def get_best_grasp(rope_points_in_tool):
     rope_points_in_tool_torch = torch.from_numpy(rope_points_in_tool)
 
     # Take the closest point to the tool tip, which is where the grippers will close
     distances = np.linalg.norm(rope_points_in_tool, axis=-1)
     closest_idx = np.argmin(distances)
     grasp_pos_in_tool = rope_points_in_tool[closest_idx]
-    grasp_pos_in_tool_torch = torch.from_numpy(grasp_pos_in_tool)
 
     # use PCA to extract the long (x) direction of the rope
     _, _, V = torch.pca_lowrank(rope_points_in_tool_torch)
     rope_x_in_tool = V[:, 0]
     grasp_mat_in_tool = np.eye(3)
 
-    # Outer loop, we adjust the closest_xyz_in_tool_torch
-    for _ in range(3):
-        # Inner loop, optimize orientation. Using pymanopt to optimize both did not work well for me
-        # Create a manifold that is 3D Euclidean space plus SO(3) rotations
-        SO3 = SpecialOrthogonalGroup(3)
-        manifold = SO3
+    SO3 = SpecialOrthogonalGroup(3)
+    manifold = SO3
 
-        @pymanopt.function.pytorch(manifold)
-        def cost(mat):
-            new_finger_tips_in_tool = batch_rotate_and_translate(finger_tips_in_tool_torch, mat,
-                                                                 grasp_pos_in_tool_torch)
-            new_finger_tips_in_world = batch_rotate_and_translate(new_finger_tips_in_tool, tool2world_mat_torch,
-                                                                  tool_site_pos_torch)
-            # TODO: do a bilinear interpolation to get a more accurate SDF value given a low res grid?
-            #  or just make the grid a lower resolution?
-            tip_dists = sdf_lookup(sdf_torch, sdf_grad_torch, sdf_origin, sdf_res, new_finger_tips_in_world)
-            d_to_contact = torch.exp(-sdf_exp * tip_dists).max() * sdf_weight
-            candidate_grasp_x = mat[:, 0]
-            x_align = -torch.abs(torch.dot(candidate_grasp_x, rope_x_in_tool)) * align_weight
+    @pymanopt.function.pytorch(manifold)
+    def cost(mat):
+        candidate_grasp_x = mat[:, 0]
+        x_align = -torch.abs(torch.dot(candidate_grasp_x, rope_x_in_tool))
 
-            # visualize the candidate grasp
-            if viz and phy and not (torch.isnan(mat).any()):
-                q_wxyz = np.zeros(4)
-                mujoco.mju_mat2Quat(q_wxyz, mat.flatten().detach().numpy())
-                viz.tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'candidate_grasp')
-                contact_color = cm.RdYlGn(np.clip(1 - d_to_contact.detach().numpy() * 0.3, 0, 1))
-                viz.points(f'finger tips', new_finger_tips_in_world.detach().numpy(), contact_color, radius=0.02)
-                try:
-                    sdf_grads = sdf_grad_torch[
-                        torch.unbind(point_to_idx_torch(new_finger_tips_in_world, sdf_origin, sdf_res), 1)]
-                    for i, grad_i in enumerate(sdf_grads):
-                        viz.arrow(f'sdf_grad{i}', new_finger_tips_in_world[i], grad_i * sdf_weight, 'w')
-                except IndexError:
-                    pass
-                viz.viz(phy)
+        total_cost = sum([
+            x_align,
+        ])
+        return total_cost
 
-            total_cost = sum([
-                d_to_contact,
-                x_align,
-            ])
-            return total_cost
+    problem = pymanopt.Problem(manifold, cost)
+    optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=15, min_step_size=5e-4, verbosity=0)
+    result = optimizer.run(problem, initial_point=grasp_mat_in_tool)
+    grasp_mat_in_tool = result.point
 
-        problem = pymanopt.Problem(manifold, cost)
-        verbosity = 2 if viz else 0
-        optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=10, min_step_size=1e-3, verbosity=verbosity)
-        result = optimizer.run(problem, initial_point=grasp_mat_in_tool)
-        grasp_mat_in_tool = result.point
-
-        new_finger_tips_in_tool = batch_rotate_and_translate(finger_tips_in_tool, grasp_mat_in_tool, grasp_pos_in_tool)
-        new_finger_tips_in_world = batch_rotate_and_translate(new_finger_tips_in_tool, tool2world_mat, tool_site_pos)
-        # Try to move the rope deeper in between the fingers of the gripper so the grasp is more stable
-        good_grasp_weight = 0.01
-        good_grasp_grad = grasp_mat_in_tool[:, 2] * good_grasp_weight
-        # But also don't move out of penetration if the SDF value is low
-        sdf_indices = tuple(point_to_idx_np(new_finger_tips_in_world, sdf_origin_np, sdf_res_np).T)
-        tip_dists = sdf_np[sdf_indices]
-        min_tip_dist_i = tip_dists.argmin()
-        min_tip_dist = tip_dists.min()
-        sdf_grad_in_world = sdf_grad_np[sdf_indices][min_tip_dist_i] * min_tip_dist
-        sdf_grad_in_tool = tool2world_mat.T @ sdf_grad_in_world
-        if min_tip_dist <= sdf_res_np:
-            grasp_mat_in_tool += sdf_grad_in_tool
-        else:
-            grasp_pos_in_tool += good_grasp_grad
+    grasp_pos_in_tool += grasp_mat_in_tool[:, 2] * 0.01  # helps grasp deeper in the gripper
 
     return grasp_mat_in_tool, grasp_pos_in_tool
 
@@ -287,7 +346,7 @@ def mj_get_rgbd_and_rope_mask(d, hand_r, phy):
     return depth, rgb, rope_mask
 
 
-def get_v_in_tool(max_v_norm, skeleton, v_scale):
+def get_v_in_tool(skeleton, v_scale, max_v_norm):
     # b points in the right direction, but b gets bigger when you get closer, but we want it to get smaller
     # since we're doing everything in tool frame, the tool is always at the origin, so query the field at (0,0,0)
     b = skeleton_field_dir(skeleton, np.zeros([1, 3]))[0]
@@ -301,7 +360,7 @@ def get_v_in_tool(max_v_norm, skeleton, v_scale):
 
 
 def is_grasp_complete(gripper_q, desired_gripper_q):
-    return gripper_q < hp['finger_q_closed'] * 1.15 and desired_gripper_q < hp['finger_q_closed'] * 1.15
+    return gripper_q < hp['finger_q_closed'] * 1.2 and desired_gripper_q < hp['finger_q_closed'] * 1.2
 
 
 def get_masked_points(rgbd: MjRGBD, depth: np.ndarray, mask: np.ndarray):
@@ -312,6 +371,18 @@ def get_masked_points(rgbd: MjRGBD, depth: np.ndarray, mask: np.ndarray):
     zs = depth
     xyz_in_cam = np.stack([xs, ys, zs], axis=1)
     return xyz_in_cam
+
+
+def rescale_ctrl(phy, ctrl, act_indices=None):
+    vmin = phy.m.actuator_ctrlrange[act_indices, 0]
+    vmax = phy.m.actuator_ctrlrange[act_indices, 1]
+    if np.any(ctrl > vmax):
+        offending_joint = np.argmax(ctrl)
+        ctrl = ctrl / np.max(ctrl) * vmax[offending_joint]
+    if np.any(ctrl < vmin):
+        offending_joint = np.argmin(ctrl)
+        ctrl = ctrl / np.min(ctrl) * vmin[offending_joint]
+    return ctrl
 
 
 if __name__ == '__main__':
