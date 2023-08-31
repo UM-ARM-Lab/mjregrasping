@@ -1,4 +1,7 @@
 <mujoco model="untangle">
+    <visual>
+        <scale contactwidth="0.02" contactheight="0.005"/>
+    </visual>
     <default>
         <joint stiffness="0.5"/>
         <geom friction="0.01"/>

@@ -33,7 +33,7 @@ def make_clear_marker():
 class MjRViz:
     def __init__(self, xml_path: Path, tfw: Optional[TF2Wrapper] = None):
         self.tfw = tfw
-        self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
+        self.mj_xml_parser = MujocoXmlExpander(xml_path)
 
         self.eq_constraints_pub = rospy.Publisher("eq_constraints", MarkerArray, queue_size=10)
         self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
@@ -460,7 +460,7 @@ def plot_ring_rviz(pub, ring_position, ring_z_axis, radius, idx=0):
     pub.publish(markers_msg)
 
 
-class MujocoXmlMeshParser:
+class MujocoXmlExpander:
 
     def __init__(self, xml_path: Path):
         self.xml_path = xml_path
@@ -471,6 +471,10 @@ class MujocoXmlMeshParser:
             with open(f'models/{file}', 'r') as include_file:
                 include_root = ET.fromstring(include_file.read())
                 self.xml_root.extend(include_root)
+
+        # remove include elements now that they've been "included"
+        for include in self.xml_root.findall('include'):
+            self.xml_root.remove(include)
 
     def get_mesh(self, mesh_name):
         for asset in self.xml_root.findall("asset"):

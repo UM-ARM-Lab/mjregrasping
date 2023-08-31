@@ -4,22 +4,19 @@ This baseline is inspired by TAMPC
  - traps are points in 3D, with no action, corresponding to the location of the grasped points on the rope.
  - trap cost is thus the total distance between the candidate grasp locations and the trap locations
 """
-from typing import Dict, Optional
+from typing import Dict
 
 import numpy as np
 
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, SimGraspCandidate, rr_log_costs, \
-    get_geodesic_dist
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.regrasp_planner_utils import get_geodesic_dist, SimGraspCandidate
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.viz import Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
@@ -35,11 +32,10 @@ class ExploreLocsRegraspPlanner(HomotopyRegraspPlanner):
             if loc_i != -1:
                 self.trap_locs.append(loc_i)
 
-    def cost(self, sim_grasp: SimGraspCandidate):
+    def costs(self, sim_grasp: SimGraspCandidate):
         initial_locs = sim_grasp.initial_locs
         phy_plan = sim_grasp.phy
         candidate_locs = sim_grasp.locs
-        candidate_dxpos = sim_grasp.candidate_dxpos
         res = sim_grasp.res
         strategy = sim_grasp.strategy
 
@@ -47,12 +43,10 @@ class ExploreLocsRegraspPlanner(HomotopyRegraspPlanner):
         same_locs = abs(initial_locs - candidate_locs) < hp['grasp_loc_diff_thresh']
         not_stay = strategy != Strategies.STAY
         if np.any(same_locs & not_stay):
-            cost = 10 * BIG_PENALTY
-            return cost
+            return 10 * BIG_PENALTY, 0, 0, 0
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
-            cost = 10 * BIG_PENALTY
-            return cost
+            return 10 * BIG_PENALTY, 0, 0, 0
 
         # for the candidate grasp locations, get the corresponding xpos
         # then compute the distance matrix between the candidate xposes and the trap xposes
@@ -65,9 +59,9 @@ class ExploreLocsRegraspPlanner(HomotopyRegraspPlanner):
             dists = pairwise_squared_distances(valid_candidate_locs_2d, trap_locs_2d)
             mean_dists = np.mean(dists, axis=1)
             trap_cost = np.sum(np.exp(-mean_dists) * hp['trap_weight'])
-            trap_xpos = grasp_locations_to_xpos(phy_plan, self.trap_locs)
-            if viz:
-                viz.points('traps', trap_xpos, color='r', radius=0.04)
+            # trap_xpos = grasp_locations_to_xpos(phy_plan, self.trap_locs)
+            # if viz:
+            #     viz.points('traps', trap_xpos, color='r', radius=0.04)
 
         geodesics_cost = get_geodesic_dist(candidate_locs, self.op_goal) * hp['geodesic_weight']
 
@@ -78,24 +72,7 @@ class ExploreLocsRegraspPlanner(HomotopyRegraspPlanner):
             dq += np.linalg.norm(np.array(plan_pos) - np.array(prev_plan_pos))
         dq_cost = np.clip(dq, 0, BIG_PENALTY / 2) * hp['robot_dq_weight']
 
-        cost = sum([
-            dq_cost,
-            trap_cost,
-            geodesics_cost,
-        ])
+        return 0, dq_cost, trap_cost, geodesics_cost
 
-        rr_log_costs(entity_path='regrasp_costs', entity_paths=[
-            'regrasp_costs/dq_cost',
-            'regrasp_costs/trap_cost',
-            'regrasp_costs/geodesics_cost',
-        ], values=[
-            dq_cost,
-            trap_cost,
-            geodesics_cost,
-        ], colors=[
-            [0.5, 0.5, 0, 1.0],
-            [0, 1, 0, 1.0],
-            [1, 0, 0, 1.0],
-        ])
-
-        return cost
+    def get_cost_names(self):
+        return ['penalty', 'dq', 'trap', 'geodesics']

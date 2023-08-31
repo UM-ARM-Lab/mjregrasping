@@ -9,7 +9,8 @@ import rospy
 from arc_utilities import ros_init
 from mjregrasping.goals import point_goal_from_geom, GraspLocsGoal
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, get_geodesic_dist
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.physics import get_q
 from mjregrasping.rollout import control_step

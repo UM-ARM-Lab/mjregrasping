@@ -7,7 +7,7 @@ from mujoco import mjtGeom, mj_id2name
 from vedo import Plotter, Video, ProgressBarWidget, Box, Cylinder, Sphere, load, Points, Light
 
 from mjregrasping.physics import Physics
-from mjregrasping.rviz import MujocoXmlMeshParser
+from mjregrasping.rviz import MujocoXmlExpander
 
 COLORS = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'w']
 
@@ -15,7 +15,7 @@ COLORS = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'w']
 class MjVedo:
 
     def __init__(self, xml_path, fps=60):
-        self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
+        self.mj_xml_parser = MujocoXmlExpander(xml_path)
         self.fps = fps
 
         self.plotter = Plotter(title="drone_example", axes=1)

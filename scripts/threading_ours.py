@@ -26,11 +26,11 @@ from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.viz import make_viz
 
 
-@ros_init.with_ros("cable_harness")
+@ros_init.with_ros("threading")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    rr.init('cable_harness')
+    rr.init('threading')
     rr.connect()
 
     scenario = threading
@@ -66,7 +66,7 @@ def main():
     ]
 
     viz = make_viz(scenario)
-    for i in range(1, 10):
+    for i in range(0, 10):
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))

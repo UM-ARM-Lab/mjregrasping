@@ -1,3 +1,4 @@
+import pickle
 import sys
 import time
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import control_step, limit_actuator_windup, slow_when_eqs_bad
-from mjregrasping.scenarios import threading, setup_threading
+from mjregrasping.scenarios import threading, setup_threading, val_untangle
 from mjregrasping.viz import make_viz
 from ros_numpy import numpify, msgify
 
@@ -112,28 +113,30 @@ class InteractiveControls(QMainWindow):
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
     rospy.init_node("interactive_viewer")
-    scenario = threading
-    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+    scenario = val_untangle
 
     rr.init("viewer")
     rr.connect()
 
+    trial_idx = 0
     viz = make_viz(scenario)
-    d = mujoco.MjData(m)
-    # state_path = Path("states/CableHarness/init0.pkl")
-    # d = load_data_and_eq(m, state_path, True)
-    phy = Physics(m, d, objects=MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-    setup_threading(phy, viz)
+    trials_root = Path("trial_data") / scenario.name
+    trial_path = trials_root / f"{scenario.name}_{trial_idx}.pkl"
+    with trial_path.open("rb") as f:
+        trial_info = pickle.load(f)
+    phy_path = trial_info['phy_path']
+    with phy_path.open("rb") as f:
+        phy_loaded = pickle.load(f)
 
+    new_d = mujoco.MjData(phy_loaded.m)
+    phy = Physics(phy_loaded.m, new_d, phy_loaded.o)
 
     left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)
     right_im = Basic3DPoseInteractiveMarker(name='right', scale=0.1)
     init_im_pose(left_im, phy, 'left_tool')
     init_im_pose(right_im, phy, 'right_tool')
 
-    root = Path(f"states/{scenario.name}")
-    root.mkdir(exist_ok=True, parents=True)
-    with mujoco.viewer.launch_passive(m, d) as viewer:
+    with mujoco.viewer.launch_passive(phy.m, phy.d) as viewer:
         with viewer.lock():
             viewer.scn.flags[mujoco.mjtRndFlag.mjRND_SHADOW] = 0
 
@@ -147,7 +150,7 @@ def main():
         recording_path.mkdir(exist_ok=True, parents=True)
 
         dt = phy.m.opt.timestep * 10
-        n_sub_time = int(dt / m.opt.timestep)
+        n_sub_time = int(dt / phy.m.opt.timestep)
 
         def _update_sim():
             nonlocal is_recording, ims_enabled
@@ -172,9 +175,9 @@ def main():
             gripper_vel = 0.1
             grasp_n_steps = 25
             if latest_cmd == CmdType.SAVE:
-                path = root / f"{controls_window.save_filename}.pkl"
-                print(f"Saving to {path}")
-                save_data_and_eq(phy, path)
+                print(f"Saving disabled")
+                # path = root / f"{controls_window.save_filename}.pkl"
+                # save_data_and_eq(phy, path)
             elif latest_cmd == CmdType.GRASP:
                 activate_grasp(phy, controls_window.eq_name, controls_window.loc)
                 if 'left' in controls_window.eq_name:
@@ -212,17 +215,17 @@ def main():
                 init_im_pose(right_im, phy, 'right_tool')
 
             if is_recording:
-                if int(d.time * 10) % 10 == 0:
+                if int(phy.d.time * 10) % 10 == 0:
                     now = int(time.time())
                     path = recording_path / f"{now}.pkl"
                     save_data_and_eq(phy, path)
 
             # Now step the simulation
             if ims_enabled:
-                d.ctrl = ctrl
+                phy.d.ctrl = ctrl
             slow_when_eqs_bad(phy)
             limit_actuator_windup(phy)
-            mujoco.mj_step(m, d, nstep=n_sub_time)
+            mujoco.mj_step(phy.m, phy.d, nstep=n_sub_time)
 
             # ensure events are processed only once
             controls_window.latest_cmd = None
@@ -232,7 +235,7 @@ def main():
 
         timer = QTimer()
         timer.timeout.connect(_update_sim)
-        sim_step_ms = int(m.opt.timestep * 1000)
+        sim_step_ms = int(phy.m.opt.timestep * 1000)
         timer.start(sim_step_ms)
 
         sys.exit(app.exec())

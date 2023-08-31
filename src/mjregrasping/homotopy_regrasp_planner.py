@@ -1,7 +1,4 @@
-import itertools
-from dataclasses import dataclass
-from time import perf_counter
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 
 import numpy as np
 import rerun as rr
@@ -10,53 +7,18 @@ from pymjregrasping_cpp import seedOmpl
 from mjregrasping.goal_funcs import get_rope_points, locs_eq
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
-from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.regrasp_planner_utils import get_geodesic_dist, get_all_strategies_from_phy, SimGraspCandidate, \
+    SimGraspInput
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.viz import Viz
-from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
-
-
-@dataclass
-class SimGraspCandidate:
-    phy0: Physics
-    phy: Physics
-    strategy: List[Strategies]
-    res: MotionPlanResponse
-    locs: np.ndarray
-    candidate_dxpos: np.ndarray
-    tool_paths: np.ndarray
-    initial_locs: np.ndarray
-
-
-@dataclass
-class SimGraspInput:
-    strategy: List[Strategies]
-    candidate_locs: np.ndarray
-    candidate_dxpos: np.ndarray
-
-
-def _timeit(f):
-    def __timeit(*args, **kwargs):
-        t0 = perf_counter()
-        ret = f(*args, **kwargs)
-        t1 = perf_counter()
-        print(f'evaluating regrasp cost: {t1 - t0:.2f}s')
-        return ret
-
-    return __timeit
-
-
-def rr_log_costs(entity_path, entity_paths, values, colors):
-    for path_i, v_i, color_i in zip(entity_paths, values, colors):
-        rr.log_scalar(f'{entity_path}/{path_i}', v_i, color=color_i)
-    rr.log_scalar(f'{entity_path}/total', sum(values), color=[1, 1, 1, 1.0])
+from moveit_msgs.msg import MoveItErrorCodes
 
 
 class HomotopyRegraspPlanner:
@@ -89,7 +51,7 @@ class HomotopyRegraspPlanner:
     def simulate_grasps(self, grasps_inputs, phy, viz, viz_execution):
         sim_grasps = []
         for grasp_input in grasps_inputs:
-            sim_grasp = simulate_grasp(self.grasp_rrt, phy, viz, grasp_input, self.rng, viz_execution)
+            sim_grasp = self.simulate_grasp(phy, viz, grasp_input, viz_execution)
             sim_grasps.append(sim_grasp)
         return sim_grasps
 
@@ -107,19 +69,15 @@ class HomotopyRegraspPlanner:
                 else:
                     sample_loc = self.rng.uniform(0, 1)
                 candidate_locs = []
-                candidate_dxpos = []
                 for tool_name, s_i, is_grasping_i in zip(phy.o.rd.tool_sites, strategy, is_grasping):
                     if s_i in [Strategies.NEW_GRASP, Strategies.MOVE]:
                         candidate_locs.append(sample_loc)
-                        candidate_dxpos.append(self.rng.uniform(-0.15, 0.15, size=3))  # TODO: add waypoint
                     elif s_i in [Strategies.RELEASE, Strategies.STAY]:
                         candidate_locs.append(-1)
-                        candidate_dxpos.append(np.zeros(3))
 
                 candidate_locs = np.array(candidate_locs)
-                candidate_dxpos = np.array(candidate_dxpos)
 
-                grasps_inputs.append(SimGraspInput(strategy, candidate_locs, candidate_dxpos))
+                grasps_inputs.append(SimGraspInput(strategy, candidate_locs))
         return grasps_inputs
 
     def get_best(self, sim_grasps, viz: Optional[Viz]) -> SimGraspCandidate:
@@ -139,12 +97,12 @@ class HomotopyRegraspPlanner:
         if not viz:
             return best_sim_grasp
 
+        cost_names = self.get_cost_names()
         for i, (sim_grasp, costs_list) in enumerate(zip(sorted_grasps, sorted_cost_lists)):
             rr.set_time_sequence('regrasp_planner', i)
             viz.viz(sim_grasp.phy, is_planning=True)
             cost_i = sum(costs_list)
             rr.log_tensor('homotopy_costs', [BIG_PENALTY, cost_i] + list(costs_list))
-            cost_names = ["penalty", "dq", "drope", "homotopy", "geodesic"]
             msg = " ".join([f"{name}: {cost:.2f}" for name, cost in zip(cost_names, costs_list)])
             rr.log_tensor('homotopy_costs', msg)
 
@@ -155,7 +113,6 @@ class HomotopyRegraspPlanner:
         initial_locs = sim_grasp.initial_locs
         phy_plan = sim_grasp.phy
         candidate_locs = sim_grasp.locs
-        candidate_dxpos = sim_grasp.candidate_dxpos
         res = sim_grasp.res
         strategy = sim_grasp.strategy
 
@@ -164,14 +121,10 @@ class HomotopyRegraspPlanner:
         not_stay = strategy != Strategies.STAY
         if np.any(same_locs & not_stay):
             cost = 10 * BIG_PENALTY
-            # print(candidate_locs, cost)
-            # rr.log_text_entry(f'homotopy_costs', f'TOO CLOSE {candidate_locs} {strategy} {cost}')
             return cost, 0, 0, 0, 0
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
             cost = 10 * BIG_PENALTY
-            # print(candidate_locs, cost)
-            # rr.log_text_entry(f'homotopy_costs', f'NO PLAN {candidate_locs} {strategy} {cost}')
             return cost, 0, 0, 0, 0
 
         homotopy_cost = 0
@@ -197,118 +150,39 @@ class HomotopyRegraspPlanner:
 
         return 0, dq_cost, drope_cost, homotopy_cost, geodesics_cost
 
+    def get_cost_names(self):
+        return ["penalty", "dq", "drope", "homotopy", "geodesic"]
+
     def cost(self, sim_grasp: SimGraspCandidate):
         costs = self.costs(sim_grasp)
         return sum(costs)
 
+    def simulate_grasp(self, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, viz_execution=False):
+        strategy = grasp_input.strategy
+        candidate_locs = grasp_input.candidate_locs
+        initial_locs = get_grasp_locs(phy)
 
-def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, rng,
-                   viz_execution=False):
-    strategy = grasp_input.strategy
-    candidate_locs = grasp_input.candidate_locs
-    candidate_dxpos = grasp_input.candidate_dxpos
-    initial_locs = get_grasp_locs(phy)
+        viz = viz if viz_execution else None
+        phy_plan = phy.copy_all()
 
-    viz = viz if viz_execution else None
-    phy_plan = phy.copy_all()
+        # release and settle for any moving grippers
+        release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
 
-    candidate_pos = grasp_locations_to_xpos(phy_plan, candidate_locs)
-    tool_paths = get_tool_paths(candidate_pos, candidate_dxpos)
+        res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
-    # release and settle for any moving grippers
-    release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
+        if res.error_code.val != MoveItErrorCodes.SUCCESS:
+            return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+        print(f"plan has {len(res.trajectory.joint_trajectory.points)} points")
 
-    res, scene_msg = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
+        if viz_execution and viz is not None:
+            self.grasp_rrt.display_result(viz, res, scene_msg)
 
-    if res.error_code.val != MoveItErrorCodes.SUCCESS:
-        return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths,
-                                 initial_locs)
-    print(f"plan has {len(res.trajectory.joint_trajectory.points)} points")
+        # Teleport to the final planned joint configuration
+        teleport_to_end_of_plan(phy_plan, res)
+        if viz_execution:
+            viz.viz(phy_plan, is_planning=True)
 
-    if viz_execution and viz is not None:
-        grasp_rrt.display_result(viz, res, scene_msg)
+        # Activate grasps
+        grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
 
-    # Teleport to the final planned joint configuration
-    teleport_to_end_of_plan(phy_plan, res)
-    if viz_execution:
-        viz.viz(phy_plan, is_planning=True)
-
-    # Activate grasps
-    grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
-
-    # TODO: also use RRT to plan the dxpos motions
-    return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, candidate_dxpos, tool_paths, initial_locs)
-
-
-def get_tool_paths(candidate_pos, candidate_dxpos):
-    candidate_subgoals = candidate_pos[:, None] + candidate_dxpos
-    tool_paths = np.concatenate((candidate_pos[:, None], candidate_subgoals), axis=1)
-    return tool_paths
-
-
-def get_geodesic_dist(locs, op_goal: ObjectPointGoal):
-    return np.min(np.abs(locs - op_goal.loc))
-
-
-def get_will_be_grasping(s: Strategies, is_grasping: bool):
-    if is_grasping:
-        return s in [Strategies.STAY, Strategies.MOVE]
-    else:
-        return s in [Strategies.NEW_GRASP]
-
-
-def get_all_strategies_from_phy(phy: Physics):
-    current_is_grasping = get_is_grasping(phy)
-    return get_all_strategies(phy.o.rd.n_g, current_is_grasping)
-
-
-def get_all_strategies(n_g: int, current_is_grasping: np.ndarray):
-    strategies_per_gripper = []
-    for i in range(n_g):
-        is_grasping_i = current_is_grasping[i]
-        strategies = []
-        for strategy in Strategies:
-            if strategy == Strategies.NEW_GRASP:
-                if is_grasping_i:
-                    continue  # not valid
-                else:
-                    strategies.append(strategy)
-            elif strategy == Strategies.RELEASE:
-                if not is_grasping_i:
-                    continue  # not valid
-                else:
-                    strategies.append(strategy)
-            elif strategy == Strategies.MOVE:
-                if not is_grasping_i:
-                    continue  # not valid
-                else:
-                    strategies.append(strategy)
-            elif strategy == Strategies.STAY:
-                strategies.append(strategy)
-            else:
-                raise NotImplementedError(strategy)
-        strategies_per_gripper.append(strategies)
-
-    all_strategies = list(itertools.product(*strategies_per_gripper))
-
-    # filter out invalid strategies
-    all_strategies = [s_i for s_i in all_strategies if is_valid_strategy(s_i, current_is_grasping)]
-    # convert to numpy arrays
-    all_strategies = np.array(all_strategies)
-    return all_strategies
-
-
-def is_valid_strategy(s, is_grasping):
-    will_be_grasping = [get_will_be_grasping(s_i, g_i) for s_i, g_i in zip(s, is_grasping)]
-    if not any(will_be_grasping):
-        return False
-    if all([s_i == Strategies.STAY for s_i in s]):
-        return False
-    if all([s_i == Strategies.RELEASE for s_i in s]):
-        return False
-    if sum([s_i in [Strategies.MOVE, Strategies.NEW_GRASP] for s_i in s]) > 1:
-        return False
-    # NOTE: the below condition prevents strategies such as [NEW_GRASP, RELEASE]
-    # if len(s) > 1 and any([s_i == Strategies.NEW_GRASP for s_i in s]) and any([s_i == Strategies.RELEASE for s_i in s]):
-    #     return False
-    return True
+        return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)

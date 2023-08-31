@@ -14,7 +14,7 @@ from trimesh.creation import box, cylinder
 from mjregrasping.grasping import get_eq_points
 from mjregrasping.my_transforms import np_wxyz_to_xyzw
 from mjregrasping.physics import Physics, get_total_contact_force, get_parent_child_names
-from mjregrasping.rviz import MujocoXmlMeshParser
+from mjregrasping.rviz import MujocoXmlExpander
 
 logger = logging.getLogger(f'rosout.{__name__}')
 
@@ -30,7 +30,7 @@ def init():
 class MjReRun:
 
     def __init__(self, xml_path):
-        self.mj_xml_parser = MujocoXmlMeshParser(xml_path)
+        self.mj_xml_parser = MujocoXmlExpander(xml_path)
         init()
 
     def viz(self, phy: Physics, is_planning=False, detailed=False):

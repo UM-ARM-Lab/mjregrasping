@@ -4,42 +4,37 @@ This baseline is inspired by task and motion planning methods (Not to be confuse
 The idea is that to evaluate the cost of a feasibile grasp,
 we simply run our MPPI planner for a fixed horizon and take the final/accumulated cost.
 """
-from typing import Dict, Optional
+import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
+from typing import Optional, Dict
 
 import numpy as np
 
-from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_checker import CollisionChecker, AllowablePenetration
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, SimGraspCandidate, rr_log_costs, \
-    get_geodesic_dist
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.regrasp_planner_utils import SimGraspCandidate, SimGraspInput
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
+from mjregrasping.physics import Physics
+from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics
+from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
+from mjregrasping.scenarios import val_untangle, Scenario
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
 class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
-    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+    def __init__(self, scenario: Scenario, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
         super().__init__(op_goal, grasp_rrt, skeletons, seed)
-        self.trap_locs = []
+        self.scenario = scenario
 
-    def update_blacklists(self, phy):
-        locs = get_grasp_locs(phy)
-        for loc_i in locs:
-            if loc_i != -1:
-                self.trap_locs.append(loc_i)
-
-    def cost(self, sim_grasp: SimGraspCandidate):
+    def costs(self, sim_grasp: SimGraspCandidate):
         initial_locs = sim_grasp.initial_locs
         phy_plan = sim_grasp.phy
         candidate_locs = sim_grasp.locs
-        candidate_dxpos = sim_grasp.candidate_dxpos
         res = sim_grasp.res
         strategy = sim_grasp.strategy
 
@@ -54,48 +49,27 @@ class TAMPRegraspPlanner(HomotopyRegraspPlanner):
             cost = 10 * BIG_PENALTY
             return cost
 
-        # for the candidate grasp locations, get the corresponding xpos
-        # then compute the distance matrix between the candidate xposes and the trap xposes
-        if len(self.trap_locs) == 0:
-            trap_cost = 0
-        else:
-            valid_candidate_locs = np.array(list(filter(lambda x: x != -1, candidate_locs)))
-            trap_locs_2d = np.atleast_2d(self.trap_locs)
-            valid_candidate_locs_2d = np.atleast_2d(valid_candidate_locs)
-            dists = pairwise_squared_distances(valid_candidate_locs_2d, trap_locs_2d)
-            mean_dists = np.mean(dists, axis=1)
-            trap_cost = np.sum(np.exp(-mean_dists) * hp['trap_weight'])
-            trap_xpos = grasp_locations_to_xpos(phy_plan, self.trap_locs)
-            if viz:
-                viz.points('traps', trap_xpos, color='r', radius=0.04)
+        return 0, 0
 
-        geodesics_cost = get_geodesic_dist(candidate_locs, self.op_goal) * hp['geodesic_weight']
+    def simulate_grasp(self, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, viz_execution=False):
+        sim_grasp = super().simulate_grasp(phy, viz, grasp_input, viz_execution)
 
-        prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
-        dq = 0
-        for point in res.trajectory.joint_trajectory.points[1:]:
-            plan_pos = point.positions
-            dq += np.linalg.norm(np.array(plan_pos) - np.array(prev_plan_pos))
-        dq_cost = np.clip(dq, 0, BIG_PENALTY / 2) * hp['robot_dq_weight']
+        # now we run the MPPI planner for a fixed horizon and take the final cost
+        pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
+        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=0, horizon=hp['horizon'],
+                           # FIXME: scenario is hard-coded
+                           noise_sigma=self.scenario.noise_sigma, temp=hp['temp'])
+        mppi.reset()
 
-        cost = sum([
-            dq_cost,
-            trap_cost,
-            geodesics_cost,
-        ])
+        for t in range(10):
+            command, sub_time_s = mppi.command(phy, self.op_goal, hp['n_samples'], viz=viz)
+            control_step(phy, command, sub_time_s)
+            viz.viz(phy, is_planning=True)
 
-        rr_log_costs(entity_path='regrasp_costs', entity_paths=[
-            'regrasp_costs/dq_cost',
-            'regrasp_costs/trap_cost',
-            'regrasp_costs/geodesics_cost',
-        ], values=[
-            dq_cost,
-            trap_cost,
-            geodesics_cost,
-        ], colors=[
-            [0.5, 0.5, 0, 1.0],
-            [0, 1, 0, 1.0],
-            [1, 0, 0, 1.0],
-        ])
+            results = op_goal.get_results(phy)
+            do_grasp_dynamics(phy, results)
 
-        return cost
+            mppi.roll()
+
+        # TODO: do we need different outputs for the different planners?
+        return sim_grasp

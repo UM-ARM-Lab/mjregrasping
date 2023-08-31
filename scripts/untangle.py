@@ -11,7 +11,8 @@ from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, get_geodesic_dist
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.params import hp
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
@@ -52,7 +53,10 @@ def main():
         num_samples = hp['n_samples']
         grasp_rrt = GraspRRT()
 
+        # from mjregrasping.explore_locs_regrasp_planner import ExploreLocsRegraspPlanner
         # planner = BaselineRegraspPlanner(goal, grasp_rrt, skeletons)
+        # from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
+        # planner = TAMPRegraspPlanner(scenario, goal, grasp_rrt, skeletons)
         planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons)
 
         goal.viz_goal(phy)

@@ -15,7 +15,8 @@ from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner, get_geodesic_dist
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.movie import MjMovieMaker
