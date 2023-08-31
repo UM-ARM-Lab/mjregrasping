@@ -9,7 +9,6 @@ MUJOCO_LOG.TXT
 *.*prof
 outcmaes
 wandb
-*.pkl
 *.png
 *.swp
 *.blend1
