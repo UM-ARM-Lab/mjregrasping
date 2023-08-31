@@ -236,7 +236,7 @@ def simulate_grasp(grasp_rrt: GraspRRT, phy: Physics, viz: Optional[Viz], grasp_
                                  initial_locs)
     print(f"plan has {len(res.trajectory.joint_trajectory.points)} points")
 
-    if viz_execution:
+    if viz_execution and viz is not None:
         grasp_rrt.display_result(viz, res, scene_msg)
 
     # Teleport to the final planned joint configuration

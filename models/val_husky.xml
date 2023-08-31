@@ -371,7 +371,7 @@
                      forcelimited="true" forcerange="-8 8"/>
         <!--  6 -->
         <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
-                     forcerange="-2 2"/>
+                     forcerange="-8 8"/>
         <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
                      forcelimited="true" forcerange="-4 4"/>
         <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
@@ -390,7 +390,7 @@
                      forcelimited="true" forcerange="-8 8"/>
         <!--  14 -->
         <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
-                     forcerange="-2 2"/>
+                     forcerange="-8 8"/>
         <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
                      forcelimited="true" forcerange="-4 4"/>
         <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"

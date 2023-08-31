@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-import argparse
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 import numpy as np
 import rerun as rr
@@ -36,6 +34,9 @@ def main():
 
     scenario = threading
 
+    gl_ctx = mujoco.GLContext(1280, 720)
+    gl_ctx.make_current()
+
     grasp_rrt = GraspRRT()
     subgoal_locs = [
         np.array([-1, 0.93]),
@@ -65,7 +66,7 @@ def main():
 
     viz = make_viz(scenario)
     for i in range(1, 10):
-        phy, sdf, skeletons, mov, metrics_path = load_trial(i, scenario, viz)
+        phy, sdf, skeletons, mov, metrics_path = load_trial(i, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
@@ -157,7 +158,12 @@ def main():
             itr += 1
 
         # save the results
-        save_metrics(metrics_path, mov, itr=itr, success=success, time=phy.d.time)
+        metrics = {
+            'itr':     itr,
+            'success': success,
+            'time':    phy.d.time
+        }
+        mov.close(metrics)
 
 
 if __name__ == "__main__":

@@ -34,6 +34,18 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
         trial_info = pickle.load(f)
     phy_path = trial_info['phy_path']
     sdf_path = trial_info['sdf_path']
+
+    # fixed_phy_path = Path(str(phy_path).replace("CableHarness", "Threading"))
+    # fixed_sdf_path = Path(str(sdf_path).replace("CableHarness", "Threading"))
+    #
+    # fixed_trial_info = {
+    #     'phy_path':  fixed_phy_path,
+    #     'sdf_path':  fixed_sdf_path,
+    #     'skeletons': trial_info['skeletons'],
+    # }
+    # with trial_path.open("wb") as f:
+    #     pickle.dump(fixed_trial_info, f)
+
     skeletons = trial_info['skeletons']
     with phy_path.open("rb") as f:
         phy = pickle.load(f)

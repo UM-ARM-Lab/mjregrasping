@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Union
 
 import mujoco
 import numpy as np
@@ -276,3 +276,5 @@ def get_untangle_skeletons(phy: Physics):
             dz(-m.geom("rack2_post3").size[2] * 2),
         ], axis=0),
     }
+
+

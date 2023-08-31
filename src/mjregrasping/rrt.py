@@ -3,6 +3,9 @@ from typing import Optional
 import numpy as np
 from pymjregrasping_cpp import RRTPlanner
 
+import dynamic_reconfigure
+import rospy
+from dynamic_reconfigure.client import Client
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_is_grasping
@@ -16,6 +19,11 @@ class GraspRRT:
 
     def __init__(self):
         self.rrt = RRTPlanner()
+        # For some reason, I can fix the RRT collision issues by setting these params
+        client = Client("/ompl")
+        client.update_configuration({
+            "maximum_waypoint_distance": 0.1,
+        })
 
     def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
              pos_noise=0.05):
