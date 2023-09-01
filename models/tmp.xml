@@ -60,8 +60,8 @@
     </asset>
     <worldbody>
         <body pos="0 0 0" name="val_base">
-            <body pos="0 0 -0.25" euler="0 0 0" name="stand">
-                <geom type="box" name="stand" size="0.25 0.25 0.19" rgba="0.3 0.3 0.1 1" />
+            <body pos="0 0 -0.26" euler="0 0 0" name="stand">
+                <geom type="box" name="stand" size="0.25 0.25 0.17" rgba="0.3 0.3 0.1 1" />
             </body>
             <body name="pedestal" pos="0 0 0" euler="-1.5707 0 0">
                 <body pos="0 0 0.0891" euler="-1.5707 0 0" name="drive56">
@@ -98,7 +98,7 @@
                                             <geom type="mesh" mesh="MK4_LT" name="drive44_mesh" rgba="0.2 0.2 0.2 1" />
                                         </body>
                                         <body name="leftforearm" pos="0.06758 0 0.0486304" quat="0 -0.707107 0 0.707107">
-                                            <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 0.5" damping="8" frictionloss="1" />
+                                            <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-3.14159 1.0" damping="8" frictionloss="1" />
                                             <geom type="mesh" mesh="FOREARM_BRACKET" name="left_forearm_bracket" rgba="0.2 0.2 0.2 1" />
                                             <body pos="0 -0.17 0.05749" quat="0.707107 -0.707107 0 0" name="drive45">
                                                 <geom type="mesh" mesh="A35_DRIVE" name="drive45_mesh" rgba="0.2 0.2 0.2 1" />
@@ -161,7 +161,7 @@
                                             <geom type="mesh" mesh="MK4_LT" name="drive4_mesh" rgba="0.2 0.2 0.2 1" />
                                         </body>
                                         <body name="rightforearm" pos="0.06758 0 0.0486304" quat="0.707107 0 -0.707107 0">
-                                            <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-3.14159 0.5" damping="8" frictionloss="1" />
+                                            <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-3.14159 1.0" damping="8" frictionloss="1" />
                                             <geom type="mesh" mesh="FOREARM_BRACKET" name="right_forearm_bracket" rgba="0.2 0.2 0.2 1" />
                                             <body pos="0 -0.17 0.05749" quat="0.707107 -0.707107 0 0" name="drive5">
                                                 <geom type="mesh" mesh="A35_DRIVE" name="drive5_mesh" rgba="0.2 0.2 0.2 1" />
@@ -224,7 +224,7 @@
         <intvelocity name="joint41_vel" joint="joint41" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15" />
         <intvelocity name="joint42_vel" joint="joint42" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-0.15 3.14159" kp="5000" forcelimited="true" forcerange="-15 15" />
         <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-10 10" />
-        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-10 10" />
+        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 1.0" kp="1000" forcelimited="true" forcerange="-10 10" />
         
         <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-8 8" />
         <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4" />
@@ -235,7 +235,7 @@
         <intvelocity name="joint1_vel" joint="joint1" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="10000" forcelimited="true" forcerange="-15 15" />
         <intvelocity name="joint2_vel" joint="joint2" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.15" kp="5000" forcelimited="true" forcerange="-15 15" />
         <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000" forcelimited="true" forcerange="-10 10" />
-        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 0.5" kp="1000" forcelimited="true" forcerange="-8 8" />
+        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 1.0" kp="1000" forcelimited="true" forcerange="-8 8" />
         
         <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-8 8" />
         <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4" />
@@ -252,27 +252,27 @@
                 <geom name="wall" type="box" pos="0 0.7 0.975" size="5 0.01 1" rgba="0.8 0.8 0.8 1" />
                 <geom name="wall2" type="box" pos="0.6 0 0.975" size="0.01 5 1" rgba="0.8 0.8 0.8 1" />
             </body>
-            <body name="attach" pos="-0.026210717862549138 0.3434213997924794 0.59">
+            <body name="attach" pos="0.007594649555617929 0.3429296197576214 0.59">
                 <geom name="rack_attach" type="box" size="0.005 0.005 0.005" rgba="0.5 0 0 1" />
             </body>
             <body name="racks" pos="0 0 0.03">
                 <body name="rack1">
-                    <geom name="rack1_bottom" type="box" pos="0 0 0" size="0.29 0.39249148899147396 0.03" material="dark-wood" rgba="0.2 0.2 0.2 1.0" />
-                    <geom name="rack1_post1" type="box" pos="-0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post2" type="box" pos="-0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post3" type="box" pos="0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post4" type="box" pos="0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_bottom" type="box" pos="0 0 0" size="0.29 0.31864223811283093 0.03" material="dark-wood" rgba="0.2 0.2 0.2 1.0" />
+                    <geom name="rack1_post1" type="box" pos="-0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_post2" type="box" pos="-0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_post3" type="box" pos="0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_post4" type="box" pos="0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
                 </body>
                 <body name="rack2" pos="0 0 0.5">
-                    <geom name="rack2_bottom" type="box" size="0.25 0.353491488991474 0.03" material="dark-wood" rgba="0.3 0.3 0.3 1.0" />
-                    <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.39249148899147396 0.05" material="dark-wood" rgba="0.4 0.4 0.4 1.0" />
-                    <geom name="rack2_post1" type="box" pos="-0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post2" type="box" pos="-0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post3" type="box" pos="0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post4" type="box" pos="0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="box1" type="box" pos="0.008908200756239562 0.022701503804953838 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1" />
+                    <geom name="rack2_bottom" type="box" size="0.25 0.27964223811283095 0.03" material="dark-wood" rgba="0.3 0.3 0.3 1.0" />
+                    <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.31864223811283093 0.05" material="dark-wood" rgba="0.4 0.4 0.4 1.0" />
+                    <geom name="rack2_post1" type="box" pos="-0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack2_post2" type="box" pos="-0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack2_post3" type="box" pos="0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack2_post4" type="box" pos="0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="box1" type="box" pos="0.04185259499092041 -0.0657764539380079 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1" />
                 </body>
-                <body name="computer" pos="-0.12 0.13968015477556867 1.0">
+                <body name="computer" pos="-0.12 0.09935572663695724 1.0">
                     <geom name="case" type="box" pos="0 0 0.2" size="0.15 0.1 0.2" rgba="0.2 0.2 0.4 1" />
                     <body name="port" pos="-0.15 0.04 0.25">
                         <geom name="port" type="box" size="0.01 0.01 0.01" rgba="0.2 0.6 0.4 1" />

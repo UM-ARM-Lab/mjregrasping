@@ -170,7 +170,7 @@ def main():
             phy.d.act[phy.m.actuator("joint41_vel").id] = np.deg2rad(-30)
 
             mujoco.mj_step(phy.m, phy.d, 500)
-            viz.viz(phy)
+            viz.viz(phy, is_planning=True)
 
             for j in range(5):
                 loc = rng.uniform(0.5, 1.0)

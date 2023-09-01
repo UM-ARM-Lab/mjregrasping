@@ -11,10 +11,16 @@ from moveit_msgs.msg import MotionPlanResponse
 
 
 def execute_grasp_plan(phy: Physics, res: MotionPlanResponse, viz: Viz, is_planning: bool,
-                       mov: Optional[MjMovieMaker] = None):
+                       mov: Optional[MjMovieMaker] = None, reached_tol=3.0):
     qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
     for q in qs[:-1]:
-        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, reached_tol=2.0)
+        q_current = get_q(phy)
+        error = np.abs(q_current - q)
+        max_joint_error = np.max(error)
+        reached = np.rad2deg(max_joint_error) < reached_tol
+        if reached:
+            continue
+        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, reached_tol=reached_tol, stopped_tol=10)
     pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov)
 
 

@@ -22,7 +22,7 @@ class GraspRRT:
         self.rrt = RRTPlanner()
         # For some reason, I can fix the RRT collision issues by setting these params
         client = Client("/ompl")
-        client.update_configuration({"maximum_waypoint_distance": 0.1})
+        client.update_configuration({"maximum_waypoint_distance": 0.2})
         self.fix_start_rng = np.random.RandomState(0)
 
     def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
@@ -30,7 +30,7 @@ class GraspRRT:
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
-        self.fix_start_state_in_place(phy_plan)
+        self.fix_start_state_in_place(phy_plan, viz)
 
         scene_msg = make_planning_scene(phy_plan)
         res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time,
@@ -45,22 +45,27 @@ class GraspRRT:
         scene_msg = make_planning_scene(phy)
         return self.rrt.is_state_valid(scene_msg)
 
-    def fix_start_state_in_place(self, phy: Physics):
-        q_new = self.get_fixed_qpos(phy)
+    def fix_start_state_in_place(self, phy: Physics, viz: Optional[Viz] = None):
+        q_new, _ = self.get_fixed_qpos(phy, viz)
         phy.d.qpos = q_new
 
-    def get_fixed_qpos(self, phy: Physics):
+    def get_fixed_qpos(self, phy: Physics, viz: Optional[Viz] = None):
         """ Sample a new qpos for the robot that is collision free according to the RRT planner """
         phy_plan = phy.copy_all()
         q0 = phy_plan.d.qpos[phy_plan.o.robot.qpos_indices]
+        is_fixed = False
         for _ in range(100):
             mujoco.mj_forward(phy_plan.m, phy_plan.d)
             valid = self.is_state_valid(phy_plan)
+            if viz:
+                viz.viz(phy, is_planning=True)
+                # print(valid)
             if valid:
+                is_fixed = True
                 break
             phy_plan.d.qpos[phy_plan.o.robot.qpos_indices] = q0 + np.deg2rad(
                 self.fix_start_rng.uniform(-1, 1, size=len(phy_plan.o.robot.qpos_indices)))
-        return phy_plan.d.qpos
+        return phy_plan.d.qpos, is_fixed
 
 
 def plan_to_grasp(candidate_locs, phy_plan, strategy):

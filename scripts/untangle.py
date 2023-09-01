@@ -65,12 +65,10 @@ def main():
         traps.reset_trap_detection()
 
         itr = 0
-        command = None
-        sub_time_s = None
         success = False
         viz.viz(phy)
         while True:
-            if itr >= 150:
+            if itr >= 200:
                 break
 
             goal.viz_goal(phy)
@@ -80,12 +78,12 @@ def main():
                 break
 
             is_stuck = traps.check_is_stuck(phy)
-            current_state_is_valid_for_planning = grasp_rrt.is_state_valid(phy)
             needs_reset = False
-            if is_stuck and current_state_is_valid_for_planning:
+            if is_stuck:
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
                 initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal.loc)
                 sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+                grasp_rrt.is_state_valid(phy)
                 best_grasp = planner.get_best(sim_grasps, viz=viz)
                 new_geodesic_cost = get_geodesic_dist(best_grasp.locs, goal.loc)
                 # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -107,16 +105,13 @@ def main():
 
                 needs_reset = True
 
-            n_warmstart = max(1, min(hp['warmstart'], int((1 - traps.frac_dq) * 5)))
-
             if needs_reset:
                 mppi.reset()
                 traps.reset_trap_detection()
                 n_warmstart = hp['warmstart']
 
-            for k in range(n_warmstart):
-                command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
-                mppi_viz(mppi, goal, phy, command, sub_time_s)
+            command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
+            mppi_viz(mppi, goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s, mov=mov)
             viz.viz(phy)

@@ -12,7 +12,6 @@ Panels:
         - /MotionPlanning1/Planned Path1
         - /PlanningScene1/Scene Geometry1
         - /PlanningScene1/Scene Robot1
-        - /Trajectory1
       Splitter Ratio: 0.6168224215507507
     Tree Height: 840
   - Class: rviz/Selection
@@ -42,13 +41,13 @@ Visualization Manager:
   Displays:
     - Alpha: 1
       Class: rviz/Axes
-      Enabled: false
+      Enabled: true
       Length: 1
       Name: Axes
       Radius: 0.004999999888241291
       Reference Frame: <Fixed Frame>
       Show Trail: false
-      Value: false
+      Value: true
     - Class: rviz/TF
       Enabled: false
       Filter (blacklist): ""
@@ -71,7 +70,10 @@ Visualization Manager:
       Marker Topic: /markers
       Name: debug markers
       Namespaces:
-        {}
+        ee_0: true
+        ee_1: true
+        goal: true
+        rope: true
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
@@ -181,19 +183,20 @@ Visualization Manager:
       Queue Size: 100
       Value: true
     - Class: rviz/MarkerArray
-      Enabled: true
+      Enabled: false
       Marker Topic: /planning
       Name: planning
       Namespaces:
         {}
       Queue Size: 100
-      Value: true
+      Value: false
     - Class: rviz/MarkerArray
       Enabled: true
       Marker Topic: /eq_constraints
       Name: constraints
       Namespaces:
         eq_attach: true
+        eq_left: true
         eq_right: true
       Queue Size: 100
       Value: true
@@ -202,114 +205,65 @@ Visualization Manager:
       Marker Topic: /contacts
       Name: contacts
       Namespaces:
-        G0_Drive56_mesh: true
-        G0_box1: true
+        G0_left_finger_pad: true
+        G0_left_finger_pad2: true
         G0_rack2_bottom: true
         G0_rack_attach: true
-        G0_torso: true
-        G10_stand: true
+        G10_left_finger_pad: true
+        G10_left_finger_pad2: true
+        G10_rack2_bottom: true
+        G10_right_finger_pad: true
+        G10_right_finger_pad2: true
+        G10_rightgripper: true
         G1_box1: true
         G1_rack2_bottom: true
-        G1_torso: true
         G2_box1: true
-        G2_drive4_mesh: true
         G2_rack2_bottom: true
-        G2_rack2_post2: true
-        G2_right_forearm_bracket: true
-        G2_torso: true
         G3_box1: true
-        G3_drive4_mesh: true
         G3_rack2_bottom: true
-        G3_right_forearm_bracket: true
         G4_box1: true
         G4_rack2_bottom: true
         G5_box1: true
         G5_rack2_bottom: true
+        G5_right_finger_pad: true
+        G5_right_finger_pad2: true
+        G5_rightgripper: true
+        G6_box1: true
+        G6_drive6_mesh: true
+        G6_drive7_housing_mesh: true
+        G6_drive7_mesh: true
         G6_rack2_bottom: true
+        G6_right_finger_pad: true
+        G6_right_finger_pad2: true
+        G7_drive7_housing_mesh: true
+        G7_drive7_mesh: true
         G7_rack2_bottom: true
+        G7_rack2_top: true
         G7_right_finger_pad: true
-        G7_stand: true
+        G7_right_finger_pad2: true
+        G7_rightgripper: true
+        G7_rightgripper2: true
+        G8_drive7_housing_mesh: true
         G8_rack2_bottom: true
+        G8_right_finger_pad: true
         G8_right_finger_pad2: true
-        G8_stand: true
-        G9_Drive56_mesh: true
-        G9_stand: true
-        box1_left_finger_pad: true
-        box1_left_finger_pad2: true
-        cc_sphere_G0: true
-        drive1_mesh_drive43_mesh: true
-        drive1_mesh_drive47_housing_mesh: true
-        drive1_mesh_drive47_mesh: true
-        drive1_mesh_left_d405_mount: true
-        drive1_mesh_left_finger_pad: true
-        drive1_mesh_left_wrist_mesh: true
-        drive1_mesh_leftgripper: true
-        drive1_mesh_leftgripper2: true
-        drive1_mesh_lefttube_mesh: true
+        G8_rightgripper: true
+        G8_rightgripper2: true
+        G9_drive7_housing_mesh: true
+        G9_rack2_bottom: true
+        G9_right_finger_pad: true
+        G9_right_finger_pad2: true
+        G9_rightgripper: true
+        G9_rightgripper2: true
         drive41_mesh_joint3_mesh: true
-        drive42_mesh_drive46_mesh: true
-        drive42_mesh_drive47_mesh: true
-        drive42_mesh_left_finger_pad: true
-        drive42_mesh_left_wrist_mesh: true
-        drive42_mesh_leftgripper: true
-        drive43_mesh_drive45_mesh: true
-        drive43_mesh_drive46_mesh: true
-        drive43_mesh_drive47_housing_mesh: true
-        drive43_mesh_drive47_mesh: true
-        drive43_mesh_left_forearm_bracket: true
-        drive43_mesh_left_wrist_mesh: true
-        drive45_mesh_drive47_mesh: true
-        drive47_mesh_left_finger_pad: true
-        drive47_mesh_leftgripper: true
-        drive5_mesh_drive7_housing_mesh: true
-        drive5_mesh_drive7_mesh: true
-        drive7_mesh_right_finger_pad: true
-        drive7_mesh_rightgripper: true
-        left_finger_pad_drive5_mesh: true
         left_finger_pad_left_finger_pad2: true
-        left_finger_pad_right_forearm_bracket: true
-        left_shoulder_bracket_drive45_mesh: true
-        left_shoulder_bracket_drive46_mesh: true
-        left_shoulder_bracket_drive47_mesh: true
-        left_shoulder_bracket_left_forearm_bracket: true
-        leftgripper_drive5_mesh: true
-        leftgripper_leftgripper2: true
-        leftgripper_right_forearm_bracket: true
-        rack1_post1_right_finger_pad: true
-        rack1_post1_right_finger_pad2: true
-        rack2_bottom_drive47_housing_mesh: true
-        rack2_bottom_left_d405_mount: true
-        rack2_bottom_leftgripper2: true
-        rack2_post1_drive5_mesh: true
+        rack2_bottom_drive42_mesh: true
+        rack2_bottom_drive4_mesh: true
+        rack2_bottom_right_finger_pad2: true
+        rack2_bottom_rightgripper2: true
         rack2_post1_right_finger_pad: true
-        rack2_post1_right_finger_pad2: true
-        rack2_post1_rightgripper: true
-        rack2_post1_rightgripper2: true
-        rack2_post2_leftgripper: true
-        rack2_post2_leftgripper2: true
+        rack2_top_right_finger_pad: true
         right_finger_pad_right_finger_pad2: true
-        right_forearm_bracket_drive7_housing_mesh: true
-        right_forearm_bracket_drive7_mesh: true
-        right_forearm_bracket_right_d405_mount: true
-        stand_torso: true
-        torso_drive43_mesh: true
-        torso_drive44_mesh: true
-        torso_drive45_mesh: true
-        torso_drive46_mesh: true
-        torso_drive47_mesh: true
-        torso_drive4_mesh: true
-        torso_drive6_mesh: true
-        torso_joint3_mesh: true
-        torso_left_d405_mount: true
-        torso_left_finger_pad2: true
-        torso_left_forearm_bracket: true
-        torso_left_shoulder_bracket: true
-        torso_leftgripper2: true
-        torso_lefttube_mesh: true
-        torso_right_finger_pad: true
-        torso_right_shoulder_bracket: true
-        torso_righttube_mesh: true
-        torso_rightwrist_mesh: true
       Queue Size: 100
       Value: true
     - Acceleration_Scaling_Factor: 0.1
@@ -1139,7 +1093,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 2.2888731956481934
+      Distance: 2.410595417022705
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -1147,17 +1101,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.023163877427577972
-        Y: 0.6653746962547302
-        Z: 0.22681643068790436
+        X: -0.1277351677417755
+        Y: 0.17508678138256073
+        Z: 0.06964796036481857
       Focal Shape Fixed Size: false
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.19979818165302277
+      Pitch: 0.27979776263237
       Target Frame: anim_camera
-      Yaw: 5.817092418670654
+      Yaw: 5.967141628265381
     Saved: ~
 Window Geometry:
   Displays:

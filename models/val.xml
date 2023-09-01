@@ -27,8 +27,8 @@
     </asset>
     <worldbody>
         <body pos="0 0 0" name="val_base">
-            <body pos="0 0 -0.25" euler="0 0 0" name="stand">
-                <geom type="box" name="stand" size="0.25 0.25 0.19" rgba="0.3 0.3 0.1 1"/>
+            <body pos="0 0 -0.26" euler="0 0 0" name="stand">
+                <geom type="box" name="stand" size="0.25 0.25 0.17" rgba="0.3 0.3 0.1 1"/>
             </body>
             <body name="pedestal" pos="0 0 0" euler="-1.5707 0 0">
                 <body pos="0 0 0.0891" euler="-1.5707 0 0" name="drive56">

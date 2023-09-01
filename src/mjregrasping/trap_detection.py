@@ -7,7 +7,7 @@ from mjregrasping.params import hp
 
 def get_q_for_trap_detection(phy):
     return np.concatenate(
-        (hp['q_joint_weight'] * phy.d.qpos[phy.o.rope.qpos_indices], phy.d.qpos[phy.o.robot.qpos_indices]))
+        (hp['trap_q_rope_weight'] * phy.d.qpos[phy.o.rope.qpos_indices], phy.d.qpos[phy.o.robot.qpos_indices]))
 
 
 class TrapDetection:
