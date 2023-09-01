@@ -53,6 +53,7 @@ hp = {
     "attach_loop_size":                0.02,
     "joint_kp":                        6.0,
     "act_windup_limit":                0.02,
+    "start_state_jiggle_deg":          2,
     "bayes_opt":                       {
         "n_iter": 14,
         "n_init": 6,

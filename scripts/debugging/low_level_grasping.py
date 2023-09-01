@@ -1,20 +1,16 @@
 from pathlib import Path
-import open3d as o3d
-from PIL import Image
-from time import time
 from time import perf_counter
 
 import cv2
 import matplotlib.pyplot as plt
 import mujoco
 import numpy as np
+import open3d as o3d
 import pymanopt
 import pyrealsense2 as rs
-import pysdf_tools
 import rerun as rr
 import torch
 from arm_segmentation.predictor import Predictor
-from matplotlib import cm
 from pymanopt.manifolds import SpecialOrthogonalGroup
 
 import ros_numpy
@@ -29,13 +25,10 @@ from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
-from mjregrasping.rollout import control_step
 from mjregrasping.rviz import plot_points_rviz
 from mjregrasping.scenarios import val_untangle
-from mjregrasping.sdf_autograd import point_to_idx as point_to_idx_torch
-from mjregrasping.sdf_autograd import sdf_lookup
+from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import make_viz, Viz
-from mjregrasping.voxelgrid import point_to_idx as point_to_idx_np
 from ros_numpy.point_cloud2 import merge_rgb_fields
 from sensor_msgs.msg import PointCloud2
 
@@ -45,11 +38,6 @@ def batch_rotate_and_translate(points, mat, pos=None):
     if pos is not None:
         new_p += pos
     return new_p
-
-
-def val_dedup(x):
-    """ removes the duplicated gripper values, which are at indices 10 and 19 """
-    return np.concatenate([x[:10], x[11:19], x[20:]])
 
 
 @ros_init.with_ros("low_level_grasping")

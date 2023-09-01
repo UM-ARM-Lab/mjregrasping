@@ -174,6 +174,7 @@ def main():
 
             for j in range(5):
                 loc = rng.uniform(0.5, 1.0)
+                grasp_rrt.fix_start_state_in_place(phy, viz)
                 res, scene_msg = grasp_rrt.plan(phy, [Strategies.STAY, Strategies.NEW_GRASP], [-1, loc], viz, pos_noise=0.2)
                 if res.error_code.val == MoveItErrorCodes.SUCCESS:
                     teleport_to_end_of_plan(phy, res)

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List
+from typing import Callable
 
 import mujoco
 import numpy as np
@@ -19,16 +19,24 @@ class MjVedo:
         self.fps = fps
 
         self.plotter = Plotter(title="drone_example", axes=1)
-        self.video = None
-        self.plotter.camera.SetFocalPoint(0, 0, 0)
-        self.plotter.camera.SetViewUp(0, 0, 1)
 
         self.mesh_cache = {}
         # maps from mujoco geom IDs to Vedo actors
         self.actor_map = {}
 
-    def record(self, filename):
-        self.video = Video(filename, fps=self.fps)
+    def record(self, filename, anim_func: Callable, num_frames: int):
+        pb = ProgressBarWidget(num_frames)
+        self.plotter += pb
+
+        video = Video(filename, fps=self.fps, backend="ffmpeg")
+
+        for t in range(num_frames):
+            anim_func(t, self.plotter)
+            video.add_frame()
+            self.plotter.show(interactive=False)
+            pb.update()
+
+        video.close()
 
     def viz(self, phy: Physics, is_planning=False):
         m = phy.m
@@ -107,30 +115,8 @@ class MjVedo:
         goem_id = phy.m.geom(geom_name).id
         return self.actor_map[goem_id]
 
-    def fade(self, phy, geom_names: List[str]):
-        actors = [self.get_actor(phy, "tree") for name in geom_names]
-        for a in np.linspace(1, 0, 60):
-            for actor in actors:
-                actor.alpha(a)
-            self.plotter.show(interactive=False)
-            self.video.add_frame()
-
-    def spin(self, seconds_per_spin=3, n_spins=1, cx=2, cy=-10, z=10, distance=10):
-        total_rotation = n_spins * 2 * np.pi
-        num_frames = int(seconds_per_spin * self.fps * n_spins)
-
-        pb = ProgressBarWidget(num_frames)
-        self.plotter += pb
-
-        for azimuth in np.linspace(0, total_rotation, num_frames):
-            x = distance * np.cos(azimuth) + cx
-            y = distance * np.sin(azimuth) + cy
-            self.plotter.camera.SetPosition(x, y, z)
-
-            self.plotter.show(interactive=False)
-            self.video.add_frame()
-
-            pb.update()
+    def num_frames_for_spin(self, seconds_per_spin, n_spins):
+        return int(seconds_per_spin * self.fps * n_spins)
 
     def load_and_cache_mesh(self, mesh_name):
         extensions = [".obj", ".stl", ".glb"]
@@ -145,6 +131,3 @@ class MjVedo:
             self.mesh_cache[mesh_name] = mesh
             return
         raise RuntimeError(f"Mesh {mesh_name} not found")
-
-    def close(self):
-        self.video.close()

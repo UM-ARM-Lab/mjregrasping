@@ -2,7 +2,16 @@
     <include file="materials.xml"/>
     <include file="cc_sphere.xml"/>
     <include file="computer_rack.xml"/>
+    <default>
+        <default class="visual">
+            <geom contype="0" conaffinity="0" group="2"/>
+        </default>
+    </default>
     <worldbody>
-        <light name="top" pos="0 -1 15" mode="trackcom"/>
+        <body pos="0 0 -0.445" name="floor">
+            <geom type="plane" name="floor" size="50 50 0.1"  material="cream-plaster"/>
+        </body>
+        <light pos="0 -2 10" mode="trackcom" exponent="1" ambient="0.04 0 0"/>
+        <light pos="0 0 10" mode="trackcom" exponent="1" ambient="0.03 0.03 0"/>
     </worldbody>
 </mujoco>

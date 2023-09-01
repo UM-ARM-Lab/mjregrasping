@@ -51,6 +51,8 @@ class HomotopyRegraspPlanner:
             self.true_h_blacklist.append(current_true_h)
 
     def simulate_sampled_grasps(self, phy, viz, viz_execution=False):
+        self.grasp_rrt.fix_start_state_in_place(phy, viz)
+
         grasps_inputs = self.sample_grasp_inputs(phy)
         sim_grasps = self.simulate_grasps(grasps_inputs, phy, viz, viz_execution)
         return sim_grasps

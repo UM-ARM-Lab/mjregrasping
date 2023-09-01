@@ -10,8 +10,12 @@ from dynamic_reconfigure.client import Client
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_is_grasping
+from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.moveit_planning import make_planning_scene
+from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q
+from mjregrasping.rollout import DEFAULT_SUB_TIME_S
+from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MotionPlanResponse
 
@@ -30,8 +34,6 @@ class GraspRRT:
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
-        self.fix_start_state_in_place(phy_plan, viz)
-
         scene_msg = make_planning_scene(phy_plan)
         res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time,
                                                 pos_noise)
@@ -46,8 +48,13 @@ class GraspRRT:
         return self.rrt.is_state_valid(scene_msg)
 
     def fix_start_state_in_place(self, phy: Physics, viz: Optional[Viz] = None):
-        q_new, _ = self.get_fixed_qpos(phy, viz)
-        phy.d.qpos = q_new
+        for _ in range(5):
+            valid = self.is_state_valid(phy)
+            if valid:
+                return True
+            q_new, is_fixed = self.get_fixed_qpos(phy, viz)
+            pid_to_joint_config(phy, viz, val_dedup(q_new), DEFAULT_SUB_TIME_S, is_planning=False)
+        return False
 
     def get_fixed_qpos(self, phy: Physics, viz: Optional[Viz] = None):
         """ Sample a new qpos for the robot that is collision free according to the RRT planner """
@@ -58,14 +65,15 @@ class GraspRRT:
             mujoco.mj_forward(phy_plan.m, phy_plan.d)
             valid = self.is_state_valid(phy_plan)
             if viz:
-                viz.viz(phy, is_planning=True)
+                viz.viz(phy_plan, is_planning=True)
                 # print(valid)
             if valid:
                 is_fixed = True
                 break
             phy_plan.d.qpos[phy_plan.o.robot.qpos_indices] = q0 + np.deg2rad(
-                self.fix_start_rng.uniform(-1, 1, size=len(phy_plan.o.robot.qpos_indices)))
-        return phy_plan.d.qpos, is_fixed
+                self.fix_start_rng.uniform(-hp['start_state_jiggle_deg'], hp['start_state_jiggle_deg'],
+                                           size=len(phy_plan.o.robot.qpos_indices)))
+        return phy_plan.d.qpos[phy_plan.o.robot.qpos_indices], is_fixed
 
 
 def plan_to_grasp(candidate_locs, phy_plan, strategy):
