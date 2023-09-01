@@ -5,19 +5,20 @@ Based on "An Online Method for Tight-tolerance Insertion Tasks for String and Ro
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 
+import mujoco
 import numpy as np
 import rerun as rr
 from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, \
-    WeifuThreadingGoal
+from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, WeifuThreadingGoal
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, activate_grasp
+from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.homotopy_utils import skeleton_field_dir
 from mjregrasping.params import hp
-from mjregrasping.trials import load_trial, save_metrics
+from mjregrasping.trials import load_trial
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
@@ -37,10 +38,13 @@ def main():
 
     viz = make_viz(scenario)
 
+    gl_ctx = mujoco.GLContext(1280, 720)
+    gl_ctx.make_current()
+
     grasp_rrt = GraspRRT()
 
     for i in range(10):
-        phy, sdf, skeletons, mov, metrics_path = load_trial(i, scenario, viz)
+        phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
@@ -79,7 +83,7 @@ def main():
 
             if isinstance(goal, ObjectPointGoal):
                 if goal.satisfied(phy):
-                    print(Fore.GREEN + "Goal reached!" + Fore.RESET)
+                    print(Fore.GREEN + "Task complete!" + Fore.RESET)
                     break
             else:
                 disc_center = np.mean(goal.skel[:4], axis=0)
@@ -89,6 +93,7 @@ def main():
                 if goal.satisfied(phy, disc_center, disc_normal, disc_rad):
                     mppi.reset()
 
+                    # Baseline
                     strategy = [Strategies.STAY, Strategies.MOVE]
                     locs = np.array([-1, end_loc])
                     res, scene_msg = grasp_rrt.plan(phy, strategy, locs, viz)
@@ -105,13 +110,12 @@ def main():
                     activate_grasp(phy, 'right', goal.loc)
                     control_step(phy, np.zeros(phy.m.nu), sub_time_s=1.0, mov=mov)
                     viz.viz(phy, False)
+
+                    # Our method
+                    planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons)
+
                     goal = goals[goal_idx]
                     grasp_goal.set_grasp_locs(np.array([-1, goal.loc]))
-
-                    if goal_idx >= len(goals):
-                        print(Fore.GREEN + "Task complete!" + Fore.RESET)
-                        success = True
-                        break
 
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
             mppi_viz(mppi, goal, phy, command, sub_time_s)
@@ -126,7 +130,13 @@ def main():
 
             itr += 1
 
-        save_metrics(metrics_path, mov, itr=itr, success=success, time=phy.d.time)
+        # save the results
+        metrics = {
+            'itr':     itr,
+            'success': success,
+            'time':    phy.d.time
+        }
+        mov.close(metrics)
 
 
 if __name__ == "__main__":

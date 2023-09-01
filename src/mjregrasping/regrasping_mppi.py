@@ -6,14 +6,14 @@ from matplotlib import cm
 from numpy.linalg import norm
 
 import rospy
+from mjregrasping.goal_funcs import get_tool_points
 from mjregrasping.goals import MPPIGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.grasping import get_grasp_eqs
+from mjregrasping.grasping import get_grasp_eqs, get_finger_qs
 from mjregrasping.math import softmax
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import control_step
-from mjregrasping.viz import Viz
 
 
 class RegraspMPPI:
@@ -152,7 +152,7 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     results_0 = goal.get_results(phy)
     # Only do this at the beginning, since it's expensive and if it went in the loop, it could potentially cause
     # rapid oscillations of grasping/not grasping which seems undesirable.
-    do_grasp_dynamics(phy, results_0)
+    do_grasp_dynamics(phy)
     results = [results_0]
 
     for t, u in enumerate(u_sample):
@@ -172,9 +172,9 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     return results, cost, costs_by_term
 
 
-def do_grasp_dynamics(phy, results):
-    tools_pos = results[0]
-    finger_qs = results[7]
+def do_grasp_dynamics(phy: Physics):
+    tools_pos = get_tool_points(phy)
+    finger_qs = get_finger_qs(phy)
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
     did_new_grasp = False
     eqs = get_grasp_eqs(phy)
@@ -206,6 +206,7 @@ def do_grasp_dynamics(phy, results):
 
     return did_new_grasp
 
+
 def mppi_viz(mppi: RegraspMPPI, goal: MPPIGoal, phy: Physics, command: np.ndarray, sub_time_s: float):
     sorted_traj_indices = np.argsort(mppi.cost)
 
@@ -224,4 +225,3 @@ def mppi_viz(mppi: RegraspMPPI, goal: MPPIGoal, phy: Physics, command: np.ndarra
         cmd_rollout_results, _, _ = rollout(phy.copy_all(), goal, np.expand_dims(command, 0),
                                             np.expand_dims(sub_time_s, 0), viz=None)
         goal.viz_result(phy, cmd_rollout_results, i, color='b', scale=0.004)
-

@@ -139,9 +139,7 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
         rope_points: The 3d position of all the rope points
 
     Returns:
-        Costs for finger joint angles, distance to desired rope positions, and distance to nearest point on rope.
-        The distance-to-nearest term is used to allow the controller to give up and just grasp a point near the desired
-        regrasp position.
+        Costs for finger joint angles, and distance to desired rope positions
 
     """
     desired_is_grasping = desired_locs >= 0
@@ -149,16 +147,12 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
     regrasp_dists = norm(regrasp_xpos - tools_pos, axis=-1)
     regrasp_pos_cost = np.sum(regrasp_dists * desired_is_grasping, -1) * hp['grasp_pos_weight']
 
-    dists = pairwise_squared_distances(tools_pos, rope_points)
-    min_dist = np.min(np.min(dists, axis=-1), axis=-1)
-    regrasp_near_cost = min_dist * hp['grasp_near_weight']
-
     desired_open = check_should_be_open(current_grasp_locs, is_grasping, desired_locs, desired_is_grasping)
     # Double the q_open, so we are encouraged to open a lot more than the minimum required to release the rope
     desired_finger_qs = np.where(desired_open, 2 * hp['finger_q_open'], hp['finger_q_closed'])
     regrasp_finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1)) * hp['grasp_finger_weight']
 
-    return regrasp_finger_cost, regrasp_pos_cost, regrasp_near_cost
+    return regrasp_finger_cost, regrasp_pos_cost
 
 
 def check_should_be_open(current_grasp_locs, current_is_grasping, desired_locs, desired_is_grasping):

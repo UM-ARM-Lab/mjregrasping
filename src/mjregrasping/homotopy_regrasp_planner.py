@@ -5,7 +5,6 @@ import rerun as rr
 from pymjregrasping_cpp import seedOmpl
 
 from mjregrasping.goal_funcs import get_rope_points, locs_eq
-from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
@@ -23,8 +22,16 @@ from moveit_msgs.msg import MoveItErrorCodes
 
 class HomotopyRegraspPlanner:
 
-    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
-        self.op_goal = op_goal
+    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+        """
+
+        Args:
+            key_loc: The location on the rope which we care about "using" for the task
+            grasp_rrt:
+            skeletons:
+            seed:
+        """
+        self.key_loc = key_loc
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
         self.true_h_blacklist = []
@@ -61,7 +68,7 @@ class HomotopyRegraspPlanner:
         for strategy in get_all_strategies_from_phy(phy):
             for i in range(hp['n_grasp_samples']):
                 if i == 0:
-                    sample_loc = self.op_goal.loc
+                    sample_loc = self.key_loc
                 elif i == 1:
                     sample_loc = 0
                 elif i == 2:
@@ -135,7 +142,7 @@ class HomotopyRegraspPlanner:
                 homotopy_cost = BIG_PENALTY
                 break
 
-        geodesics_cost = get_geodesic_dist(candidate_locs, self.op_goal) * hp['geodesic_weight']
+        geodesics_cost = get_geodesic_dist(candidate_locs, self.key_loc) * hp['geodesic_weight']
 
         prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
         dq = 0
@@ -172,7 +179,6 @@ class HomotopyRegraspPlanner:
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
             return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
-        print(f"plan has {len(res.trajectory.joint_trajectory.points)} points")
 
         if viz_execution and viz is not None:
             self.grasp_rrt.display_result(viz, res, scene_msg)

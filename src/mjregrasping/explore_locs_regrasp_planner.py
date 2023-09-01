@@ -22,8 +22,8 @@ from moveit_msgs.msg import MoveItErrorCodes
 
 class ExploreLocsRegraspPlanner(HomotopyRegraspPlanner):
 
-    def __init__(self, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
-        super().__init__(op_goal, grasp_rrt, skeletons, seed)
+    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+        super().__init__(key_loc, grasp_rrt, skeletons, seed)
         self.trap_locs = []
 
     def update_blacklists(self, phy):
@@ -63,7 +63,7 @@ class ExploreLocsRegraspPlanner(HomotopyRegraspPlanner):
             # if viz:
             #     viz.points('traps', trap_xpos, color='r', radius=0.04)
 
-        geodesics_cost = get_geodesic_dist(candidate_locs, self.op_goal) * hp['geodesic_weight']
+        geodesics_cost = get_geodesic_dist(candidate_locs, self.key_loc) * hp['geodesic_weight']
 
         prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
         dq = 0

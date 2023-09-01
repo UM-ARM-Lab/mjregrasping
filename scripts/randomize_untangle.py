@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Optional
 
 import mujoco
@@ -8,14 +7,19 @@ import numpy as np
 import rerun as rr
 
 from arc_utilities import ros_init
-from mjregrasping.move_to_joint_config import pid_to_joint_config
+from mjregrasping.grasp_strategies import Strategies
+from mjregrasping.grasping import activate_grasp
+from mjregrasping.move_to_joint_config import pid_to_joint_config, execute_grasp_plan
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
+from mjregrasping.rrt import GraspRRT
 from mjregrasping.rviz import MujocoXmlExpander
-from mjregrasping.scenarios import val_untangle, get_untangle_skeletons, setup_untangle
+from mjregrasping.scenarios import val_untangle, get_untangle_skeletons
+from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.trials import save_trial
 from mjregrasping.viz import make_viz, Viz
+from moveit_msgs.msg import MoveItErrorCodes
 
 
 def randomize_rack(orignial_path: Path, rng: np.random.RandomState):
@@ -133,9 +137,12 @@ def main():
     root = Path("trial_data") / scenario.name
     root.mkdir(exist_ok=True, parents=True)
 
+    grasp_rrt = GraspRRT()
+
     rng = np.random.RandomState(0)
-    for i in range(10):
-        while True:
+    for trial_idx in range(10):
+        good = False
+        while not good:
             # Configure the model before we construct the data and physics object
             new_path = randomize_rack(scenario.xml_path, rng)
 
@@ -144,19 +151,43 @@ def main():
             d = mujoco.MjData(m)
             objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
             phy = Physics(m, d, objects)
+            # Must call mj_forward or the skeletons will be wrong
+            mujoco.mj_forward(m, d)
 
             skeletons = get_untangle_skeletons(phy)
             viz.skeletons(skeletons)
 
-            setup_untangle(phy, viz)
+            rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
+            phy.d.qpos[rope_xyz_q_indices] = phy.d.body("attach").xpos
+            phy.m.eq("attach").data[3:6] = 0
+            phy.d.qpos[phy.m.joint("joint56").qposadr[0]] = np.deg2rad(-30)
+            phy.d.act[phy.m.actuator("joint56_vel").id] = np.deg2rad(-30)
+            phy.d.qpos[phy.m.joint("joint57").qposadr[0]] = np.deg2rad(35)
+            phy.d.act[phy.m.actuator("joint57_vel").id] = np.deg2rad(35)
+            phy.d.qpos[phy.m.joint("joint1").qposadr[0]] = np.deg2rad(-30)
+            phy.d.act[phy.m.actuator("joint1_vel").id] = np.deg2rad(-30)
+            phy.d.qpos[phy.m.joint("joint41").qposadr[0]] = np.deg2rad(-30)
+            phy.d.act[phy.m.actuator("joint41_vel").id] = np.deg2rad(-30)
 
-            randomize_qpos(phy, rng, viz)
+            mujoco.mj_step(phy.m, phy.d, 500)
+            viz.viz(phy)
 
-            q = input("is this good? (y/n) ")
-            if q == "y":
-                break
+            for j in range(5):
+                loc = rng.uniform(0.5, 1.0)
+                res, scene_msg = grasp_rrt.plan(phy, [Strategies.STAY, Strategies.NEW_GRASP], [-1, loc], viz, pos_noise=0.2)
+                if res.error_code.val == MoveItErrorCodes.SUCCESS:
+                    teleport_to_end_of_plan(phy, res)
+                    activate_grasp(phy, 'right', loc)
 
-        save_trial(i, phy, scenario, None, skeletons)
+                    randomize_qpos(phy, rng, viz)
+
+                    q = input("is this good? (y/n) ")
+                    if q == "y":
+                        good = True
+                        break
+
+        save_trial(trial_idx, phy, scenario, None, skeletons)
+        print(f"Trial {trial_idx} saved")
 
 
 if __name__ == "__main__":

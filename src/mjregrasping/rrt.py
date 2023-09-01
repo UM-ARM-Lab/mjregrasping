@@ -1,5 +1,6 @@
 from typing import Optional
 
+import mujoco
 import numpy as np
 from pymjregrasping_cpp import RRTPlanner
 
@@ -45,12 +46,21 @@ class GraspRRT:
         return self.rrt.is_state_valid(scene_msg)
 
     def fix_start_state_in_place(self, phy: Physics):
-        for i in range(10):
-            valid = self.is_state_valid(phy)
+        q_new = self.get_fixed_qpos(phy)
+        phy.d.qpos = q_new
+
+    def get_fixed_qpos(self, phy: Physics):
+        """ Sample a new qpos for the robot that is collision free according to the RRT planner """
+        phy_plan = phy.copy_all()
+        q0 = phy_plan.d.qpos[phy_plan.o.robot.qpos_indices]
+        for _ in range(100):
+            mujoco.mj_forward(phy_plan.m, phy_plan.d)
+            valid = self.is_state_valid(phy_plan)
             if valid:
                 break
-            phy.d.qpos[phy.o.robot.qpos_indices] += np.deg2rad(
-                self.fix_start_rng.uniform(-2, 2, size=len(phy.o.robot.qpos_indices)))
+            phy_plan.d.qpos[phy_plan.o.robot.qpos_indices] = q0 + np.deg2rad(
+                self.fix_start_rng.uniform(-1, 1, size=len(phy_plan.o.robot.qpos_indices)))
+        return phy_plan.d.qpos
 
 
 def plan_to_grasp(candidate_locs, phy_plan, strategy):

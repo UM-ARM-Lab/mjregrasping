@@ -1,20 +1,34 @@
 from typing import Optional
 
-import mujoco
 import numpy as np
 
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
-from mjregrasping.val_dup import val_dup
 from mjregrasping.viz import Viz
+from moveit_msgs.msg import MotionPlanResponse
 
 
-def execute_grasp_plan(phy: Physics, qs, viz: Viz, is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def execute_grasp_plan(phy: Physics, res: MotionPlanResponse, viz: Viz, is_planning: bool,
+                       mov: Optional[MjMovieMaker] = None):
+    qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
     for q in qs[:-1]:
         pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, reached_tol=2.0)
     pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov)
+
+
+def warn_about_limits(q_target, phy):
+    low = phy.m.actuator_actrange[:, 0]
+    high = phy.m.actuator_actrange[:, 1]
+    if np.any(q_target > high):
+        offending_idx = np.argmin(high - q_target)
+        name = phy.m.actuator(offending_idx).name
+        print(f"q_target {q_target[offending_idx]} is above actuator limit {high[offending_idx]} for joint {name}!")
+    if np.any(q_target < low):
+        offending_idx = np.argmin(q_target - low)
+        name = phy.m.actuator(offending_idx).name
+        print(f"q_target {q_target[offending_idx]} is below actuator limit {low[offending_idx]} for joint {name}!")
 
 
 def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, is_planning: bool = False,
@@ -31,6 +45,8 @@ def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, 
 
         # get the new current q
         q_current = get_q(phy)
+
+        warn_about_limits(q_target, phy)
 
         error = np.abs(q_current - q_target)
         max_joint_error = np.max(error)

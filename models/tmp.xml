@@ -121,7 +121,6 @@
                                                             <camera mode="fixed" name="left_hand" euler="1.22 0 0" pos="0 0.01 0.03" />
                                                             
                                                             <site name="left_hand_cam" euler="1.22 3.14159 3.14159" pos="0 0.01 0.03" size="0.001" />
-                                                            <light name="left_hand" mode="fixed" dir="0 1 -0.35" pos="0 0 0.03" />
                                                         </body>
                                                         <body name="leftgripper" pos="0 0.0135 0.068553" euler="1.15 -1.5707 0">
                                                             <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true" range="-0.01 1" damping="0.01" frictionloss="0.01" />
@@ -185,8 +184,7 @@
                                                                 <geom type="mesh" mesh="d405_mount" name="right_d405_mount" rgba="0.9 0.9 0.9 1" />
                                                                 <camera mode="fixed" name="right_hand" euler="1.22 0 0" pos="0.01 0 0.03" />
                                                                 
-                                                                <site name="right_hand_cam" euler="1.22 3.14159 3.14159" pos="0.01 0 0.03" size="0.001" />
-                                                                <light name="right_hand" mode="fixed" dir="0 1 -0.35" pos="0 0 0.03" />
+                                                                <site name="right_hand_cam" euler="-1.93 0 3.1415" pos="0.01 0 0.03" size="0.001" />
                                                             </body>
                                                         </body>
 
@@ -254,27 +252,27 @@
                 <geom name="wall" type="box" pos="0 0.7 0.975" size="5 0.01 1" rgba="0.8 0.8 0.8 1" />
                 <geom name="wall2" type="box" pos="0.6 0 0.975" size="0.01 5 1" rgba="0.8 0.8 0.8 1" />
             </body>
-            <body name="attach" pos="0.007432524884957881 0.3153200819857134 0.59">
+            <body name="attach" pos="-0.026210717862549138 0.3434213997924794 0.59">
                 <geom name="rack_attach" type="box" size="0.005 0.005 0.005" rgba="0.5 0 0 1" />
             </body>
             <body name="racks" pos="0 0 0.03">
                 <body name="rack1">
-                    <geom name="rack1_bottom" type="box" pos="0 0 0" size="0.29 0.4020258175004222 0.03" material="dark-wood" rgba="0.2 0.2 0.2 1.0" />
-                    <geom name="rack1_post1" type="box" pos="-0.25 -0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post2" type="box" pos="-0.25 0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post3" type="box" pos="0.25 -0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post4" type="box" pos="0.25 0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_bottom" type="box" pos="0 0 0" size="0.29 0.39249148899147396 0.03" material="dark-wood" rgba="0.2 0.2 0.2 1.0" />
+                    <geom name="rack1_post1" type="box" pos="-0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_post2" type="box" pos="-0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_post3" type="box" pos="0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack1_post4" type="box" pos="0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
                 </body>
                 <body name="rack2" pos="0 0 0.5">
-                    <geom name="rack2_bottom" type="box" size="0.25 0.36302581750042223 0.03" material="dark-wood" rgba="0.3 0.3 0.3 1.0" />
-                    <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.4020258175004222 0.05" material="dark-wood" rgba="0.4 0.4 0.4 1.0" />
-                    <geom name="rack2_post1" type="box" pos="-0.25 -0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post2" type="box" pos="-0.25 0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post3" type="box" pos="0.25 -0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post4" type="box" pos="0.25 0.36302581750042223 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="box1" type="box" pos="-0.01714539114150651 0.10390544595488432 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1" />
+                    <geom name="rack2_bottom" type="box" size="0.25 0.353491488991474 0.03" material="dark-wood" rgba="0.3 0.3 0.3 1.0" />
+                    <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.39249148899147396 0.05" material="dark-wood" rgba="0.4 0.4 0.4 1.0" />
+                    <geom name="rack2_post1" type="box" pos="-0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack2_post2" type="box" pos="-0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack2_post3" type="box" pos="0.25 -0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="rack2_post4" type="box" pos="0.25 0.353491488991474 0.25" size="0.04 0.04 0.25" material="metal" />
+                    <geom name="box1" type="box" pos="0.008908200756239562 0.022701503804953838 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1" />
                 </body>
-                <body name="computer" pos="-0.12 -0.08291310779296868 1.0">
+                <body name="computer" pos="-0.12 0.13968015477556867 1.0">
                     <geom name="case" type="box" pos="0 0 0.2" size="0.15 0.1 0.2" rgba="0.2 0.2 0.4 1" />
                     <body name="port" pos="-0.15 0.04 0.25">
                         <geom name="port" type="box" size="0.01 0.01 0.01" rgba="0.2 0.6 0.4 1" />

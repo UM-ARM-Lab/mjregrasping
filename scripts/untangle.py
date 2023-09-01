@@ -57,7 +57,7 @@ def main():
         # planner = BaselineRegraspPlanner(goal, grasp_rrt, skeletons)
         # from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
         # planner = TAMPRegraspPlanner(scenario, goal, grasp_rrt, skeletons)
-        planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons)
+        planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons)
 
         goal.viz_goal(phy)
 
@@ -70,7 +70,7 @@ def main():
         success = False
         viz.viz(phy)
         while True:
-            if itr >= scenario.max_iters:
+            if itr >= 150:
                 break
 
             goal.viz_goal(phy)
@@ -80,13 +80,14 @@ def main():
                 break
 
             is_stuck = traps.check_is_stuck(phy)
+            current_state_is_valid_for_planning = grasp_rrt.is_state_valid(phy)
             needs_reset = False
-            if is_stuck:
+            if is_stuck and current_state_is_valid_for_planning:
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
-                initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal)
+                initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal.loc)
                 sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
                 best_grasp = planner.get_best(sim_grasps, viz=viz)
-                new_geodesic_cost = get_geodesic_dist(best_grasp.locs, goal)
+                new_geodesic_cost = get_geodesic_dist(best_grasp.locs, goal.loc)
                 # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
                 if initial_geodesic_cost - new_geodesic_cost < 0.01:  # less than 1% closer to the keypoint
                     print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
@@ -100,8 +101,7 @@ def main():
                 # from mjregrasping.trials import save_trial
                 # save_trial(999, phy, scenario, None, skeletons)
                 release_and_settle(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-                qs = np.array([p.positions for p in best_grasp.res.trajectory.joint_trajectory.points])
-                execute_grasp_plan(phy, qs, viz, is_planning=False, mov=mov)
+                execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
                 grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
                 grasp_goal.set_grasp_locs(best_grasp.locs)
 
@@ -121,8 +121,7 @@ def main():
             control_step(phy, command, sub_time_s, mov=mov)
             viz.viz(phy)
 
-            results = goal.get_results(phy)
-            do_grasp_dynamics(phy, results)
+            do_grasp_dynamics(phy)
 
             mppi.roll()
 

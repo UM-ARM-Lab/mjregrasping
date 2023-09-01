@@ -10,25 +10,24 @@ from typing import Optional, Dict
 
 import numpy as np
 
-from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-from mjregrasping.regrasp_planner_utils import SimGraspCandidate, SimGraspInput
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.regrasp_planner_utils import SimGraspCandidate, SimGraspInput
 from mjregrasping.regrasping_mppi import RegraspMPPI, do_grasp_dynamics
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import val_untangle, Scenario
+from mjregrasping.scenarios import Scenario
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
 class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
-    def __init__(self, scenario: Scenario, op_goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
-        super().__init__(op_goal, grasp_rrt, skeletons, seed)
+    def __init__(self, scenario: Scenario, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+        super().__init__(key_loc, grasp_rrt, skeletons, seed)
         self.scenario = scenario
 
     def costs(self, sim_grasp: SimGraspCandidate):
@@ -66,7 +65,7 @@ class TAMPRegraspPlanner(HomotopyRegraspPlanner):
             control_step(phy, command, sub_time_s)
             viz.viz(phy, is_planning=True)
 
-            results = op_goal.get_results(phy)
+            results = self.key_loc.get_results(phy)
             do_grasp_dynamics(phy, results)
 
             mppi.roll()

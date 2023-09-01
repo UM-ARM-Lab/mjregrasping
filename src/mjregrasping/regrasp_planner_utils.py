@@ -11,8 +11,8 @@ from mjregrasping.physics import Physics
 from moveit_msgs.msg import MotionPlanResponse
 
 
-def get_geodesic_dist(locs, op_goal: ObjectPointGoal):
-    return np.min(np.abs(locs - op_goal.loc))
+def get_geodesic_dist(locs, key_loc: float):
+    return np.min(np.abs(locs - key_loc))
 
 
 def get_will_be_grasping(s: Strategies, is_grasping: bool):

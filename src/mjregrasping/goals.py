@@ -186,7 +186,7 @@ class ObjectPointGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
 
-        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
@@ -199,7 +199,6 @@ class ObjectPointGoal(ObjectPointGoalBase):
 
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
-        grasp_near_cost = sum(grasp_near_cost)
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost)
         gripper_to_goal_cost = sum(gripper_to_goal_cost)
 
@@ -215,7 +214,6 @@ class ObjectPointGoal(ObjectPointGoalBase):
             keypoint_cost,
             grasp_finger_cost,
             grasp_pos_cost,
-            grasp_near_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
@@ -230,7 +228,6 @@ class ObjectPointGoal(ObjectPointGoalBase):
             "keypooint",
             "grasp_finger",
             "grasp_pos",
-            "grasp_near",
             "nongrasping_rope_contact",
             "gripper_to_goal",
             "ever_not_grasping",
@@ -305,12 +302,11 @@ class ThreadingGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
 
-        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
-        grasp_near_cost = sum(grasp_near_cost)
 
         gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
@@ -342,7 +338,6 @@ class ThreadingGoal(ObjectPointGoalBase):
             torso_cost,
             grasp_finger_cost,
             grasp_pos_cost,
-            grasp_near_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
@@ -360,7 +355,6 @@ class ThreadingGoal(ObjectPointGoalBase):
             "torso_cost",
             "grasp_finger",
             "grasp_pos",
-            "grasp_near",
             "nongrasping_rope_contact",
             "gripper_to_goal",
             "ever_not_grasping",
@@ -468,12 +462,11 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
 
-        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
-        grasp_near_cost = sum(grasp_near_cost)
 
         gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
@@ -506,7 +499,6 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
             torso_cost,
             grasp_finger_cost,
             grasp_pos_cost,
-            grasp_near_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
@@ -524,7 +516,6 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
             "torso_cost",
             "grasp_finger",
             "grasp_pos",
-            "grasp_near",
             "nongrasping_rope_contact",
             "gripper_to_goal",
             "ever_not_grasping",
@@ -591,7 +582,7 @@ class PullThroughGoal(ThreadingGoal):
 
         nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
 
-        grasp_finger_cost, grasp_pos_cost, grasp_near_cost = get_regrasp_costs(finger_qs, is_grasping,
+        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
                                                                                current_locs, grasp_locs,
                                                                                grasp_xpos, tools_pos, rope_points)
 
@@ -612,7 +603,6 @@ class PullThroughGoal(ThreadingGoal):
         unstable_cost = sum(unstable_cost)
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
-        grasp_near_cost = sum(grasp_near_cost)
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost)
         gripper_to_goal_cost = sum(gripper_to_goal_cost)
 
@@ -637,7 +627,6 @@ class PullThroughGoal(ThreadingGoal):
             torso_cost,
             grasp_finger_cost,
             grasp_pos_cost,
-            grasp_near_cost,
             next_reachability_cost,
             nongrasping_rope_contact_cost,
             gripper_to_goal_cost,
@@ -656,7 +645,6 @@ class PullThroughGoal(ThreadingGoal):
             "torso_cost",
             "grasp_finger",
             "grasp_pos",
-            "grasp_near",
             "next_reachability",
             "nongrasping_rope_contact",
             "gripper_to_goal",

@@ -5,14 +5,11 @@ import mujoco
 import numpy as np
 import rerun as rr
 
-import rospy
 from arc_utilities import ros_init
 from mjregrasping.goals import point_goal_from_geom, GraspLocsGoal
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist
-from mjregrasping.move_to_joint_config import execute_grasp_plan
-from mjregrasping.physics import get_q
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import threading
@@ -39,9 +36,9 @@ def main():
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
     goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
-    planner = HomotopyRegraspPlanner(goal, grasp_rrt, skeletons, seed=i)
+    planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons, seed=i)
 
-    initial_geodesic_cost = get_geodesic_dist(get_grasp_locs(phy), goal)
+    initial_geodesic_cost = get_geodesic_dist(get_grasp_locs(phy), goal.loc)
 
     ctrl = np.zeros(phy.m.nu)
     ctrl[0] = 0.02
@@ -86,7 +83,7 @@ def main():
         t += 1
         grasp = sim_grasps[i]
         cost_i = costs[i]
-        geodesic_cost_i = get_geodesic_dist(get_grasp_locs(grasp.phy), goal)
+        geodesic_cost_i = get_geodesic_dist(get_grasp_locs(grasp.phy), goal.loc)
         print(f'cost: {cost_i:.3f} {grasp.locs=:} {grasp.strategy=:}, geodesic: {geodesic_cost_i:.3f}')
         rr.log_text_entry("planned", f'cost: {cost_i:.3f} grasp: {grasp.locs=:}')
         viz.viz(grasp.phy, is_planning=True)
@@ -104,7 +101,7 @@ def main():
         t += 1
         grasp = sim_grasps[i]
         cost_i = costs[i]
-        geodesic_cost_i = get_geodesic_dist(get_grasp_locs(grasp.phy), goal)
+        geodesic_cost_i = get_geodesic_dist(get_grasp_locs(grasp.phy), goal.loc)
         print(f'cost: {cost_i:.3f} {grasp.locs=:} {grasp.strategy=:}, geodesic: {geodesic_cost_i:.3f}')
         rr.log_text_entry("planned", f'cost: {cost_i:.3f} grasp: {grasp.locs=:}')
         viz.viz(grasp.phy, is_planning=True)

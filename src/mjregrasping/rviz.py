@@ -291,10 +291,7 @@ class MjRViz:
             plot_lines_rviz(self.pub, skel, k)
 
 
-
-def plot_spheres_rviz(
-        pub, positions, colors, radius, frame_id="world", idx=0, label=""
-):
+def plot_spheres_rviz(pub, positions, colors, radius, frame_id="world", idx=0, label=""):
     msg = Marker()
     msg.action = Marker.ADD
     msg.type = Marker.SPHERE_LIST
@@ -314,9 +311,7 @@ def plot_spheres_rviz(
     pub.publish(array_msg)
 
 
-def plot_sphere_rviz(
-        pub, position, radius, frame_id="world", color="m", idx=0, label=""
-):
+def plot_sphere_rviz(pub, position, radius, frame_id="world", color="m", idx=0, label=""):
     msg = Marker()
     msg.action = Marker.ADD
     msg.type = Marker.SPHERE
@@ -358,9 +353,7 @@ def plot_point_rviz(pub, position, idx, label, color="g", frame_id="world"):
     pub.publish(array_msg)
 
 
-def plot_arrows_rviz(
-        pub, starts, directions, label, idx=0, color="g", frame_id="world", s=1
-):
+def plot_arrows_rviz(pub, starts, directions, label, idx=0, color="g", frame_id="world", s=1):
     msg = MarkerArray()
     for i, (start_i, dir_i) in enumerate(zip(starts, directions)):
         marker_msg = Marker()
@@ -405,9 +398,7 @@ def plot_points_rviz(pub, positions, idx, label, color="g", frame_id="world", s=
     pub.publish(msg)
 
 
-def plot_lines_rviz(
-        pub, positions, label, idx=0, color="g", colors=None, frame_id="world", scale=0.005
-):
+def plot_lines_rviz(pub, positions, label, idx=0, color="g", colors=None, frame_id="world", scale=0.005):
     marker_msg = Marker()
     marker_msg.header.frame_id = frame_id
     marker_msg.header.stamp = rospy.Time.now()
