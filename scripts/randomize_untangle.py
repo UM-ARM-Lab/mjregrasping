@@ -22,68 +22,45 @@ from mjregrasping.viz import make_viz, Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
-def randomize_rack(orignial_path: Path, rng: np.random.RandomState):
-    # load xml
-    parser = MujocoXmlExpander(orignial_path)
-    root = parser.xml_root
+def randomize_rack(original_path: Path, rng: np.random.RandomState):
+    mxml = MujocoXmlExpander(original_path)
 
-    # iterate over all worldbody elements
-    # and all body elements within them recursively
-    def _get_e(tag: str, name: str):
-        for e in root.iter(tag):
-            if "name" in e.attrib and e.attrib["name"] == name:
-                return e
-
-    def _get_vec(e, k: str):
-        x_str = e.attrib[k]
-        x = [float(x) for x in x_str.split()]
-        return x
-
-    def _set_vec(e, x, k: str):
-        x_str = " ".join([str(x) for x in x])
-        e.attrib[k] = x_str
-
-    def _set_vec_i(e, k: str, i: int, x_i: float):
-        x = _get_vec(e, k)
-        x[i] = x_i
-        _set_vec(e, x, k)
-
-    attach = _get_e("body", "attach")
-    attach_pos = _get_vec(attach, 'pos')
+    attach = mxml.get_e("body", "attach")
+    attach_pos = mxml.get_vec(attach, 'pos')
     attach_pos[0] += rng.uniform(-0.05, 0.05)
     attach_pos[1] += rng.uniform(-0.05, 0.05)
-    _set_vec(attach, attach_pos, 'pos')
+    mxml.set_vec(attach, attach_pos, 'pos')
 
     # shrink the computer rack in the X axis
     # h will be the half-size in X of the bottom/top geoms of the rack
     h = rng.uniform(0.2, 0.45)
-    rack1_bottom = _get_e("geom", "rack1_bottom")
-    rack1_post1 = _get_e("geom", "rack1_post1")
-    post_size = _get_vec(rack1_post1, 'size')
-    rack1_post2 = _get_e("geom", "rack1_post2")
-    rack1_post3 = _get_e("geom", "rack1_post3")
-    rack1_post4 = _get_e("geom", "rack1_post4")
-    rack2_bottom = _get_e("geom", "rack2_bottom")
-    rack2_top = _get_e("geom", "rack2_top")
-    rack2_post1 = _get_e("geom", "rack2_post1")
-    rack2_post2 = _get_e("geom", "rack2_post2")
-    rack2_post3 = _get_e("geom", "rack2_post3")
-    rack2_post4 = _get_e("geom", "rack2_post4")
-    _set_vec_i(rack1_bottom, 'size', 1, h + post_size[1] - 0.001)
-    _set_vec_i(rack2_bottom, 'size', 1, h)
-    _set_vec_i(rack2_top, 'size', 1, h + post_size[1] - 0.001)
-    _set_vec_i(rack1_post1, 'pos', 1, -h)
-    _set_vec_i(rack1_post2, 'pos', 1, h)
-    _set_vec_i(rack1_post3, 'pos', 1, -h)
-    _set_vec_i(rack1_post4, 'pos', 1, h)
-    _set_vec_i(rack2_post1, 'pos', 1, -h)
-    _set_vec_i(rack2_post2, 'pos', 1, h)
-    _set_vec_i(rack2_post3, 'pos', 1, -h)
-    _set_vec_i(rack2_post4, 'pos', 1, h)
+    rack1_bottom = mxml.get_e("geom", "rack1_bottom")
+    rack1_post1 = mxml.get_e("geom", "rack1_post1")
+    post_size = mxml.get_vec(rack1_post1, 'size')
+    rack1_post2 = mxml.get_e("geom", "rack1_post2")
+    rack1_post3 = mxml.get_e("geom", "rack1_post3")
+    rack1_post4 = mxml.get_e("geom", "rack1_post4")
+    rack2_bottom = mxml.get_e("geom", "rack2_bottom")
+    rack2_top = mxml.get_e("geom", "rack2_top")
+    rack2_post1 = mxml.get_e("geom", "rack2_post1")
+    rack2_post2 = mxml.get_e("geom", "rack2_post2")
+    rack2_post3 = mxml.get_e("geom", "rack2_post3")
+    rack2_post4 = mxml.get_e("geom", "rack2_post4")
+    mxml.set_vec_i(rack1_bottom, 'size', 1, h + post_size[1] - 0.001)
+    mxml.set_vec_i(rack2_bottom, 'size', 1, h)
+    mxml.set_vec_i(rack2_top, 'size', 1, h + post_size[1] - 0.001)
+    mxml.set_vec_i(rack1_post1, 'pos', 1, -h)
+    mxml.set_vec_i(rack1_post2, 'pos', 1, h)
+    mxml.set_vec_i(rack1_post3, 'pos', 1, -h)
+    mxml.set_vec_i(rack1_post4, 'pos', 1, h)
+    mxml.set_vec_i(rack2_post1, 'pos', 1, -h)
+    mxml.set_vec_i(rack2_post2, 'pos', 1, h)
+    mxml.set_vec_i(rack2_post3, 'pos', 1, -h)
+    mxml.set_vec_i(rack2_post4, 'pos', 1, h)
 
     # compute the extents of the rack for placing the box and computer on it
-    rack1_bottom_pos = _get_vec(rack1_bottom, 'pos')
-    bottom_size = _get_vec(rack1_bottom, 'size')
+    rack1_bottom_pos = mxml.get_vec(rack1_bottom, 'pos')
+    bottom_size = mxml.get_vec(rack1_bottom, 'size')
 
     x0 = rack1_bottom_pos[0] - bottom_size[0] / 2
     x1 = rack1_bottom_pos[0] + bottom_size[0] / 2
@@ -91,29 +68,28 @@ def randomize_rack(orignial_path: Path, rng: np.random.RandomState):
     y1 = rack1_bottom_pos[1] + bottom_size[1] / 2
 
     # place the box on the rack
-    box1 = _get_e("geom", "box1")
-    box1_size = _get_vec(box1, 'size')
+    box1 = mxml.get_e("geom", "box1")
+    box1_size = mxml.get_vec(box1, 'size')
     box1_x0 = x0 + box1_size[0] / 2
     box1_x1 = x1 - box1_size[0] / 2
     box1_y0 = y0 + box1_size[1] / 2
     box1_y1 = y1 - box1_size[1] / 2
-    _set_vec_i(box1, 'pos', 0, rng.uniform(box1_x0, box1_x1))
-    _set_vec_i(box1, 'pos', 1, rng.uniform(box1_y0, box1_y1))
+    mxml.set_vec_i(box1, 'pos', 0, rng.uniform(box1_x0, box1_x1))
+    mxml.set_vec_i(box1, 'pos', 1, rng.uniform(box1_y0, box1_y1))
 
     # place the computer on the rack
-    case = _get_e("geom", "case")
-    case_size = _get_vec(case, 'size')
-    computer = _get_e("body", "computer")
-    computer_pos = _get_vec(computer, 'pos')
+    case = mxml.get_e("geom", "case")
+    case_size = mxml.get_vec(case, 'size')
+    computer = mxml.get_e("body", "computer")
+    computer_pos = mxml.get_vec(computer, 'pos')
     c_y0 = -h + case_size[1] / 2
     c_y1 = h - case_size[1] / 2
     computer_pos[1] = rng.uniform(c_y0, c_y1)
-    _set_vec(computer, computer_pos, 'pos')
+    mxml.set_vec(computer, computer_pos, 'pos')
 
-    # save to new temp xml file and return the path
-    new_filename = 'models/tmp.xml'
-    parser.xml_tree.write(new_filename)
-    return Path(new_filename)
+    tmp_path = mxml.save_tmp()
+    m = mujoco.MjModel.from_xml_path(str(tmp_path))
+    return m
 
 
 def randomize_qpos(phy: Physics, rng: np.random.RandomState, viz: Optional[Viz]):
@@ -144,9 +120,7 @@ def main():
         good = False
         while not good:
             # Configure the model before we construct the data and physics object
-            new_path = randomize_rack(scenario.xml_path, rng)
-
-            m = mujoco.MjModel.from_xml_path(str(new_path))
+            m = randomize_rack(scenario.xml_path, rng)
 
             d = mujoco.MjData(m)
             objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
@@ -175,7 +149,8 @@ def main():
             for j in range(5):
                 loc = rng.uniform(0.5, 1.0)
                 grasp_rrt.fix_start_state_in_place(phy, viz)
-                res, scene_msg = grasp_rrt.plan(phy, [Strategies.STAY, Strategies.NEW_GRASP], [-1, loc], viz, pos_noise=0.2)
+                res, scene_msg = grasp_rrt.plan(phy, [Strategies.STAY, Strategies.NEW_GRASP], [-1, loc], viz,
+                                                pos_noise=0.2)
                 if res.error_code.val == MoveItErrorCodes.SUCCESS:
                     teleport_to_end_of_plan(phy, res)
                     activate_grasp(phy, 'right', loc)

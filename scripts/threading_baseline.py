@@ -12,18 +12,18 @@ from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
-from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, WeifuThreadingGoal
+from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, ThreadingGoal
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, activate_grasp
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.homotopy_utils import skeleton_field_dir
 from mjregrasping.params import hp
-from mjregrasping.trials import load_trial
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import threading
 from mjregrasping.teleport_to_plan import teleport_to_planned_q
+from mjregrasping.trap_detection import TrapDetection
+from mjregrasping.trials import load_trial
 from mjregrasping.viz import make_viz
 
 
@@ -59,9 +59,9 @@ def main():
 
         end_loc = 0.98
         goals = [
-            WeifuThreadingGoal(grasp_goal, skeletons, 'loop1', end_loc, sdf, viz),
-            WeifuThreadingGoal(grasp_goal, skeletons, 'loop2', end_loc, sdf, viz),
-            WeifuThreadingGoal(grasp_goal, skeletons, 'loop3', end_loc, sdf, viz),
+            ThreadingGoal(grasp_goal, skeletons, 'loop1', end_loc, viz),
+            ThreadingGoal(grasp_goal, skeletons, 'loop2', end_loc, viz),
+            ThreadingGoal(grasp_goal, skeletons, 'loop3', end_loc, viz),
             point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
         ]
         goal = goals[goal_idx]
@@ -111,20 +111,13 @@ def main():
                     control_step(phy, np.zeros(phy.m.nu), sub_time_s=1.0, mov=mov)
                     viz.viz(phy, False)
 
-                    # Our method
-                    planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons)
-
-                    goal = goals[goal_idx]
-                    grasp_goal.set_grasp_locs(np.array([-1, goal.loc]))
-
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
             mppi_viz(mppi, goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s, mov=mov)
             viz.viz(phy)
 
-            results = goal.get_results(phy)
-            do_grasp_dynamics(phy, results)
+            do_grasp_dynamics(phy)
 
             mppi.roll()
 

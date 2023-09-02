@@ -1,7 +1,12 @@
-<mujoco model="cable_harness_scene">
+<mujoco model="threading_scene">
     <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
+    <default>
+        <default class="visual">
+            <geom contype="0" conaffinity="0" group="2"/>
+        </default>
+    </default>
     <include file="materials.xml"/>
     <include file="cc_sphere.xml"/>
     <include file="floor.xml"/>
-    <include file="cable_harness_obstacles.xml"/>
+    <include file="threading_obstacles.xml"/>
 </mujoco>

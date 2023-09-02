@@ -1,26 +1,20 @@
-from copy import deepcopy, copy
-from time import perf_counter
+from copy import deepcopy
 from typing import Dict, Optional
 
 import numpy as np
-import pysdf_tools
 from numpy.linalg import norm
 
+from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, \
     get_nongrasping_rope_contact_cost, get_regrasp_costs
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_locations_to_xpos
-from mjregrasping.grasp_strategies import get_strategy, Strategies
+from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_is_grasping, get_grasp_locs, get_finger_qs
-from mjregrasping.grasp_and_settle import grasp_and_settle
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
-from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.homotopy_utils import skeleton_field_dir
 from mjregrasping.my_transforms import angle_between
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.rrt import GraspRRT
 from mjregrasping.viz import Viz
-from moveit_msgs.msg import MotionPlanResponse
 from tf.transformations import quaternion_from_matrix
 from visualization_msgs.msg import MarkerArray, Marker
 
@@ -47,6 +41,7 @@ def get_angle_cost(skel, loc, rope_points):
     rope_deltas = rope_points[1:] - rope_points[:-1]  # [t-1, n, 3]
     bfield_dirs_flat = skeleton_field_dir(skel, rope_points[:-1].reshape(-1, 3))
     bfield_dirs = bfield_dirs_flat.reshape(rope_deltas.shape)  # [t-1, n, 3]
+    # no_motion_cost = np.exp(-100 * np.linalg.norm(rope_deltas, axis=-1))
     angle_cost = angle_between(rope_deltas, bfield_dirs)
     # weight by the geodesic distance from each rope point to the loc we're threading through
     w = np.exp(-hp['thread_geodesic_w'] * np.abs(np.linspace(0, 1, rope_points.shape[1]) - loc))
@@ -187,8 +182,8 @@ class ObjectPointGoal(ObjectPointGoalBase):
         nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
 
         grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                               current_locs, grasp_locs,
-                                                                               grasp_xpos, tools_pos, rope_points)
+                                                              current_locs, grasp_locs,
+                                                              grasp_xpos, tools_pos, rope_points)
 
         gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
@@ -253,160 +248,7 @@ def perturb_locs(strategy, locs):
 
 class ThreadingGoal(ObjectPointGoalBase):
 
-    def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_name, loc: float, next_tool_name: str,
-                 next_locs, next_h,
-                 grasp_rrt: GraspRRT, sdf: pysdf_tools.SignedDistanceField, viz: Viz):
-        self.skel = skeletons[skeleton_name]
-        goal_point = np.mean(self.skel[:4], axis=0)
-        super().__init__(goal_point, loc, viz)
-
-        self.skeletons = skeletons
-        self.goal_dir = skeleton_field_dir(self.skel, self.goal_point[None])[0] * 0.01
-        self.next_tool_name = next_tool_name
-        self.next_locs = next_locs
-        self.next_h = next_h
-        self.grasp_rrt = grasp_rrt
-        self.sdf = sdf
-        self.grasp_goal = grasp_goal
-
-    def get_results(self, phy: Physics):
-        tools_pos, joint_positions, contact_cost, is_unstable = get_results_common(phy)
-        is_grasping = get_is_grasping(phy)
-        rope_points = get_rope_points(phy)
-        finger_qs = get_finger_qs(phy)
-        op_goal_body_idx, op_goal_offset = grasp_locations_to_indices_and_offsets(self.loc, phy)
-        keypoint = get_keypoint(phy, op_goal_body_idx, op_goal_offset)
-
-        current_locs = get_grasp_locs(phy)
-
-        grasp_locs = self.grasp_goal.get_grasp_locs()
-
-        nongrasping_rope_contact_cost = get_nongrasping_rope_contact_cost(phy, grasp_locs)
-
-        grasp_xpos = grasp_locations_to_xpos(phy, grasp_locs)
-        next_xpos = grasp_locations_to_xpos(phy, self.next_locs)
-
-        return result(tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint,
-                      finger_qs, grasp_locs, grasp_xpos, next_xpos, joint_positions, nongrasping_rope_contact_cost)
-
-    def viz_goal(self, phy: Physics):
-        self.viz.arrow('goal_dir', self.goal_point, self.goal_dir, 'g')
-        xpos = grasp_locations_to_xpos(phy, [self.loc])[0]
-        self.viz.sphere('current_loc', xpos, 0.015, 'g')
-
-    def costs(self, results, u_sample):
-        (tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint, finger_qs,
-         grasp_locs, grasp_xpos, next_xpos, joint_positions, nongrasping_rope_contact_cost) = as_floats(results)
-
-        unstable_cost = is_unstable * hp['unstable_weight']
-
-        nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
-
-        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                               current_locs, grasp_locs,
-                                                                               grasp_xpos, tools_pos, rope_points)
-        grasp_finger_cost = sum(grasp_finger_cost)
-        grasp_pos_cost = sum(grasp_pos_cost)
-
-        gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
-        gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
-        gripper_to_goal_cost = sum(gripper_to_goal_cost)
-
-        smoothness_cost = get_smoothness_cost(u_sample)
-
-        contact_cost = sum(contact_cost)
-        unstable_cost = sum(unstable_cost)
-
-        no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
-        ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
-
-        keypoint_dist = self.keypoint_dist_to_goal(keypoint)[1:]
-        keypoint_cost = sum(keypoint_dist * hp['keypoint_weight'])
-
-        angle_cost = get_angle_cost(self.skel, self.loc, rope_points)
-
-        sdf_cost = get_next_xpos_sdf_cost(self.sdf, next_xpos, self.next_locs)
-
-        torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
-
-        return (
-            contact_cost,
-            unstable_cost,
-            angle_cost,
-            keypoint_cost,
-            sdf_cost,
-            torso_cost,
-            grasp_finger_cost,
-            grasp_pos_cost,
-            nongrasping_rope_contact_cost,
-            gripper_to_goal_cost,
-            ever_not_grasping_cost,
-            smoothness_cost,
-        )
-
-    @staticmethod
-    def cost_names():
-        return [
-            "contact",
-            "unstable",
-            "threading_angle",
-            "threading_keypoint",
-            "threading_sdf",
-            "torso_cost",
-            "grasp_finger",
-            "grasp_pos",
-            "nongrasping_rope_contact",
-            "gripper_to_goal",
-            "ever_not_grasping",
-            "smoothness",
-        ]
-
-    def satisfied(self, phy: Physics):
-        # See if we can grasp the next loc and if we can, and it's the right homotopy, then we're done
-        res, scene_msg = self.plan_to_next_locs(phy)
-        if res is None:
-            return False
-        else:
-            satisfied = self.satisfied_from_res(phy, res)
-            return satisfied
-
-    def satisfied_from_res(self, phy: Physics, res: MotionPlanResponse):
-        if res is None:
-            return False
-
-        phy_plan = phy.copy_all()
-        teleport_to_end_of_plan(phy_plan, res)
-        grasp_and_settle(phy_plan, self.next_locs, viz=None, is_planning=True)
-
-        h, _ = get_full_h_signature_from_phy(self.skeletons, phy_plan,
-                                             collapse_empty_gripper_cycles=False,
-                                             gripper_ids_in_h_signature=True)
-        satisfied = h == self.next_h
-        return satisfied
-
-    def plan_to_next_locs(self, phy: Physics):
-        next_locs = copy(self.next_locs)
-        for _ in range(5):
-            current_locs = get_grasp_locs(phy)
-            strategy = get_strategy(current_locs, next_locs)
-
-            t0 = perf_counter()
-            res, scene_msg = self.grasp_rrt.plan(phy, strategy, next_locs, viz=self.viz, allowed_planning_time=1.0)
-            plan_found = res.error_code.val == res.error_code.SUCCESS
-            print(f'dt: {perf_counter() - t0:.4f}, {plan_found=}')
-            if plan_found:
-                return res, scene_msg
-
-            # perturb the next locs a little
-            next_locs = perturb_locs(strategy, next_locs)
-
-        return None, None
-
-
-class WeifuThreadingGoal(ObjectPointGoalBase):
-
-    def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_name, loc: float,
-                 sdf: pysdf_tools.SignedDistanceField, viz: Viz):
+    def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_name, loc: float, viz: Viz):
         """
 
         Args:
@@ -414,20 +256,15 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
             skeletons:
             skeleton_name:
             loc: This is analogous to the first reference point in Weifu's method
-            next_tool_name:
-            next_locs:
-            next_h:
-            grasp_rrt:
-            sdf:
             viz:
         """
+        self.skeleton_name = skeleton_name
         self.skel = skeletons[skeleton_name]
         goal_point = np.mean(self.skel[:4], axis=0)
         super().__init__(goal_point, loc, viz)
 
         self.skeletons = skeletons
         self.goal_dir = skeleton_field_dir(self.skel, self.goal_point[None])[0] * 0.01
-        self.sdf = sdf
         self.grasp_goal = grasp_goal
 
     def get_results(self, phy: Physics):
@@ -462,9 +299,13 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
 
+        min_dists_to_rope = np.min(pairwise_squared_distances(rope_points, tools_pos), axis=1)
+        nongrasping_rope_dist_cost = np.sum(min_dists_to_rope * np.logical_not(is_grasping), axis=-1)
+        nongrasping_rope_dist_cost = sum(nongrasping_rope_dist_cost) * hp['nongrasping_rope_dist_weight']
+
         grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                               current_locs, grasp_locs,
-                                                                               grasp_xpos, tools_pos, rope_points)
+                                                              current_locs, grasp_locs,
+                                                              grasp_xpos, tools_pos, rope_points)
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
 
@@ -485,9 +326,6 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
 
         angle_cost = get_angle_cost(self.skel, self.loc, rope_points)
 
-        dist = np.clip(self.sdf.GetValueByCoordinates(*keypoint[0])[0], -1, 1)
-        sdf_cost = np.exp(-dist) * hp['weifu_sdf_weight']
-
         torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
 
         return (
@@ -495,11 +333,11 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
             unstable_cost,
             angle_cost,
             keypoint_cost,
-            sdf_cost,
             torso_cost,
             grasp_finger_cost,
             grasp_pos_cost,
             nongrasping_rope_contact_cost,
+            nongrasping_rope_dist_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
             smoothness_cost,
@@ -512,18 +350,20 @@ class WeifuThreadingGoal(ObjectPointGoalBase):
             "unstable",
             "threading_angle",
             "threading_keypoint",
-            "threading_sdf",
             "torso_cost",
             "grasp_finger",
             "grasp_pos",
             "nongrasping_rope_contact",
+            "nongrasping_rope_dist",
             "gripper_to_goal",
             "ever_not_grasping",
             "smoothness",
         ]
 
     def satisfied(self, phy: Physics, disc_center, disc_normal, disc_rad):
-        satisfied = penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy, self.loc, self.viz)
+        # NOTE: always using 1 here means regardless of which loc we're trying to push through the loop,
+        #  check whether the tip is penetrating the disc
+        satisfied = penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy, 1.0, self.viz)
         return satisfied
 
 
@@ -570,87 +410,6 @@ def penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy: Phys
         disc_msg.markers.append(disc_marker_msg)
         viz.markers_pub.publish(disc_msg)
     return satisfied
-
-
-class PullThroughGoal(ThreadingGoal):
-
-    def costs(self, results, u_sample):
-        (tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint, finger_qs,
-         grasp_locs, grasp_xpos, next_xpos, joint_positions, nongrasping_rope_contact_cost) = as_floats(results)
-
-        unstable_cost = is_unstable * hp['unstable_weight']
-
-        nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
-
-        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                                               current_locs, grasp_locs,
-                                                                               grasp_xpos, tools_pos, rope_points)
-
-        strategy = get_strategy(current_locs[0], self.next_locs)
-        is_new = np.array([[s == Strategies.NEW_GRASP for s in strategy]])
-        # Anything closer than 0.3m is considered reachable, anything further than 1.3m is considered unreachable
-        # and the cost scales linearly between those two distances.
-        dists_to_base = np.clip(norm(next_xpos, axis=-1), 0.3, 1.3)
-        next_reachability = np.sum(dists_to_base * is_new)
-        next_reachability_cost = next_reachability * hp['reachability_weight']
-
-        gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
-        gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
-
-        smoothness_cost = get_smoothness_cost(u_sample)
-
-        contact_cost = sum(contact_cost)
-        unstable_cost = sum(unstable_cost)
-        grasp_finger_cost = sum(grasp_finger_cost)
-        grasp_pos_cost = sum(grasp_pos_cost)
-        nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost)
-        gripper_to_goal_cost = sum(gripper_to_goal_cost)
-
-        no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
-        ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
-
-        keypoint_dist = self.keypoint_dist_to_goal(keypoint)[1:]
-        keypoint_cost = sum(keypoint_dist * hp['keypoint_weight'])
-
-        angle_cost = get_pull_through_cost(self.loc, rope_points, self.goal_dir)
-
-        sdf_cost = get_next_xpos_sdf_cost(self.sdf, next_xpos, self.next_locs)
-
-        torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
-
-        return (
-            contact_cost,
-            unstable_cost,
-            angle_cost,
-            keypoint_cost,
-            sdf_cost,
-            torso_cost,
-            grasp_finger_cost,
-            grasp_pos_cost,
-            next_reachability_cost,
-            nongrasping_rope_contact_cost,
-            gripper_to_goal_cost,
-            ever_not_grasping_cost,
-            smoothness_cost,
-        )
-
-    @staticmethod
-    def cost_names():
-        return [
-            "contact",
-            "unstable",
-            "threading_angle",
-            "threading_keypoint",
-            "threading_sdf",
-            "torso_cost",
-            "grasp_finger",
-            "grasp_pos",
-            "next_reachability",
-            "nongrasping_rope_contact",
-            "gripper_to_goal",
-            "ever_not_grasping",
-            "smoothness",
-        ]
 
 
 def point_goal_from_geom(grasp_goal: GraspLocsGoal, phy: Physics, geom: str, loc: float, viz: Viz):

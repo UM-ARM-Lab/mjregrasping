@@ -11,9 +11,22 @@ from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.viz import Viz
 
 
-def release_and_settle(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
-    needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
+def deactivate_moving(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+    needs_release = [s == Strategies.MOVE for s in strategy]
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
 
+
+def deactivate_release(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+    needs_release = [s == Strategies.RELEASE for s in strategy]
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
+
+
+def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+    needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
+
+
+def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)

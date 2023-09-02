@@ -2,7 +2,7 @@
 import numpy as np
 from numpy.linalg import norm
 
-from mjregrasping.geometry import point_to_line_segment, pairwise_squared_distances
+from mjregrasping.geometry import point_to_line_segment
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp

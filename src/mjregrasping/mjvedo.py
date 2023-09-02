@@ -28,15 +28,15 @@ class MjVedo:
         pb = ProgressBarWidget(num_frames)
         self.plotter += pb
 
-        video = Video(filename, fps=self.fps, backend="ffmpeg")
+        # video = Video(filename, fps=self.fps, backend="ffmpeg")
 
         for t in range(num_frames):
             anim_func(t, self.plotter)
-            video.add_frame()
+            # video.add_frame()
             self.plotter.show(interactive=False)
             pb.update()
 
-        video.close()
+        # video.close()
 
     def viz(self, phy: Physics, is_planning=False):
         m = phy.m

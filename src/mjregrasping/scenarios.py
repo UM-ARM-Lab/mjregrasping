@@ -23,7 +23,6 @@ class Scenario:
     robot_data: RobotData
     rope_name: str
     noise_sigma: Union[np.ndarray, float]
-    max_iters: int
 
 
 conq_hose = Scenario(
@@ -33,7 +32,6 @@ conq_hose = Scenario(
     robot_data=conq,
     rope_name="rope",
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
-    max_iters=250,
 )
 
 val_untangle = Scenario(
@@ -43,7 +41,6 @@ val_untangle = Scenario(
     robot_data=val,
     rope_name="rope",
     noise_sigma=np.deg2rad(2),
-    max_iters=250,
 )
 
 threading = Scenario(
@@ -53,7 +50,6 @@ threading = Scenario(
     robot_data=val,
     rope_name="rope",
     noise_sigma=np.deg2rad(1),
-    max_iters=250,
 )
 
 
@@ -136,34 +132,6 @@ def make_conq_hose_goal(viz):
     goal_point = np.array([1.5, -0.75, 0.04])
     goal = ObjectPointGoal(goal_point, goal_radius=0.15, loc=1, viz=viz)
     return goal
-
-
-def setup_threading(phy, viz):
-    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
-    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
-    phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
-    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0.2, np.pi)
-
-    activate_grasp(phy, 'attach1', 0.0)
-
-    q = np.array([
-        0.4, 0.8,  # torso
-        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
-        0,  # left gripper
-        0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
-        0.2,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-    activate_grasp(phy, 'right', 0.93)
-    settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
-    q = np.array([
-        -0.3, 0.0,  # torso
-        -0.2, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
-        0,  # left gripper
-        -0.1, 0.0, 0, 0.0, 0, -0.0, -1.7,  # right arm
-        0.06,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
 
 
 def dx(x):
@@ -268,5 +236,3 @@ def get_untangle_skeletons(phy: Physics):
             dz(-m.geom("rack2_post3").size[2] * 2),
         ], axis=0),
     }
-
-

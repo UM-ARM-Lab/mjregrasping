@@ -5,7 +5,7 @@ import rerun as rr
 from pymjregrasping_cpp import seedOmpl
 
 from mjregrasping.goal_funcs import get_rope_points, locs_eq
-from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
+from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
@@ -13,11 +13,11 @@ from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist, get_all_strategies_from_phy, SimGraspCandidate, \
-    SimGraspInput
+    SimGraspInput, get_will_be_grasping
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.viz import Viz
-from moveit_msgs.msg import MoveItErrorCodes
+from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
 
 
 class HomotopyRegraspPlanner:
@@ -26,7 +26,8 @@ class HomotopyRegraspPlanner:
         """
 
         Args:
-            key_loc: The location on the rope which we care about "using" for the task
+            key_loc: The location on the rope which we care about "using" for the task. The cost will try to minimize
+                     geometric distance to this location.
             grasp_rrt:
             skeletons:
             seed:
@@ -66,9 +67,15 @@ class HomotopyRegraspPlanner:
 
     def sample_grasp_inputs(self, phy):
         grasps_inputs = []
+        current_locs = get_grasp_locs(phy)
         is_grasping = get_is_grasping(phy)
         for strategy in get_all_strategies_from_phy(phy):
+            if not self.is_valid_strategy(strategy, is_grasping):
+                continue
+
+            # convert to numpy arrays
             for i in range(hp['n_grasp_samples']):
+                # Always include the key location, 0, and 1 as candidate locations
                 if i == 0:
                     sample_loc = self.key_loc
                 elif i == 1:
@@ -78,11 +85,13 @@ class HomotopyRegraspPlanner:
                 else:
                     sample_loc = self.rng.uniform(0, 1)
                 candidate_locs = []
-                for tool_name, s_i, is_grasping_i in zip(phy.o.rd.tool_sites, strategy, is_grasping):
+                for tool_name, s_i, loc_i in zip(phy.o.rd.tool_sites, strategy, current_locs):
                     if s_i in [Strategies.NEW_GRASP, Strategies.MOVE]:
                         candidate_locs.append(sample_loc)
-                    elif s_i in [Strategies.RELEASE, Strategies.STAY]:
+                    elif s_i == Strategies.RELEASE:
                         candidate_locs.append(-1)
+                    elif s_i == Strategies.STAY:
+                        candidate_locs.append(loc_i)
 
                 candidate_locs = np.array(candidate_locs)
 
@@ -175,8 +184,9 @@ class HomotopyRegraspPlanner:
         phy_plan = phy.copy_all()
 
         # release and settle for any moving grippers
-        release_and_settle(phy_plan, strategy, viz=viz, is_planning=True)
+        deactivate_release_and_moving(phy_plan, strategy, viz=viz, is_planning=True)
 
+        # check if we need to move the arms at all
         res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
@@ -194,3 +204,15 @@ class HomotopyRegraspPlanner:
         grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
 
         return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+
+    def is_valid_strategy(self, s, is_grasping):
+        will_be_grasping = [get_will_be_grasping(s_i, g_i) for s_i, g_i in zip(s, is_grasping)]
+        if not any(will_be_grasping):
+            return False
+        if all([s_i == Strategies.STAY for s_i in s]):
+            return False
+        if all([s_i == Strategies.RELEASE for s_i in s]):
+            return False
+        if sum([s_i in [Strategies.MOVE, Strategies.NEW_GRASP] for s_i in s]) > 1:
+            return False
+        return True

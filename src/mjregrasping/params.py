@@ -17,7 +17,7 @@ hp = {
     "grasp_finger_weight":             0.5,
     "grasp_loc_diff_thresh":           0.025,  # A percentage of rope length
     "smoothness_weight":               0.02,
-    "angle_cost_weight":               0.2,  # for ThreadingGoal
+    "angle_cost_weight":               0.25,  # for ThreadingGoal
     "thread_geodesic_w":               20.0,
     "unstable_weight":                 100,
     "ever_not_grasping_weight":        5.0,
@@ -29,6 +29,7 @@ hp = {
     "settle_steps":                    10,
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
+    "nongrasping_rope_dist_weight":    0.18,
     "gripper_to_goal_weight":          0.2,
     "robot_dq_weight":                 0.5,
     "rope_dq_weight":                  5.0,
@@ -54,8 +55,5 @@ hp = {
     "joint_kp":                        6.0,
     "act_windup_limit":                0.02,
     "start_state_jiggle_deg":          2,
-    "bayes_opt":                       {
-        "n_iter": 14,
-        "n_init": 6,
-    }
+    "scootch_fraction":                0.03,
 }

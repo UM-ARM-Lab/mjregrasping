@@ -2,9 +2,5 @@
     <equality>
         <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181" active="false" solref="0.04 1"/>
         <connect body1="drive10" body2="B_first" name="right" anchor="0 0 0.181" active="false" solref="0.04 1"/>
-        <connect body1="drive50" body2="world" name="left_world" anchor="0 0 0.181" active="false" solref="0.02 1"/>
-        <connect body1="drive10" body2="world" name="right_world" anchor="0 0 0.181" active="false" solref="0.02 1"/>
-        <connect body1="world" body2="B_first" name="rope_left_world" anchor="0 0 0" active="false" solref="0.04 1"/>
-        <connect body1="world" body2="B_first" name="rope_right_world" anchor="0 0 0" active="false" solref="0.04 1"/>
     </equality>
 </mujoco>

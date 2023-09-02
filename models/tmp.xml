@@ -1,7 +1,4 @@
-<mujoco model="untangle">
-    <visual>
-        <scale contactwidth="0.02" contactheight="0.005" />
-    </visual>
+<mujoco model="threading_scene">
     <default>
         <joint stiffness="0.5" />
         <geom friction="0.01" />
@@ -13,12 +10,21 @@
     <worldbody>
         
         <body name="mycamera">
-            <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4" />
+            <camera mode="fixed" name="mycamera" xyaxes="1.0 0 0 0.0 1.0 0.5" pos="0.0 -0.2 2.0" />
         </body>
-        <light name="overhead1" pos="0 0 10" mode="trackcom" />
+        <light name="top" pos="-1 0 105" mode="trackcom" />
     </worldbody>
     <equality>
-        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1" />
+        <connect body1="attach1" body2="B_first" name="attach1" anchor="0 -0.03 0" active="false" solref="0.03 1" />
+    </equality>
+    <equality>
+        <connect body1="attach2" body2="B_first" name="attach2" anchor="0 0.03 0" active="false" solref="0.03 1" />
+    </equality>
+    <equality>
+        
+        <connect body1="loop1" body2="B_first" name="attach_loop1" anchor="0 0 0.06" active="false" solref="0.03 1" />
+        <connect body1="loop2" body2="B_first" name="attach_loop2" anchor="0 0 0.06" active="false" solref="0.03 1" />
+        <connect body1="loop3" body2="B_first" name="attach_loop3" anchor="0 0 0.06" active="false" solref="0.03 1" />
     </equality>
 <asset>
         <texture file="textures/light-wood.png" type="2d" name="tex-light-wood" />
@@ -79,11 +85,9 @@
                                 <geom type="mesh" mesh="MK4_MT" name="drive41_mesh" rgba="0.2 0.2 0.2 1" />
                             </body>
                             <body name="drive42" pos="-0.174736 0 0.44399" quat="0.5 -0.5 -0.5 -0.5">
-                                mass="0.372" diaginertia="0.000423 0.000381 0.000247"/&gt;
                                 <joint name="joint41" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2" damping="20" frictionloss="1" />
                                 <geom type="mesh" mesh="MK4_LT" name="drive42_mesh" rgba="0.2 0.2 0.2 1" />
                                 <body name="leftshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 -0.707107">
-                                    mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/&gt;
                                     <joint name="joint42" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-0.15 3.14159" damping="8" frictionloss="1" />
                                     <geom type="mesh" mesh="SHOULDER_BRACKET" name="left_shoulder_bracket" rgba="0.2 0.2 0.2 1" />
                                     <body pos="0 -0.1 0.07526" quat="0.707107 -0.707107 0 0" name="drive43">
@@ -247,41 +251,10 @@
         <joint name="right_mimic" joint1="rightgripper" joint2="rightgripper2" solref="0.01 1" />
     </equality>
 <worldbody>
-        <body name="computer_rack" pos="0 0.8 -0.445" quat="0.707 0 0 0.707">
-            <body name="wall">
-                <geom name="wall" type="box" pos="0 0.7 0.975" size="5 0.01 1" rgba="0.8 0.8 0.8 1" />
-                <geom name="wall2" type="box" pos="0.6 0 0.975" size="0.01 5 1" rgba="0.8 0.8 0.8 1" />
-            </body>
-            <body name="attach" pos="0.007594649555617929 0.3429296197576214 0.59">
-                <geom name="rack_attach" type="box" size="0.005 0.005 0.005" rgba="0.5 0 0 1" />
-            </body>
-            <body name="racks" pos="0 0 0.03">
-                <body name="rack1">
-                    <geom name="rack1_bottom" type="box" pos="0 0 0" size="0.29 0.31864223811283093 0.03" material="dark-wood" rgba="0.2 0.2 0.2 1.0" />
-                    <geom name="rack1_post1" type="box" pos="-0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post2" type="box" pos="-0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post3" type="box" pos="0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack1_post4" type="box" pos="0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                </body>
-                <body name="rack2" pos="0 0 0.5">
-                    <geom name="rack2_bottom" type="box" size="0.25 0.27964223811283095 0.03" material="dark-wood" rgba="0.3 0.3 0.3 1.0" />
-                    <geom name="rack2_top" type="box" pos="0 0 0.45" size="0.29 0.31864223811283093 0.05" material="dark-wood" rgba="0.4 0.4 0.4 1.0" />
-                    <geom name="rack2_post1" type="box" pos="-0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post2" type="box" pos="-0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post3" type="box" pos="0.25 -0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="rack2_post4" type="box" pos="0.25 0.27964223811283095 0.25" size="0.04 0.04 0.25" material="metal" />
-                    <geom name="box1" type="box" pos="0.04185259499092041 -0.0657764539380079 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1" />
-                </body>
-                <body name="computer" pos="-0.12 0.09935572663695724 1.0">
-                    <geom name="case" type="box" pos="0 0 0.2" size="0.15 0.1 0.2" rgba="0.2 0.2 0.4 1" />
-                    <body name="port" pos="-0.15 0.04 0.25">
-                        <geom name="port" type="box" size="0.01 0.01 0.01" rgba="0.2 0.6 0.4 1" />
-                        <body name="goal" pos="-0.04 0.0 0.0">
-                            <geom name="goal" class="visual" type="sphere" size="0.05" rgba="1 0 1 0.3" />
-                        </body>
-                    </body>
-                </body>
-            </body>
+        <body pos="0 0 0" name="cc_sphere">
+            
+            <geom type="sphere" name="cc_sphere" size="0.005" rgba="1 1 1 0.1" />
+            <joint type="free" name="cc_sphere" damping="0.1" />
         </body>
     </worldbody>
 <worldbody>
@@ -290,28 +263,53 @@
         </body>
     </worldbody>
 <worldbody>
-        <body pos="0 0 0" euler="0 0 0" name="rope">
-            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001" />
-            <composite type="cable" curve="s" count="12 1 1" size="1 0.22 1">
-                <joint kind="main" damping=".015" />
-                <geom type="capsule" size=".01" rgba="0.8 0.2 0.1 1" condim="1" group="1" />
-            </composite>
-            <joint type="free" />
+        <body name="obstacles" pos="0 0.7 -0.6" euler="0 0 4.7123">
+            <body name="wall">
+                <geom type="box" name="wall" size="0.05 1 1" pos="0 0 1" material="cream-plaster" />
+            </body>
+            <light mode="fixed" pos="0.3 0.2 1.7" dir="-0.25 0.1 -1" diffuse="0.61 0.61 0.6" castshadow="false" />
+            <light mode="fixed" pos="0.3 -0.2 1.7" dir="-0.25 -0.1 -1" diffuse="0.61 0.61 0.6" castshadow="false" />
+            <body name="attach1" pos="0.05 0.75 1.5">
+                <geom name="attach1" size="0.02 0.02 0.02" rgba="1.0 0 0 1" />
+                <body name="cover">
+                    <geom name="cover" class="visual" type="box" size="0.05 0.05 0.05" rgba="1 0 0 1" />
+                </body>
+            </body>
+            <body name="attach2" pos="0.05 -0.75 1">
+                <geom name="attach2" type="sphere" size="0.02" rgba="1.0 0 0 1" />
+                <body name="goal">
+                    <geom name="goal" class="visual" type="sphere" size="0.05" rgba="1 0 1 0.3" />
+                </body>
+            </body>
+            <body name="loop1" pos="0.07 0.3633788101139821 0.9740024296493639">
+                <geom type="box" name="loop1_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
+                <geom type="box" name="loop1_front" pos="0.09 0 0.03" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1" />
+                <geom type="box" name="loop1_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
+            </body>
+            <body name="loop2" pos="0.07 0.05743420106793168 1.1598317128433449">
+                <geom type="box" name="loop2_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
+                <geom type="box" name="loop2_front" pos="0.09 0 0.03" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1" />
+                <geom type="box" name="loop2_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
+            </body>
+            <body name="loop3" pos="0.07 -0.3346224765296482 1.0561058352572912">
+                <geom type="box" name="loop3_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
+                <geom type="box" name="loop3_front" pos="0.09 0 0.04" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1" />
+                <geom type="box" name="loop3_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
+            </body>
         </body>
     </worldbody>
 <worldbody>
-        <body pos="0 0 0" name="cc_sphere">
-            
-            <geom type="sphere" name="cc_sphere" size="0.005" rgba="1 1 1 0.1" />
-            <joint type="free" name="cc_sphere" damping="0.1" />
+        <body pos="1.1 0.25 0.55" euler="0 0 -1.5707" name="rope">
+            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001" />
+            <composite type="cable" curve="s" count="12 1 1" size="2.0 0.22 1">
+                <joint kind="main" damping=".25" stiffness="1" />
+                <geom type="capsule" size=".01" rgba=".8 .2 .1 1" condim="1" group="1" />
+            </composite>
+            <joint type="free" />
         </body>
     </worldbody>
 <equality>
         <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181" active="false" solref="0.04 1" />
         <connect body1="drive10" body2="B_first" name="right" anchor="0 0 0.181" active="false" solref="0.04 1" />
-        <connect body1="drive50" body2="world" name="left_world" anchor="0 0 0.181" active="false" solref="0.02 1" />
-        <connect body1="drive10" body2="world" name="right_world" anchor="0 0 0.181" active="false" solref="0.02 1" />
-        <connect body1="world" body2="B_first" name="rope_left_world" anchor="0 0 0" active="false" solref="0.04 1" />
-        <connect body1="world" body2="B_first" name="rope_right_world" anchor="0 0 0" active="false" solref="0.04 1" />
     </equality>
 </mujoco>

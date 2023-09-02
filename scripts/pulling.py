@@ -12,7 +12,7 @@ from colorama import Fore
 import rospy
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
-from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
+from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.move_to_joint_config import execute_grasp_plan
@@ -114,7 +114,7 @@ def main():
                 print(Fore.RED + "Failed to find a plan." + Fore.RESET)
             viz.viz(best_grasp.phy, is_planning=True)
             # now execute the plan
-            release_and_settle(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
+            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
             execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
             grasp_goal.set_grasp_locs(best_grasp.locs)

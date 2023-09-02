@@ -9,12 +9,11 @@ from colorama import Fore
 
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
-from mjregrasping.grasp_and_settle import release_and_settle, grasp_and_settle
+from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.params import hp
+from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
@@ -54,9 +53,10 @@ def main():
 
         # from mjregrasping.explore_locs_regrasp_planner import ExploreLocsRegraspPlanner
         # planner = BaselineRegraspPlanner(goal, grasp_rrt, skeletons)
-        # from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
-        # planner = TAMPRegraspPlanner(scenario, goal, grasp_rrt, skeletons)
-        planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons)
+        from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
+        planner = TAMPRegraspPlanner(scenario, goal, grasp_rrt, skeletons)
+        # from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+        # planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons)
 
         goal.viz_goal(phy)
 
@@ -68,6 +68,7 @@ def main():
         viz.viz(phy)
         while True:
             if itr >= 200:
+                print(Fore.RED + "Task failed!" + Fore.RESET)
                 break
 
             goal.viz_goal(phy)
@@ -80,12 +81,12 @@ def main():
             needs_reset = False
             if is_stuck:
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
-                initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal.loc)
+                initial_geodesic_dist = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal.loc)
                 sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
                 best_grasp = planner.get_best(sim_grasps, viz=viz)
-                new_geodesic_cost = get_geodesic_dist(best_grasp.locs, goal.loc)
+                new_geodesic_dist = get_geodesic_dist(best_grasp.locs, goal.loc)
                 # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
-                if initial_geodesic_cost - new_geodesic_cost < 0.01:  # less than 1% closer to the keypoint
+                if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
                     print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
                     print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
                     planner.update_blacklists(phy)
@@ -94,7 +95,7 @@ def main():
                     print(Fore.RED + "Failed to find a plan." + Fore.RESET)
                 viz.viz(best_grasp.phy, is_planning=True)
                 # now execute the plan
-                release_and_settle(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
+                deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
                 execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
                 grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
                 grasp_goal.set_grasp_locs(best_grasp.locs)

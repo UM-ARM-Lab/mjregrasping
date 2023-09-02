@@ -1,37 +1,53 @@
 #!/usr/bin/env python3
-import pickle
 from pathlib import Path
 from typing import Optional
 
 import mujoco
 import numpy as np
 import rerun as rr
+from transformations import quaternion_from_euler
 
 from arc_utilities import ros_init
-from mjregrasping.mjcf_scene_to_sdf import save_sdf
+from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects
-from mjregrasping.physics import Physics, get_q
-from mjregrasping.trials import save_trial
+from mjregrasping.physics import Physics
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-from mjregrasping.scenarios import threading, setup_threading, get_threading_skeletons
+from mjregrasping.rviz import MujocoXmlExpander
+from mjregrasping.scenarios import threading, get_threading_skeletons
+from mjregrasping.settle import settle
+from mjregrasping.trials import save_trial
 from mjregrasping.viz import make_viz, Viz
 
 
-def randomize_loop_positions(m: mujoco.MjModel, rng: np.random.RandomState):
-    m.body("loop1").pos[1] += rng.uniform(-0.1, 0.1)
-    m.body("loop1").pos[2] += rng.uniform(-0.1, 0.1)
-    m.body("loop2").pos[1] += rng.uniform(-0.1, 0.1)
-    m.body("loop2").pos[2] += rng.uniform(-0.1, 0.1)
-    m.body("loop3").pos[1] += rng.uniform(-0.1, 0.1)
-    m.body("loop3").pos[2] += rng.uniform(-0.1, 0.1)
+def randomize_loop_positions(original_path: Path, rng: np.random.RandomState):
+    mxml = MujocoXmlExpander(original_path)
 
+    dy = 0.06
+    dz = 0.1
 
-def randomize_qpos(phy: Physics, rng: np.random.RandomState, viz: Optional[Viz]):
-    q = get_q(phy)
-    q[0] += np.deg2rad(rng.uniform(-5, 5))
-    q[1] += np.deg2rad(rng.uniform(-5, 5))
-    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+    loop1 = mxml.get_e("body", "loop1")
+    loop1_pos = mxml.get_vec(loop1, 'pos')
+    loop1_pos[1] += rng.uniform(-dy, dy)
+    loop1_pos[2] += rng.uniform(-dz, dz)
+    mxml.set_vec(loop1, loop1_pos, 'pos')
+
+    loop2 = mxml.get_e("body", "loop2")
+    loop2_pos = mxml.get_vec(loop2, 'pos')
+    loop2_pos[1] += rng.uniform(-dy, dy)
+    loop2_pos[2] += rng.uniform(-dz, dz)
+    mxml.set_vec(loop2, loop2_pos, 'pos')
+
+    loop3 = mxml.get_e("body", "loop3")
+    loop3_pos = mxml.get_vec(loop3, 'pos')
+    loop3_pos[1] += rng.uniform(-dy, dy)
+    loop3_pos[2] += rng.uniform(-dz, dz)
+    mxml.set_vec(loop3, loop3_pos, 'pos')
+
+    tmp_path = mxml.save_tmp()
+    m = mujoco.MjModel.from_xml_path(str(tmp_path))
+    return m
+
 
 
 @ros_init.with_ros("randomize_threading")
@@ -50,25 +66,49 @@ def main():
 
     rng = np.random.RandomState(0)
     for i in range(10):
-        m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
-
         # Configure the model before we construct the data and physics object
-        randomize_loop_positions(m, rng)
+        m = randomize_loop_positions(scenario.xml_path, rng)
 
         d = mujoco.MjData(m)
         objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)
 
-        setup_threading(phy, viz)
-        randomize_qpos(phy, rng, viz)
+        rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
+        rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
+        phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
+        phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0.2, np.pi)
 
-        sdf_path = root / f"{scenario.name}_{i}.sdf"
+        activate_grasp(phy, 'attach1', 0.0)
 
-        save_sdf(sdf_path, phy, 0.01, xmin=-0.95, xmax=0.95, ymin=0.2, ymax=0.85, zmin=-0.45, zmax=1.1)
+        q = np.array([
+            0.4, 0.0,  # torso
+            0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+            0,  # left gripper
+            0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
+            0.2,  # right gripper
+        ])
+        pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+        activate_grasp(phy, 'right', 0.93)
+        settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
+        q = np.array([
+            rng.uniform(-0.7, 0), rng.uniform(-0.2, 0.2),  # torso
+            -0.2, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+            0,  # left gripper
+            -0.1, 0.0, 0, 0.0, 0, -0.0, -1.7,  # right arm
+            0.06,  # right gripper
+        ])
+        pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+
+        loc = rng.uniform(0.91, 0.96)
+        activate_grasp(phy, 'right', loc)
+        settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
+
+        if viz:
+            viz.viz(phy)
 
         skeletons = get_threading_skeletons(phy)
 
-        save_trial(i, phy, scenario, sdf_path, skeletons)
+        save_trial(i, phy, scenario, None, skeletons)
 
 
 if __name__ == "__main__":

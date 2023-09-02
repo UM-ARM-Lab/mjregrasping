@@ -14,9 +14,6 @@
             <camera mode="fixed" name="mycamera" xyaxes="1.0 0 0 0.0 1.0 0.5" pos="0.0 -0.2 2.0"/>
         </body>
         <light name="top" pos="-1 0 105" mode="trackcom"/>
-        <body name="goal">
-            <geom name="goal" class="visual" type="sphere" pos="-0.75 0.63 0.4" size="0.05" rgba="1 0 1 0.3"/>
-        </body>
     </worldbody>
     <include file="val.xml"/>
     <include file="cc_sphere.xml"/>

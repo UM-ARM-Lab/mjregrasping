@@ -50,13 +50,11 @@
                                 <geom type="mesh" mesh="MK4_MT" name="drive41_mesh" rgba="0.2 0.2 0.2 1"/>
                             </body>
                             <body name="drive42" pos="-0.174736 0 0.44399" quat="0.5 -0.5 -0.5 -0.5">
-                                mass="0.372" diaginertia="0.000423 0.000381 0.000247"/>
                                 <joint name="joint41" type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-6.2 6.2"
                                        damping="20"
                                        frictionloss="1"/>
                                 <geom type="mesh" mesh="MK4_LT" name="drive42_mesh" rgba="0.2 0.2 0.2 1"/>
                                 <body name="leftshoulder" pos="0 0 -0.07526" quat="0.707107 0 0 -0.707107">
-                                    mass="0.202" diaginertia="0.000427 0.000404 5.04e-05"/>
                                     <joint name="joint42" type="hinge" pos="0 0 0" axis="0 0 1" limited="true" range="-0.15 3.14159"
                                            damping="8"
                                            frictionloss="1"/>

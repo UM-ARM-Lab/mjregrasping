@@ -76,6 +76,10 @@ class GraspRRT:
         return phy_plan.d.qpos[phy_plan.o.robot.qpos_indices], is_fixed
 
 
+class NoArmsMoving(Exception):
+    pass
+
+
 def plan_to_grasp(candidate_locs, phy_plan, strategy):
     # Run RRT to find a collision free path from the current q to candidate_pos
     # Then in theory we should do it for the subgoals too
@@ -97,5 +101,5 @@ def plan_to_grasp(candidate_locs, phy_plan, strategy):
     elif in_planning[1]:
         group_name = 'right_arm'
     else:
-        raise ValueError('No arms are moving!')
+        raise NoArmsMoving('No arms are moving!')
     return goals, group_name, q0
