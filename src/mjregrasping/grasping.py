@@ -45,7 +45,7 @@ def activate_grasp(phy: Physics, name, loc):
         mujoco.mju_mulPose(g_b_pos, g_b_quat, neg_gripper_pos, neg_gripper_quat, b_pos, b_quat)
 
         grasp_eq.data[0:3] = offset_body
-        grasp_eq.data[3:6] = np.array([0, 0, 0.17])
+        grasp_eq.data[3:6] = np.array([0, 0, 0.181])
         grasp_eq.data[6:10] = g_b_quat
 
 
@@ -81,15 +81,24 @@ def get_loc_idx_offset_xpos(phy: Physics):
         continue
 
 
-def get_eq_points(phy, eq, eq_constraint_idx):
-    body1_offset_in_body = phy.m.eq_data[eq_constraint_idx, 0:3]
-    body1_xmat = phy.d.xmat[eq.obj1id].reshape(-1, 3, 3)
-    body1_offset_in_world = (body1_xmat @ body1_offset_in_body)[0]
-    body1_pos = phy.d.xpos[eq.obj1id][0] + body1_offset_in_world
-    body2_xmat = phy.d.xmat[eq.obj2id].reshape(-1, 3, 3)
-    body2_offset_in_body = phy.m.eq_data[eq_constraint_idx, 3:6]
-    body2_offset_in_world = (body2_xmat @ body2_offset_in_body)[0]
-    body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
-    return body1_pos, body2_pos
-
-
+def get_eq_points(phy: Physics, eq):
+    if eq.type == mujoco.mjtEq.mjEQ_CONNECT:
+        body1_offset_in_body = eq.data[0:3]
+        body1_xmat = phy.d.xmat[eq.obj1id].reshape(-1, 3, 3)
+        body1_offset_in_world = (body1_xmat @ body1_offset_in_body)[0]
+        body1_pos = phy.d.xpos[eq.obj1id][0] + body1_offset_in_world
+        body2_xmat = phy.d.xmat[eq.obj2id].reshape(-1, 3, 3)
+        body2_offset_in_body = eq.data[3:6]
+        body2_offset_in_world = (body2_xmat @ body2_offset_in_body)[0]
+        body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
+        return body1_pos, body2_pos
+    elif eq.type == mujoco.mjtEq.mjEQ_WELD:
+        body1_offset_in_body = eq.data[3:6]
+        body1_xmat = phy.d.xmat[eq.obj1id].reshape(-1, 3, 3)
+        body1_offset_in_world = (body1_xmat @ body1_offset_in_body)[0]
+        body1_pos = phy.d.xpos[eq.obj1id][0] + body1_offset_in_world
+        body2_xmat = phy.d.xmat[eq.obj2id].reshape(-1, 3, 3)
+        body2_offset_in_body = eq.data[0:3]
+        body2_offset_in_world = (body2_xmat @ body2_offset_in_body)[0]
+        body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
+        return body1_pos, body2_pos

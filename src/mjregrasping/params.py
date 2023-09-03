@@ -19,6 +19,7 @@ hp = {
     "smoothness_weight":               0.02,
     "angle_cost_weight":               0.25,  # for ThreadingGoal
     "thread_geodesic_w":               20.0,
+    "final_keypoint_dist_weight":      10.0,
     "unstable_weight":                 100,
     "ever_not_grasping_weight":        5.0,
     "finger_q_open":                   0.3,
@@ -29,7 +30,7 @@ hp = {
     "settle_steps":                    10,
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
-    "nongrasping_rope_dist_weight":    0.18,
+    "nongrasping_rope_dist_weight":    0.15,
     "gripper_to_goal_weight":          0.2,
     "robot_dq_weight":                 0.5,
     "rope_dq_weight":                  5.0,

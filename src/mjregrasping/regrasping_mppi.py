@@ -9,7 +9,7 @@ import rospy
 from mjregrasping.goal_funcs import get_tool_points
 from mjregrasping.goals import MPPIGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets_and_xpos
-from mjregrasping.grasping import get_grasp_eqs, get_finger_qs
+from mjregrasping.grasping import get_grasp_eqs, get_finger_qs, activate_grasp
 from mjregrasping.math import softmax
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -193,15 +193,11 @@ def do_grasp_dynamics(phy: Physics):
             body_idx, offset, xpos = grasp_locations_to_indices_and_offsets_and_xpos(phy, locs)
             d = norm(tool_pos - xpos, axis=-1)
             best_idx = d.argmin()
-            best_body_idx = body_idx[best_idx]
+            best_loc = locs[best_idx]
             best_d = d[best_idx]
-            best_offset = offset[best_idx]
-            best_offset_body = np.array([best_offset, 0, 0])
             # if we're close enough and gripper angle is small enough, activate the grasp constraint
             if best_d < hp["grasp_goal_radius"] and abs(finger_q - hp['finger_q_closed']) < np.deg2rad(5):
-                eq.obj2id = best_body_idx
-                eq.active = 1
-                eq.data[3:6] = best_offset_body
+                activate_grasp(phy, eq.name, best_loc)
                 did_new_grasp = True
 
     return did_new_grasp

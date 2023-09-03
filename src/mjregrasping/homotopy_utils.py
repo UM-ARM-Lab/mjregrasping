@@ -2,7 +2,7 @@
 Functions for computing h-signatures of paths through the environment.
 Based on this paper: https://www.roboticsproceedings.org/rss07/p02.pdf
 """
-from typing import Dict
+from typing import Dict, List
 
 import hjson
 import numpy as np
@@ -187,3 +187,23 @@ def from_to(i, j):
         return range(i + 1, j + 1)
     else:
         return range(i, j, -1)
+
+
+def make_h_desired(skeletons: Dict, goal_skel_names: List[str]):
+    h_desired = [0] * len(skeletons)
+    for n in goal_skel_names:
+        goal_skel_i = get_goal_skel_i(skeletons, n)
+        h_desired[goal_skel_i] = 1
+    h_desired = Multiset([tuple(h_desired)])
+    return h_desired
+
+
+def get_goal_skel_i(skeletons, goal_skel_name):
+    return list(skeletons.keys()).index(goal_skel_name)
+
+
+def h2array(h: Multiset):
+    h_list = []
+    for h_i in h:
+        h_list.extend(list(h_i))
+    return np.array(h_list)

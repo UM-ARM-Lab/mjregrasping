@@ -33,11 +33,7 @@ class Viz:
         self.fig_pub = rospy.Publisher("fig", Image, queue_size=10)
 
     def fig(self, fig):
-        canvas = fig.canvas
-        canvas.draw()  # Draw the canvas, cache the renderer
-        image_flat = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')  # (H * W * 3,)
-        # NOTE: reversed converts (W, H) from get_width_height to (H, W)
-        image = image_flat.reshape(*reversed(canvas.get_width_height()), 3)  # (H, W, 3)
+        image = plt_fig_to_img_np(fig)
 
         msg = ros_numpy.msgify(Image, image, encoding='rgb8')
         msg.header.stamp = rospy.Time.now()
@@ -116,3 +112,11 @@ class Viz:
         if self.mjrr:
             rr_color = to_rgba(color)
             rr.log_arrow(f'{ns}/{idx}', start, direction, color=rr_color)
+
+
+def plt_fig_to_img_np(fig):
+    canvas = fig.canvas
+    canvas.draw()  # Draw the canvas, cache the renderer
+    image_flat = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')  # (H * W * 3,)
+    image = image_flat.reshape(*reversed(canvas.get_width_height()), 3)  # (H, W, 3)
+    return image

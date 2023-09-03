@@ -1,5 +1,6 @@
 from typing import Dict, Optional
 
+import matplotlib.pyplot as plt
 import numpy as np
 import rerun as rr
 from pymjregrasping_cpp import seedOmpl
@@ -11,13 +12,14 @@ from mjregrasping.grasping import get_grasp_locs, get_is_grasping
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_q
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist, get_all_strategies_from_phy, SimGraspCandidate, \
     SimGraspInput, get_will_be_grasping
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
-from mjregrasping.viz import Viz
+from mjregrasping.viz import Viz, plt_fig_to_img_np
 from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
+from trajectory_msgs.msg import JointTrajectoryPoint
 
 
 class HomotopyRegraspPlanner:
@@ -120,9 +122,17 @@ class HomotopyRegraspPlanner:
             rr.set_time_sequence('regrasp_planner', i)
             viz.viz(sim_grasp.phy, is_planning=True)
             cost_i = sum(costs_list)
-            rr.log_tensor('homotopy_costs', [BIG_PENALTY, cost_i] + list(costs_list))
-            msg = " ".join([f"{name}: {cost:.2f}" for name, cost in zip(cost_names, costs_list)])
-            rr.log_tensor('homotopy_costs', msg)
+
+            # also log as 3D boxes like a bar graph
+            fig, ax = plt.subplots()
+            ax.bar(['total'] + cost_names, (cost_i,) + costs_list)
+            ax.set_ylim(0, BIG_PENALTY)
+            strat_str = ",".join([str(s) for s in sim_grasp.strategy])
+            plt.title(f'Costs for grasp {sim_grasp.locs} {strat_str}')
+            plt.xticks(rotation=30)
+            plt.close(fig)
+            image = plt_fig_to_img_np(fig)
+            rr.log_image('homotopy_costs_plot', image)
 
         return best_sim_grasp
 
@@ -187,18 +197,26 @@ class HomotopyRegraspPlanner:
         deactivate_release_and_moving(phy_plan, strategy, viz=viz, is_planning=True)
 
         # check if we need to move the arms at all
-        res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
+        any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
+        if any_moving:
+            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
-        if res.error_code.val != MoveItErrorCodes.SUCCESS:
-            return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+            if res.error_code.val != MoveItErrorCodes.SUCCESS:
+                return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
 
-        if viz_execution and viz is not None:
-            self.grasp_rrt.display_result(viz, res, scene_msg)
+            if viz_execution and viz is not None:
+                self.grasp_rrt.display_result(viz, res, scene_msg)
 
-        # Teleport to the final planned joint configuration
-        teleport_to_end_of_plan(phy_plan, res)
-        if viz_execution:
-            viz.viz(phy_plan, is_planning=True)
+            # Teleport to the final planned joint configuration
+            teleport_to_end_of_plan(phy_plan, res)
+            if viz_execution:
+                viz.viz(phy_plan, is_planning=True)
+        else:
+            res = MotionPlanResponse()
+            res.error_code.val = MoveItErrorCodes.SUCCESS
+            point = JointTrajectoryPoint()
+            point.positions = get_q(phy_plan)
+            res.trajectory.joint_trajectory.points.append(point)
 
         # Activate grasps
         grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)

@@ -4,7 +4,7 @@ This considers both true homotopy and first-order homotopy.
 """
 from copy import deepcopy
 from enum import Enum, auto
-from typing import Dict
+from typing import Dict, List
 
 import networkx as nx
 import numpy as np
@@ -14,7 +14,7 @@ from multiset import Multiset
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
 from mjregrasping.homotopy_utils import passes_through, floorify, from_to, check_new_cycle, NO_HOMOTOPY, pairwise, \
-    has_gripper_gripper_edge, get_h_signature
+    has_gripper_gripper_edge, get_h_signature, make_h_desired
 from mjregrasping.mujoco_objects import parents_points
 from mjregrasping.physics import Physics
 from mjregrasping.rope_length import get_rope_length
@@ -51,16 +51,16 @@ class CollisionChecker:
         raise NotImplementedError()
 
 
-def get_first_order_different(collision_checker: CollisionChecker, phy1: Physics, phy2: Physics):
-    rope1 = get_rope_points(phy1)
-    rope2 = get_rope_points(phy2)
-
-    def _in_collision(p):
-        return collision_checker.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
-
-    first_order_sln = get_first_order_homotopy_points(_in_collision, rope1, rope2)
-    first_order_different = len(first_order_sln) == 0
-    return first_order_different
+# def get_first_order_different(collision_checker: CollisionChecker, phy1: Physics, phy2: Physics):
+#     rope1 = get_rope_points(phy1)
+#     rope2 = get_rope_points(phy2)
+#
+#     def _in_collision(p):
+#         return collision_checker.is_collision(p, allowable_penetration=AllowablePenetration.FULL_CELL)
+#
+#     first_order_sln = get_first_order_homotopy_points(_in_collision, rope1, rope2)
+#     first_order_different = len(first_order_sln) == 0
+#     return first_order_different
 
 
 def get_true_homotopy_different(skeletons: Dict, phy1: Physics, phy2: Physics, log_loops=False):
@@ -353,3 +353,11 @@ def compare_to_goal(skeletons: Dict, rope_points, goal_rope_points, tol=0.05):
     start_same = np.linalg.norm(rope_points[0] - goal_rope_points[0]) < tol
     end_same = np.linalg.norm(rope_points[-1] - goal_rope_points[-1]) < tol
     return h_same and start_same and end_same
+
+
+def through_skels(skeletons: Dict, goal_skel_names: List[str], phy: Physics):
+    h_desired = make_h_desired(skeletons, goal_skel_names)
+    h, _ = get_full_h_signature_from_phy(skeletons, phy)
+    if h == NO_HOMOTOPY:
+        return False
+    return h_desired == h

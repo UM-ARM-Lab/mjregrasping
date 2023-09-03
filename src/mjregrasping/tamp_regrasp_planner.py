@@ -6,13 +6,12 @@ we simply run our MPPI planner for a fixed horizon and take the final/accumulate
 """
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
+from copy import copy
 from typing import Optional, Dict
 
-import numpy as np
-
-from mjregrasping.grasp_strategies import Strategies
+from mjregrasping.goals import ObjectPointGoal
+from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.regrasp_planner_utils import SimGraspCandidate, SimGraspInput
@@ -26,49 +25,49 @@ from moveit_msgs.msg import MoveItErrorCodes
 
 class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
-    def __init__(self, scenario: Scenario, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
-        super().__init__(key_loc, grasp_rrt, skeletons, seed)
+    def __init__(self, scenario: Scenario, goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+        self.goal = copy(goal)
+        super().__init__(goal.loc, grasp_rrt, skeletons, seed)
         self.scenario = scenario
 
     def costs(self, sim_grasp: SimGraspCandidate):
-        initial_locs = sim_grasp.initial_locs
-        phy_plan = sim_grasp.phy
-        candidate_locs = sim_grasp.locs
-        res = sim_grasp.res
-        strategy = sim_grasp.strategy
+        # these costs are computed using the phy after the grasp but before the post-grasp motion towards the goal
+        costs = super().costs(sim_grasp)
 
-        # If there is no significant change in the grasp, that's high cost
-        same_locs = abs(initial_locs - candidate_locs) < hp['grasp_loc_diff_thresh']
-        not_stay = strategy != Strategies.STAY
-        if np.any(same_locs & not_stay):
-            cost = 10 * BIG_PENALTY
-            return cost
+        post_motion_phy = sim_grasp.phy1
+        keypoint = grasp_locations_to_xpos(post_motion_phy, [self.goal.loc])[0]
+        final_keypoint_dist = self.goal.keypoint_dist_to_goal(keypoint) * hp['final_keypoint_dist_weight']
 
-        if res.error_code.val != MoveItErrorCodes.SUCCESS:
-            cost = 10 * BIG_PENALTY
-            return cost
+        return costs + (final_keypoint_dist,)
 
-        return 0, 0
+    def get_cost_names(self):
+        return super().get_cost_names() + ['final_keypoint_dist']
 
     def simulate_grasp(self, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, viz_execution=False):
         sim_grasp = super().simulate_grasp(phy, viz, grasp_input, viz_execution)
+        if sim_grasp.res.error_code.val != MoveItErrorCodes.SUCCESS:
+            sim_grasp.phy1 = sim_grasp.phy.copy_data()
+            return sim_grasp
+
+        phy_plan = sim_grasp.phy.copy_data()
+
+        self.goal.grasp_goal.set_grasp_locs(sim_grasp.locs)
 
         # now we run the MPPI planner for a fixed horizon and take the final cost
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
-        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=0, horizon=hp['horizon'],
-                           # FIXME: scenario is hard-coded
+        mppi = RegraspMPPI(pool=pool, nu=phy_plan.m.nu, seed=0, horizon=hp['horizon'],
                            noise_sigma=self.scenario.noise_sigma, temp=hp['temp'])
         mppi.reset()
 
         for t in range(10):
-            command, sub_time_s = mppi.command(phy, self.op_goal, hp['n_samples'], viz=viz)
-            control_step(phy, command, sub_time_s)
-            viz.viz(phy, is_planning=True)
+            command, sub_time_s = mppi.command(phy_plan, self.goal, hp['n_samples'], viz=viz)
+            control_step(phy_plan, command, sub_time_s)
+            if viz and viz_execution:
+                viz.viz(phy_plan, is_planning=True)
 
-            results = self.key_loc.get_results(phy)
-            do_grasp_dynamics(phy, results)
+            do_grasp_dynamics(phy_plan)
 
             mppi.roll()
 
-        # TODO: do we need different outputs for the different planners?
+        sim_grasp.phy1 = phy_plan
         return sim_grasp

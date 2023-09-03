@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import multiprocessing
 from concurrent.futures.thread import ThreadPoolExecutor
+from typing import Optional
 
 import mujoco
 import numpy as np
@@ -12,7 +13,9 @@ from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.move_to_joint_config import execute_grasp_plan
+from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
+from mjregrasping.physics import Physics
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
@@ -20,8 +23,71 @@ from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
-from mjregrasping.viz import make_viz
+from mjregrasping.viz import make_viz, Viz
 from moveit_msgs.msg import MoveItErrorCodes
+
+
+class BaseOnStuckMethod:
+
+    def __init__(self, scenario, skeletons, goal, grasp_goal):
+        self.scenario = scenario
+        self.skeletons = skeletons
+        self.goal = goal
+        self.grasp_goal = grasp_goal
+        self.grasp_rrt = GraspRRT()
+
+    def on_stuck(self, phy: Physics, viz: Viz, mov: Optional[MjMovieMaker]):
+        raise NotImplementedError()
+
+
+class OnStuckTamp(BaseOnStuckMethod):
+
+    def __init__(self, scenario, skeletons, goal, grasp_goal):
+        super().__init__(scenario, skeletons, goal, grasp_goal)
+        from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
+        self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
+
+    def on_stuck(self, phy, viz, mov):
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+
+        if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
+            viz.viz(best_grasp.phy, is_planning=True)
+            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
+            execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
+            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
+            self.grasp_goal.set_grasp_locs(best_grasp.locs)
+        else:
+            print(Fore.RED + "Failed to find a plan." + Fore.RESET)
+
+
+class OnStuckOurs(BaseOnStuckMethod):
+
+    def __init__(self, scenario, skeletons, goal, grasp_goal):
+        super().__init__(scenario, skeletons, goal, grasp_goal)
+        from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
+
+    def on_stuck(self, phy, viz, mov):
+        initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
+        # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
+        if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
+            print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
+            print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
+            self.planner.update_blacklists(phy)
+            best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
+            viz.viz(best_grasp.phy, is_planning=True)
+            # now execute the plan
+            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
+            execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
+            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
+            self.grasp_goal.set_grasp_locs(best_grasp.locs)
+        else:
+            print(Fore.RED + "Failed to find a plan." + Fore.RESET)
 
 
 @ros_init.with_ros("untangle")
@@ -37,7 +103,7 @@ def main():
     gl_ctx.make_current()
 
     viz = make_viz(scenario)
-    for trial_idx in range(5, 10):
+    for trial_idx in range(2, 10):
         phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
@@ -49,14 +115,8 @@ def main():
                            noise_sigma=val_untangle.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
-        grasp_rrt = GraspRRT()
-
-        # from mjregrasping.explore_locs_regrasp_planner import ExploreLocsRegraspPlanner
-        # planner = BaselineRegraspPlanner(goal, grasp_rrt, skeletons)
-        from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
-        planner = TAMPRegraspPlanner(scenario, goal, grasp_rrt, skeletons)
-        # from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-        # planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons)
+        # osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal)
+        osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal)
 
         goal.viz_goal(phy)
 
@@ -79,27 +139,9 @@ def main():
 
             is_stuck = traps.check_is_stuck(phy)
             needs_reset = False
-            if is_stuck:
+            if is_stuck:  # FIXME: DEBUGGING!!!
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
-                initial_geodesic_dist = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal.loc)
-                sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
-                best_grasp = planner.get_best(sim_grasps, viz=viz)
-                new_geodesic_dist = get_geodesic_dist(best_grasp.locs, goal.loc)
-                # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
-                if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
-                    print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
-                    print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
-                    planner.update_blacklists(phy)
-                    best_grasp = planner.get_best(sim_grasps, viz=viz)
-                if best_grasp.res.error_code.val != MoveItErrorCodes.SUCCESS:
-                    print(Fore.RED + "Failed to find a plan." + Fore.RESET)
-                viz.viz(best_grasp.phy, is_planning=True)
-                # now execute the plan
-                deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-                execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
-                grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
-                grasp_goal.set_grasp_locs(best_grasp.locs)
-
+                osm.on_stuck(phy, viz, mov)
                 needs_reset = True
 
             if needs_reset:

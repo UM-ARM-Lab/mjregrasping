@@ -12,6 +12,7 @@ from PyQt5 import uic
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from scipy.linalg import block_diag
+from transformations import quaternion_from_euler
 
 import rospy
 from geometry_msgs.msg import Pose, Quaternion
@@ -22,8 +23,8 @@ from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
 from mjregrasping.physics import Physics, get_q
-from mjregrasping.rollout import control_step, limit_actuator_windup, slow_when_eqs_bad
-from mjregrasping.scenarios import threading, setup_threading, val_untangle
+from mjregrasping.rollout import control_step, limit_actuator_windup, slow_when_eqs_bad, DEFAULT_SUB_TIME_S
+from mjregrasping.scenarios import threading, val_untangle
 from mjregrasping.viz import make_viz
 from ros_numpy import numpify, msgify
 
@@ -113,23 +114,42 @@ class InteractiveControls(QMainWindow):
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
     rospy.init_node("interactive_viewer")
-    scenario = val_untangle
+    scenario = threading
 
     rr.init("viewer")
     rr.connect()
 
     trial_idx = 0
     viz = make_viz(scenario)
-    trials_root = Path("trial_data") / scenario.name
-    trial_path = trials_root / f"{scenario.name}_{trial_idx}.pkl"
-    with trial_path.open("rb") as f:
-        trial_info = pickle.load(f)
-    phy_path = trial_info['phy_path']
-    with phy_path.open("rb") as f:
-        phy_loaded = pickle.load(f)
+    # trials_root = Path("trial_data") / scenario.name
+    # trial_path = trials_root / f"{scenario.name}_{trial_idx}.pkl"
+    # with trial_path.open("rb") as f:
+    #     trial_info = pickle.load(f)
+    # phy_path = trial_info['phy_path']
+    # with phy_path.open("rb") as f:
+    #     phy_loaded = pickle.load(f)
+    #
+    # new_d = mujoco.MjData(phy_loaded.m)
+    # phy = Physics(phy_loaded.m, new_d, phy_loaded.o)
+    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+    d = mujoco.MjData(m)
+    phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
-    new_d = mujoco.MjData(phy_loaded.m)
-    phy = Physics(phy_loaded.m, new_d, phy_loaded.o)
+    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
+    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
+    phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
+    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0.2, np.pi)
+    q = np.array([
+        0.4, 0.8,  # torso
+        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
+        0,  # left gripper
+        0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
+        0.2,  # right gripper
+    ])
+    from mjregrasping.move_to_joint_config import pid_to_joint_config
+    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+
+    activate_grasp(phy, 'attach1', 0.0)
 
     left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)
     right_im = Basic3DPoseInteractiveMarker(name='right', scale=0.1)
@@ -161,12 +181,6 @@ def main():
             viewer.sync()
             viz.viz(phy, is_planning=False)
 
-            left_twists_in_tool = get_twist_for_tool(phy, left_im, 'left_tool', viz)
-            right_twists_in_tool = get_twist_for_tool(phy, right_im, 'right_tool', viz)
-            twists_in_tool = np.concatenate([left_twists_in_tool, right_twists_in_tool])
-            # set the initial ctrl based on the IMs
-            ctrl = get_val_dual_jac_ctrl(phy, twists_in_tool)
-
             # Rudimentary time keeping, will drift relative to wall clock.
             time_until_next_step = dt - (time.time() - step_start)
             if time_until_next_step > 0:
@@ -180,58 +194,15 @@ def main():
                 # save_data_and_eq(phy, path)
             elif latest_cmd == CmdType.GRASP:
                 activate_grasp(phy, controls_window.eq_name, controls_window.loc)
-                if 'left' in controls_window.eq_name:
-                    ctrl[phy.m.actuator('leftgripper_vel').id] = -gripper_vel
-                if 'right' in controls_window.eq_name:
-                    ctrl[phy.m.actuator('rightgripper_vel').id] = -gripper_vel
-                for _ in range(grasp_n_steps):
-                    control_step(phy, ctrl, dt)
-                    viewer.sync()
-                    viz.viz(phy, is_planning=False)
-                zero_ctrl()
             elif latest_cmd == CmdType.RELEASE:
                 phy.m.eq(controls_window.eq_name).active = 0
-                if 'left' in controls_window.eq_name:
-                    ctrl[phy.m.actuator('leftgripper_vel').id] = gripper_vel
-                if 'right' in controls_window.eq_name:
-                    ctrl[phy.m.actuator('rightgripper_vel').id] = gripper_vel
-                for _ in range(grasp_n_steps):
-                    control_step(phy, ctrl, dt)
-                    viewer.sync()
-                    viz.viz(phy, is_planning=False)
-                zero_ctrl()
-            elif latest_cmd == CmdType.START_RECORDING:
-                is_recording = True
-            elif latest_cmd == CmdType.STOP_RECORDING:
-                is_recording = False
-            elif latest_cmd == CmdType.DISABLE_IMS:
-                zero_ctrl()
-                ims_enabled = False
-            elif latest_cmd == CmdType.ENABLE_IMS:
-                zero_ctrl()
-                ims_enabled = True
-            elif latest_cmd == CmdType.RESET_TO_IMS:
-                init_im_pose(left_im, phy, 'left_tool')
-                init_im_pose(right_im, phy, 'right_tool')
 
-            if is_recording:
-                if int(phy.d.time * 10) % 10 == 0:
-                    now = int(time.time())
-                    path = recording_path / f"{now}.pkl"
-                    save_data_and_eq(phy, path)
-
-            # Now step the simulation
-            if ims_enabled:
-                phy.d.ctrl = ctrl
-            slow_when_eqs_bad(phy)
-            limit_actuator_windup(phy)
+            # slow_when_eqs_bad(phy)
+            # limit_actuator_windup(phy)
             mujoco.mj_step(phy.m, phy.d, nstep=n_sub_time)
 
             # ensure events are processed only once
             controls_window.latest_cmd = None
-
-        def zero_ctrl():
-            phy.d.ctrl = np.zeros(phy.m.nu)
 
         timer = QTimer()
         timer.timeout.connect(_update_sim)

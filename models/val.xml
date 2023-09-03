@@ -104,10 +104,13 @@
                                                         <geom type="mesh" mesh="PINCER_HOUSING2" name="drive47_housing_mesh"
                                                               rgba="0.2 0.2 0.2 1"/>
                                                         <site name="left_tool" pos="0 0 0.181" size="0.001"/>
-                                                        <body name="left_d405" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
+                                                        <body name="left_d405_mount" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
                                                             <geom type="mesh" mesh="d405_mount" name="left_d405_mount"
                                                                   rgba="0.9 0.9 0.9 1"/>
-                                                            <camera mode="fixed" name="left_hand" euler="1.22 0 0" pos="0 0.01 0.03"/>
+                                                            <body name="left_d405" euler="1.22 0 0" pos="0 0.01 0.03">
+                                                                <camera mode="fixed" name="left_hand"/>
+                                                                <geom name="left_d405" type="box" size="0.021 0.021 0.0115"/>
+                                                            </body>
                                                             <!-- The default camera frame is weird, so we use this site instead -->
                                                             <site name="left_hand_cam" euler="1.22 3.14159 3.14159" pos="0 0.01 0.03"
                                                                   size="0.001"/>
@@ -199,15 +202,16 @@
                                                         <geom type="mesh" mesh="PINCER_HOUSING2" name="drive7_housing_mesh"
                                                               rgba="0.2 0.2 0.2 1"/>
                                                         <site name="right_tool" pos="0 0 0.181" size="0.001"/>
-                                                        <body name="right_d450">
-                                                            <body name="right_d405" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
-                                                                <geom type="mesh" mesh="d405_mount" name="right_d405_mount"
-                                                                      rgba="0.9 0.9 0.9 1"/>
-                                                                <camera mode="fixed" name="right_hand" euler="1.22 0 0" pos="0.01 0 0.03"/>
-                                                                <!-- The default camera frame is weird, so we use this site instead -->
-                                                                <site name="right_hand_cam" euler="-1.93 0 3.1415" pos="0.01 0 0.03"
-                                                                      size="0.001"/>
+                                                        <body name="right_d405_mount" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
+                                                            <geom type="mesh" mesh="d405_mount" name="right_d405_mount"
+                                                                  rgba="0.9 0.9 0.9 1"/>
+                                                            <body name="right_d405" euler="1.22 0 0" pos="0 0.01 0.03">
+                                                                <geom name="right_d405" type="box" size="0.021 0.021 0.0115"/>
+                                                                <camera mode="fixed" name="right_hand"/>
                                                             </body>
+                                                            <!-- The default camera frame is weird, so we use this site instead -->
+                                                            <site name="right_hand_cam" euler="-1.93 0 3.1415" pos="0.01 0 0.03"
+                                                                  size="0.001"/>
                                                         </body>
 
                                                         <body name="rightgripper" pos="0 0.0135 0.068553"
@@ -271,7 +275,7 @@
         <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
                      forcelimited="true" forcerange="-4 4"/>
         <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
-                     forcelimited="true" forcerange="-4 4"/>
+                     forcelimited="true" forcerange="-3 3"/>
         <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.01 1" kp="35"
                      forcelimited="true" forcerange="-1 1"/>
 
@@ -290,7 +294,7 @@
         <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500"
                      forcelimited="true" forcerange="-4 4"/>
         <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
-                     forcelimited="true" forcerange="-4 4"/>
+                     forcelimited="true" forcerange="-3 3"/>
         <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.01 1" kp="35"
                      forcelimited="true" forcerange="-1 1"/>
     </actuator>

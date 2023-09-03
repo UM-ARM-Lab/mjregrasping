@@ -81,11 +81,11 @@ def main():
         activate_grasp(phy, 'attach1', 0.0)
 
         q = np.array([
-            0.4, 0.0,  # torso
+            0.4, 0.8,  # torso
             0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
             0,  # left gripper
             0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
-            0.2,  # right gripper
+            0.4,  # right gripper
         ])
         pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
         activate_grasp(phy, 'right', 0.93)
@@ -94,7 +94,7 @@ def main():
             rng.uniform(-0.7, 0), rng.uniform(-0.2, 0.2),  # torso
             -0.2, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
             0,  # left gripper
-            -0.1, 0.0, 0, 0.0, 0, -0.0, -1.7,  # right arm
+            -0.1, 0.0, 0, 0.0, 0, -0.0, -1.0,  # right arm
             0.06,  # right gripper
         ])
         pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)

@@ -10,17 +10,16 @@
     <worldbody>
         
         <body name="mycamera">
-            <camera mode="fixed" name="mycamera" xyaxes="1.0 0 0 0.0 1.0 0.5" pos="0.0 -0.2 2.0" />
+            <camera mode="fixed" name="mycamera" xyaxes="1.0 0.4 0 0.0 1.0 0.5" pos="0.5 -0.1 1.7" />
         </body>
         <light name="top" pos="-1 0 105" mode="trackcom" />
     </worldbody>
     <equality>
+        <weld body1="drive50" body2="B_first" name="left" relpose="0 0 0.17 1 0 0 0" active="false" solref="0.04 1" torquescale="0.2" />
+        <weld body1="drive10" body2="B_first" name="right" relpose="0 0 0.17 1 0 0 0" active="false" solref="0.04 1" torquescale="0.2" />
+
         <connect body1="attach1" body2="B_first" name="attach1" anchor="0 -0.03 0" active="false" solref="0.03 1" />
-    </equality>
-    <equality>
         <connect body1="attach2" body2="B_first" name="attach2" anchor="0 0.03 0" active="false" solref="0.03 1" />
-    </equality>
-    <equality>
         
         <connect body1="loop1" body2="B_first" name="attach_loop1" anchor="0 0 0.06" active="false" solref="0.03 1" />
         <connect body1="loop2" body2="B_first" name="attach_loop2" anchor="0 0 0.06" active="false" solref="0.03 1" />
@@ -120,9 +119,12 @@
                                                         <joint name="joint47" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-6.2 6.2" damping="0.08" frictionloss="0.1" />
                                                         <geom type="mesh" mesh="PINCER_HOUSING2" name="drive47_housing_mesh" rgba="0.2 0.2 0.2 1" />
                                                         <site name="left_tool" pos="0 0 0.181" size="0.001" />
-                                                        <body name="left_d405" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
+                                                        <body name="left_d405_mount" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
                                                             <geom type="mesh" mesh="d405_mount" name="left_d405_mount" rgba="0.9 0.9 0.9 1" />
-                                                            <camera mode="fixed" name="left_hand" euler="1.22 0 0" pos="0 0.01 0.03" />
+                                                            <body name="left_d405" euler="1.22 0 0" pos="0 0.01 0.03">
+                                                                <camera mode="fixed" name="left_hand" />
+                                                                <geom name="left_d405" type="box" size="0.021 0.021 0.0115" />
+                                                            </body>
                                                             
                                                             <site name="left_hand_cam" euler="1.22 3.14159 3.14159" pos="0 0.01 0.03" size="0.001" />
                                                         </body>
@@ -183,13 +185,14 @@
                                                         <joint name="joint7" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true" range="-6.2 6.2" damping=".08" frictionloss="0.1" />
                                                         <geom type="mesh" mesh="PINCER_HOUSING2" name="drive7_housing_mesh" rgba="0.2 0.2 0.2 1" />
                                                         <site name="right_tool" pos="0 0 0.181" size="0.001" />
-                                                        <body name="right_d450">
-                                                            <body name="right_d405" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
-                                                                <geom type="mesh" mesh="d405_mount" name="right_d405_mount" rgba="0.9 0.9 0.9 1" />
-                                                                <camera mode="fixed" name="right_hand" euler="1.22 0 0" pos="0.01 0 0.03" />
-                                                                
-                                                                <site name="right_hand_cam" euler="-1.93 0 3.1415" pos="0.01 0 0.03" size="0.001" />
+                                                        <body name="right_d405_mount" pos="-0.0215 0 0.031" euler="1.5707 -1.5707 0">
+                                                            <geom type="mesh" mesh="d405_mount" name="right_d405_mount" rgba="0.9 0.9 0.9 1" />
+                                                            <body name="right_d405" euler="1.22 0 0" pos="0 0.01 0.03">
+                                                                <geom name="right_d405" type="box" size="0.021 0.021 0.0115" />
+                                                                <camera mode="fixed" name="right_hand" />
                                                             </body>
+                                                            
+                                                            <site name="right_hand_cam" euler="-1.93 0 3.1415" pos="0.01 0 0.03" size="0.001" />
                                                         </body>
 
                                                         <body name="rightgripper" pos="0 0.0135 0.068553" euler="1.15 -1.5707 0">
@@ -232,7 +235,7 @@
         
         <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-8 8" />
         <intvelocity name="joint46_vel" joint="joint46" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4" />
-        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-4 4" />
+        <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-3 3" />
         <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.01 1" kp="35" forcelimited="true" forcerange="-1 1" />
 
         
@@ -243,7 +246,7 @@
         
         <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true" forcerange="-8 8" />
         <intvelocity name="joint6_vel" joint="joint6" ctrllimited="true" ctrlrange="-2 2" actrange="-1.5708 1.5708" kp="500" forcelimited="true" forcerange="-4 4" />
-        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-4 4" />
+        <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50" forcelimited="true" forcerange="-3 3" />
         <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.01 1" kp="35" forcelimited="true" forcerange="-1 1" />
     </actuator>
     <equality>
@@ -275,23 +278,23 @@
                     <geom name="cover" class="visual" type="box" size="0.05 0.05 0.05" rgba="1 0 0 1" />
                 </body>
             </body>
-            <body name="attach2" pos="0.05 -0.75 1">
+            <body name="attach2" pos="0.05 -0.55 1">
                 <geom name="attach2" type="sphere" size="0.02" rgba="1.0 0 0 1" />
                 <body name="goal">
                     <geom name="goal" class="visual" type="sphere" size="0.05" rgba="1 0 1 0.3" />
                 </body>
             </body>
-            <body name="loop1" pos="0.07 0.3633788101139821 0.9740024296493639">
+            <body name="loop1" pos="0.07 0.31971155934176043 0.8128294992697569">
                 <geom type="box" name="loop1_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
                 <geom type="box" name="loop1_front" pos="0.09 0 0.03" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1" />
                 <geom type="box" name="loop1_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
             </body>
-            <body name="loop2" pos="0.07 0.05743420106793168 1.1598317128433449">
+            <body name="loop2" pos="0.07 0.023096654324402374 1.1133202908413151">
                 <geom type="box" name="loop2_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
                 <geom type="box" name="loop2_front" pos="0.09 0 0.03" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1" />
                 <geom type="box" name="loop2_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
             </body>
-            <body name="loop3" pos="0.07 -0.3346224765296482 1.0561058352572912">
+            <body name="loop3" pos="0.07 -0.3581532610872666 1.00464961069334">
                 <geom type="box" name="loop3_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
                 <geom type="box" name="loop3_front" pos="0.09 0 0.04" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1" />
                 <geom type="box" name="loop3_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1" />
@@ -308,8 +311,4 @@
             <joint type="free" />
         </body>
     </worldbody>
-<equality>
-        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.181" active="false" solref="0.04 1" />
-        <connect body1="drive10" body2="B_first" name="right" anchor="0 0 0.181" active="false" solref="0.04 1" />
-    </equality>
 </mujoco>

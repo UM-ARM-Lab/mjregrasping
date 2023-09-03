@@ -1,5 +1,5 @@
 from copy import deepcopy
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import numpy as np
 from numpy.linalg import norm
@@ -248,22 +248,21 @@ def perturb_locs(strategy, locs):
 
 class ThreadingGoal(ObjectPointGoalBase):
 
-    def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_name, loc: float, viz: Viz):
+    def __init__(self, grasp_goal: GraspLocsGoal, skeletons: Dict, skeleton_names: List[str], loc: float, viz: Viz):
         """
 
         Args:
             grasp_goal:
             skeletons:
-            skeleton_name:
+            skeleton_names: skeletons to use for threading in order
             loc: This is analogous to the first reference point in Weifu's method
             viz:
         """
-        self.skeleton_name = skeleton_name
-        self.skel = skeletons[skeleton_name]
+        self.skeleton_names = skeleton_names
+        self.skel = skeletons[skeleton_names[-1]]
         goal_point = np.mean(self.skel[:4], axis=0)
         super().__init__(goal_point, loc, viz)
 
-        self.skeletons = skeletons
         self.goal_dir = skeleton_field_dir(self.skel, self.goal_point[None])[0] * 0.01
         self.grasp_goal = grasp_goal
 
@@ -299,7 +298,7 @@ class ThreadingGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
 
-        min_dists_to_rope = np.min(pairwise_squared_distances(rope_points, tools_pos), axis=1)
+        min_dists_to_rope = np.min(np.abs(pairwise_squared_distances(rope_points, tools_pos) - 0.10), axis=1)
         nongrasping_rope_dist_cost = np.sum(min_dists_to_rope * np.logical_not(is_grasping), axis=-1)
         nongrasping_rope_dist_cost = sum(nongrasping_rope_dist_cost) * hp['nongrasping_rope_dist_weight']
 

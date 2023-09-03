@@ -144,10 +144,10 @@ class MjReRun:
         rr.log_cleared('eqs', recursive=True)
         for eq_constraint_idx in range(phy.m.neq):
             eq = phy.m.eq(eq_constraint_idx)
-            if eq.active and eq.type == mujoco.mjtEq.mjEQ_CONNECT:
+            if eq.active and eq.type in [mujoco.mjtEq.mjEQ_CONNECT, mujoco.mjtEq.mjEQ_WELD]:
                 color = list(to_rgba("y"))
                 color[-1] = 0.4
-                points = get_eq_points(phy, eq, eq_constraint_idx)
+                points = get_eq_points(phy, eq)
                 entity_path = "eqs"
                 if entity_prefix is not None and entity_prefix != "":
                     entity_path += "/" + entity_path

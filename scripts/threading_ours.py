@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import mujoco
 import numpy as np
@@ -14,16 +14,15 @@ from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_g
 from mjregrasping.grasp_and_settle import deactivate_moving, grasp_and_settle, deactivate_release
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_h_signature_from_phy, through_skels
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-from mjregrasping.homotopy_utils import skeleton_field_dir, NO_HOMOTOPY
+from mjregrasping.homotopy_utils import skeleton_field_dir, NO_HOMOTOPY, make_h_desired, h2array
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
-from mjregrasping.regrasp_planner_utils import SimGraspInput, SimGraspCandidate, \
-    get_will_be_grasping
-from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
+from mjregrasping.regrasp_planner_utils import SimGraspInput, SimGraspCandidate, get_will_be_grasping
+from mjregrasping.regrasping_mppi import RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import threading
@@ -35,26 +34,11 @@ from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 
-def get_goal_skel_i(skeletons, goal_skel_name):
-    return list(skeletons.keys()).index(goal_skel_name)
-
-
-def through_skel(skeletons, goal_skel_name, phy: Physics):
-    goal_skel_i = get_goal_skel_i(skeletons, goal_skel_name)
-    h, _ = get_full_h_signature_from_phy(skeletons, phy)
-    if h != NO_HOMOTOPY:
-        for h_i in h:
-            if h_i[goal_skel_i] == 1:
-                return True
-    return False
-
-
 class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
 
-    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, goal_skel_name: str, seed=0):
+    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, goal_skel_names: List[str], seed=0):
         super().__init__(key_loc, grasp_rrt, skeletons, seed)
-        self.goal_skel_name = goal_skel_name
-        self.goal_skel = self.skeletons[self.goal_skel_name]
+        self.goal_skel_names = goal_skel_names
 
     def sample_grasp_inputs(self, phy):
         grasps_inputs = []
@@ -140,17 +124,19 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
     def costs(self, sim_grasp: SimGraspCandidate):
         costs = super().costs(sim_grasp)
 
-        # compute the H signature and check if any loops pass through the goal skeleton
-
-        if self.through_skel(sim_grasp.phy):
-            threading_homotopy_cost = 0
-        else:
+        phy = sim_grasp.phy
+        h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
+        if h == NO_HOMOTOPY:
             threading_homotopy_cost = BIG_PENALTY
+        else:
+            h_desired = h2array(make_h_desired(self.skeletons, self.goal_skel_names))
+            h = h2array(h)
+            threading_homotopy_cost = sum(np.abs(np.array(h) - h_desired)) * BIG_PENALTY
 
         return costs + (threading_homotopy_cost,)
 
-    def through_skel(self, phy: Physics):
-        return through_skel(self.skeletons, self.goal_skel_name, phy)
+    def through_skels(self, phy: Physics):
+        return through_skels(self.skeletons, self.goal_skel_names, phy)
 
     def get_cost_names(self):
         cost_names = super().get_cost_names()
@@ -190,9 +176,9 @@ def main():
 
         end_loc = 1.0
         goals = [
-            ThreadingGoal(grasp_goal, skeletons, 'loop1', end_loc, viz),
-            ThreadingGoal(grasp_goal, skeletons, 'loop2', end_loc, viz),
-            ThreadingGoal(grasp_goal, skeletons, 'loop3', end_loc, viz),
+            ThreadingGoal(grasp_goal, skeletons, ['loop1'], end_loc, viz),
+            ThreadingGoal(grasp_goal, skeletons, ['loop1', 'loop2'], end_loc, viz),
+            ThreadingGoal(grasp_goal, skeletons, ['loop1', 'loop2', 'loop3'], end_loc, viz),
             point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
         ]
         goal = goals[goal_idx]
@@ -230,14 +216,14 @@ def main():
 
                     mppi.reset()
 
-                    planner = HomotopyThreadingPlanner(end_loc, grasp_rrt, skeletons, goal.skeleton_name)
+                    planner = HomotopyThreadingPlanner(end_loc, grasp_rrt, skeletons, goal.skeleton_names)
 
-                    print(f"Planning to {planner.key_loc}...")
+                    print(f"Planning with {planner.key_loc=}...")
                     sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
-                    best_grasp = planner.get_best(sim_grasps, viz=None)
+                    best_grasp = planner.get_best(sim_grasps, viz=viz)
                     viz.viz(best_grasp.phy, is_planning=True)
                     if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-                        if planner.through_skel(best_grasp.phy):
+                        if planner.through_skels(best_grasp.phy):
                             print("Executing grasp change plan")
                             execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov)
 
@@ -249,11 +235,10 @@ def main():
                 elif is_stuck:
                     mppi.reset()
 
-                    # current_min_loc = np.min(np.abs(get_grasp_locs(phy)))  # the abs make sure -1 is not the min
-                    planner = HomotopyThreadingPlanner(0.94, grasp_rrt, skeletons, goal.skeleton_name)
+                    planner = HomotopyThreadingPlanner(0.94, grasp_rrt, skeletons, goal.skeleton_names)
 
                     sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
-                    best_grasp = planner.get_best(sim_grasps, viz=None)
+                    best_grasp = planner.get_best(sim_grasps, viz=viz)
                     viz.viz(best_grasp.phy, is_planning=True)
                     if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
                         execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov)
@@ -261,8 +246,8 @@ def main():
                     else:
                         print("No plans found!")
 
-                if through_skel(skeletons, goal.skeleton_name, phy):
-                    print(f"Through {goal.skeleton_name}!")
+                if through_skels(skeletons, goal.skeleton_names, phy):
+                    print(f"Through {goal.skeleton_names}!")
                     goal_idx += 1
                     goal = goals[goal_idx]
 
@@ -272,7 +257,7 @@ def main():
             control_step(phy, command, sub_time_s, mov=mov)
             viz.viz(phy)
 
-            do_grasp_dynamics(phy)
+            # do_grasp_dynamics(phy)
 
             mppi.roll()
 

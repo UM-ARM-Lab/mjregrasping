@@ -260,7 +260,7 @@ class MjRViz:
         eqs_markers = MarkerArray()
         for eq_constraint_idx in range(phy.m.neq):
             eq = phy.m.eq(eq_constraint_idx)
-            if eq.active and eq.type == mjtEq.mjEQ_CONNECT:
+            if eq.active and eq.type in [mujoco.mjtEq.mjEQ_CONNECT, mujoco.mjtEq.mjEQ_WELD]:
                 eq_marker = Marker()
                 eq_marker.action = Marker.ADD
                 eq_marker.type = Marker.LINE_STRIP
@@ -270,11 +270,8 @@ class MjRViz:
                 eq_marker.color = ColorRGBA(*to_rgba("y"))
                 eq_marker.color.a = 0.4
                 eq_marker.ns = f"eq_{eq.name}"
-                # body_xpos = phy.d.xpos[eq.obj1_id]
-                # body_x_axis = body_xmat[:, :, 0]
-                # xpos = body_xpos + body_x_axis * offsets[:, None]
 
-                body1_pos, body2_pos = get_eq_points(phy, eq, eq_constraint_idx)
+                body1_pos, body2_pos = get_eq_points(phy, eq)
 
                 eq_marker.points.append(Point(*body1_pos))
                 eq_marker.points.append(Point(*body2_pos))
