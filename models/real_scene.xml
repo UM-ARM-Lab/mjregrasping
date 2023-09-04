@@ -11,10 +11,17 @@
     <include file="val.xml"/>
     <include file="real_obs.xml"/>
     <include file="floor.xml"/>
-    <include file="rope.xml"/>
     <include file="cc_sphere.xml"/>
     <include file="val_eq_constraints.xml"/>
     <worldbody>
+        <body pos="0.576179 0.875 0.775053" euler="-0.1 1.5 0" name="rope">
+            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
+            <composite type="cable" curve="s" count="12 1 1" size="1.24 0.22 1">
+                <joint kind="main" damping=".015"/>
+                <geom type="capsule" size=".01" rgba="0.8 0.2 0.1 1" condim="1" group="1"/>
+            </composite>
+            <joint type="free"/>
+        </body>
         <!-- used for recording what happens in the simulation -->
         <body name="mycamera">
             <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4"/>

@@ -85,5 +85,7 @@ def update_mujoco_qpos(phy, val):
         joint = phy.m.joint(name)
         mj_qpos_idx = joint.qposadr[0]
         phy.d.qpos[mj_qpos_idx] = pos
-    phy.d.act = val_dedup(js.position)
+        if name not in ['leftgripper2', 'rightgripper2']:
+            act = phy.m.actuator(f'{name}_vel')
+            phy.d.act[act.id] = pos
     mujoco.mj_forward(phy.m, phy.d)

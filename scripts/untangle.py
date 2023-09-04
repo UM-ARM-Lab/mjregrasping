@@ -9,10 +9,12 @@ import numpy as np
 import rerun as rr
 from colorama import Fore
 
+import rospy
 from arc_utilities import ros_init
+from arc_utilities.listener import Listener
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
-from mjregrasping.grasping import get_grasp_locs
+from mjregrasping.grasping import get_grasp_locs, activate_grasp
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
@@ -28,6 +30,8 @@ from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
 from mjregrasping.viz import make_viz, Viz
 from moveit_msgs.msg import MoveItErrorCodes
+from ros_numpy import numpify
+from visualization_msgs.msg import MarkerArray
 
 
 class BaseOnStuckMethod:
@@ -97,6 +101,15 @@ class OnStuckOurs(BaseOnStuckMethod):
             print(Fore.RED + "Failed to find a plan." + Fore.RESET)
 
 
+def set_mujoco_rope_state_from_cdcpd(cdcpd_pred: MarkerArray, phy: Physics, viz: Viz):
+    cdcpd_np = []
+    for marker in cdcpd_pred.markers:
+        cdcpd_np.append(numpify(marker.pose.position))
+    cdcpd_np = np.array(cdcpd_np)
+
+
+
+
 @ros_init.with_ros("untangle")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
@@ -104,7 +117,7 @@ def main():
     rr.init('untangle')
     rr.connect()
 
-    scenario = val_untangle
+    # scenario = val_untangle
     scenario = real_untangle
 
     gl_ctx = mujoco.GLContext(1280, 720)
@@ -117,18 +130,22 @@ def main():
         if scenario == val_untangle:
             phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
         else:
+            val = RealValCommander(phy.o.robot)
+            cdcpd_sub = Listener("/cdcpd_pred", MarkerArray)
+
             m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
             d = mujoco.MjData(m)
             phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
 
             skeletons = get_real_untangle_skeletons(phy)
             mov = None
-            val = RealValCommander(phy.o.robot)
-            update_mujoco_qpos(phy, val)
-            viz.viz(phy, False)
+            set_up_real_scene(val, phy, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
         goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
+
+        cdcpd_pred = cdcpd_sub.get()
+        set_mujoco_rope_state_from_cdcpd(cdcpd_pred, phy, viz)
 
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
         traps = TrapDetection()
@@ -196,6 +213,18 @@ def main():
         print(metrics)
         if mov:
             mov.close(metrics)
+
+
+def set_up_real_scene(val: RealValCommander, phy: Physics, viz: Viz):
+    update_mujoco_qpos(phy, val)
+    viz.viz(phy, False)
+    for _ in range(100):
+        mujoco.mj_step(phy.m, phy.d, 5)
+        viz.viz(phy, False)
+    activate_grasp(phy, 'right', 1)
+    for _ in range(100):
+        mujoco.mj_step(phy.m, phy.d, 5)
+        viz.viz(phy, False)
 
 
 if __name__ == "__main__":
