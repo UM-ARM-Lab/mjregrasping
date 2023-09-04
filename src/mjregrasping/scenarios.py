@@ -34,6 +34,15 @@ conq_hose = Scenario(
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
 )
 
+real_untangle = Scenario(
+    name="RealUntangle",
+    xml_path=Path("models/real_scene.xml"),
+    obstacle_name="obstacles",
+    robot_data=val,
+    rope_name="rope",
+    noise_sigma=np.deg2rad(2),
+)
+
 val_untangle = Scenario(
     name="Untangle",
     xml_path=Path("models/untangle_scene.xml"),
@@ -211,4 +220,18 @@ def get_untangle_skeletons(phy: Physics):
             dx(m.geom("rack2_bottom").size[1] * 2),
             dz(-m.geom("rack2_post3").size[2] * 2),
         ], axis=0),
+    }
+
+
+def get_real_untangle_skeletons(phy: Physics):
+    d = phy.d
+    m = phy.m
+    return {
+        "loop1": d.geom("leg1").xpos - dz(m.geom("leg1").size[2]) + np.cumsum([
+            np.zeros(3),
+            dy(m.geom("top").size[0]) * 2,
+            dz(m.geom("leg1").size[2] * 2),
+            -dy(m.geom("top").size[0] * 2),
+            dz(-m.geom("leg1").size[2] * 2),
+            ], axis=0),
     }

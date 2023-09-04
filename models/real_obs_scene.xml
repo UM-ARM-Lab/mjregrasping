@@ -1,5 +1,10 @@
 <mujoco model="computer_rack_scene">
     <compiler angle="radian" meshdir="meshes/" inertiafromgeom="true"/>
+    <default>
+        <default class="visual">
+            <geom contype="0" conaffinity="0" group="2"/>
+        </default>
+    </default>
     <include file="materials.xml"/>
     <include file="cc_sphere.xml"/>
     <include file="real_obs.xml"/>

@@ -17,7 +17,9 @@ from visualization_msgs.msg import MarkerArray
 
 
 def make_viz(scenario):
-    tfw = TF2Wrapper()
+    # tfw = TF2Wrapper()
+    print("tfw is None")
+    tfw = None
     mjviz = MjRViz(scenario.xml_path, tfw)
     return Viz(rviz=mjviz, mjrr=MjReRun(scenario.xml_path))
 

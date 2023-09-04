@@ -10,6 +10,7 @@ import numpy as np
 
 import rospy
 from mjregrasping.mujoco_object import MjObject
+from mjregrasping.val_dup import val_dedup
 from sensor_msgs.msg import JointState
 
 
@@ -76,3 +77,13 @@ class RealValCommander:
     def stop(self):
         self.should_disconnect = True
         self.command_thread.join()
+
+
+def update_mujoco_qpos(phy, val):
+    js = val.get_latest_joint_state()
+    for name, pos in zip(js.name, js.position):
+        joint = phy.m.joint(name)
+        mj_qpos_idx = joint.qposadr[0]
+        phy.d.qpos[mj_qpos_idx] = pos
+    phy.d.act = val_dedup(js.position)
+    mujoco.mj_forward(phy.m, phy.d)

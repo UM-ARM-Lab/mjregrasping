@@ -24,10 +24,9 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.real_val import RealValCommander
+from mjregrasping.real_val import RealValCommander, update_mujoco_qpos
 from mjregrasping.rviz import plot_points_rviz
 from mjregrasping.scenarios import val_untangle
-from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import make_viz, Viz
 from ros_numpy.point_cloud2 import merge_rgb_fields
 from sensor_msgs.msg import PointCloud2
@@ -266,16 +265,6 @@ def read_realsense(FAR_THRESHOLD, pipe):
     points_rgb_uvs_float = points_rgb_uvs_float[is_valid]
     points_rgb = rgb[points_rgb_uvs_float[:, 1], points_rgb_uvs_float[:, 0]]
     return points_rgb, points_xyz, rgb
-
-
-def update_mujoco_qpos(phy, val):
-    js = val.get_latest_joint_state()
-    for name, pos in zip(js.name, js.position):
-        joint = phy.m.joint(name)
-        mj_qpos_idx = joint.qposadr[0]
-        phy.d.qpos[mj_qpos_idx] = pos
-    phy.d.act = val_dedup(js.position)
-    mujoco.mj_forward(phy.m, phy.d)
 
 
 def simple_hsv_mask(points_rgb, points_xyz):

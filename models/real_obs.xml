@@ -1,16 +1,27 @@
 <mujoco model="real_obs">
     <worldbody>
-        <body name="obstacles">
+        <body name="obstacles" pos="0 0 -0.445">
             <body name="walls">
-                <geom name="front_wall" type="box" pos="0 0.96 1" size="1 0.01 1" material="cream-plaster"/>
+                <body name="front_wall" pos="0 0.96 1">
+                    <geom name="front_wall" type="box" size="1 0.01 1" material="cream-plaster"/>
+                    <body name="outlet_bar" pos="0 -0.025 0.155">
+                        <geom name="outlet_bar" type="box" pos="0 0 0" size="1 0.025 0.1" material="metal"/>
+                        <body name="goal" pos="0 -0.03 0">
+                            <geom name="goal" class="visual" type="box" size="0.1 0.1 0.1" rgba="0.8 0.5 0.8 0.5"/>
+                        </body>
+                    </body>
+                    <body name="tv" pos="0 -0.05 0.64">
+                        <geom name="tv" type="box" pos="0 0 0" size="0.6 0.05 0.3" rgba="0 0 0 1"/>
+                    </body>
+                    <body name="attach" pos="0.6 -0.01 0.17">
+                        <geom name="attach" type="box" size="0.02 0.005 0.02" rgba="0.5 0 0 1"/>
+                    </body>
+                </body>
                 <geom name="left_wall" type="box" pos="0.68 0 1" size="0.01 1 1" rgba="0.5 0.1 0.1 0.1"/>
                 <geom name="right_wall" type="box" pos="-0.8 0 1" size="0.01 1 1" rgba="0.5 0.1 0.1 0.1"/>
                 <geom name="back_wall" type="box" pos="0.0 -0.2 1" size="1 0.01 1" rgba="0.5 0.1 0.1 0.1"/>
             </body>
-            <body name="attach" pos="0.6 0.95 0.67">
-                <geom name="attach" type="box" size="0.02 0.005 0.02" rgba="0.5 0 0 1"/>
-            </body>
-            <body name="table" pos="-0.25 0.71 -0.445">
+            <body name="table" pos="-0.25 0.71 0">
                 <geom name="top" type="box" pos="0 0 0.7" size="0.8375 0.24 0.015" rgba="0.35 0.45 0.5 1.0"/>
                 <geom name="leg1" type="box" pos="0.76 0.17 0.35" euler="0 0 0.785" size="0.05 0.0175 0.35"
                       material="metal"/>

@@ -15,13 +15,15 @@ from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_a
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.move_to_joint_config import execute_grasp_plan
 from mjregrasping.movie import MjMovieMaker
+from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.real_val import RealValCommander, update_mujoco_qpos
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import val_untangle
+from mjregrasping.scenarios import val_untangle, real_untangle, get_real_untangle_skeletons
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
 from mjregrasping.viz import make_viz, Viz
@@ -30,12 +32,12 @@ from moveit_msgs.msg import MoveItErrorCodes
 
 class BaseOnStuckMethod:
 
-    def __init__(self, scenario, skeletons, goal, grasp_goal):
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
         self.scenario = scenario
         self.skeletons = skeletons
         self.goal = goal
         self.grasp_goal = grasp_goal
-        self.grasp_rrt = GraspRRT()
+        self.grasp_rrt = grasp_rrt
 
     def on_stuck(self, phy: Physics, viz: Viz, mov: Optional[MjMovieMaker]):
         raise NotImplementedError()
@@ -43,8 +45,8 @@ class BaseOnStuckMethod:
 
 class OnStuckTamp(BaseOnStuckMethod):
 
-    def __init__(self, scenario, skeletons, goal, grasp_goal):
-        super().__init__(scenario, skeletons, goal, grasp_goal)
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
         self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
 
@@ -66,8 +68,8 @@ class OnStuckTamp(BaseOnStuckMethod):
 
 class OnStuckOurs(BaseOnStuckMethod):
 
-    def __init__(self, scenario, skeletons, goal, grasp_goal):
-        super().__init__(scenario, skeletons, goal, grasp_goal)
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
         self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
 
@@ -103,13 +105,27 @@ def main():
     rr.connect()
 
     scenario = val_untangle
+    scenario = real_untangle
 
     gl_ctx = mujoco.GLContext(1280, 720)
     gl_ctx.make_current()
 
+    grasp_rrt = GraspRRT()
+
     viz = make_viz(scenario)
     for trial_idx in range(0, 10):
-        phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
+        if scenario == val_untangle:
+            phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
+        else:
+            m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+            d = mujoco.MjData(m)
+            phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+
+            skeletons = get_real_untangle_skeletons(phy)
+            mov = None
+            val = RealValCommander(phy.o.robot)
+            update_mujoco_qpos(phy, val)
+            viz.viz(phy, False)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
         goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
@@ -120,7 +136,7 @@ def main():
                            noise_sigma=val_untangle.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
-        osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal)
+        osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal)
         mpc_times = []
 
@@ -177,7 +193,9 @@ def main():
             'grasp_history':  np.array(grasp_goal.history).tolist(),
             'method':        osm.__class__.__name__,
         }
-        mov.close(metrics)
+        print(metrics)
+        if mov:
+            mov.close(metrics)
 
 
 if __name__ == "__main__":
