@@ -1,3 +1,5 @@
+import pickle
+
 import cv2
 import numpy as np
 import datetime
@@ -8,54 +10,10 @@ import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper
 
 import zivid
-from mjregrasping.save_load_matrix import assert_affine_matrix_and_save
 from tf.transformations import quaternion_from_matrix
 
 
-def enter_robot_pose(tfw, index: int) -> zivid.calibration.Pose:
-    """Robot pose user input.
-
-    iospy.init_node('zivid_calib')
-
-    Args:
-        index: Robot pose ID
-
-    Returns:
-        robot_pose: Robot pose
-
-    """
-
-    transform = tfw.get_transform('hdt_michigan_root', 'drive7')
-    robot_pose = zivid.calibration.Pose(transform)
-    print(f"The following pose was entered:\n{robot_pose}")
-    return robot_pose
-
-
-def perform_calibration(hand_eye_input: List[zivid.calibration.HandEyeInput]) -> zivid.calibration.HandEyeOutput:
-    """Hand-Eye calibration type user input.
-
-    Args:
-        hand_eye_input: Hand-Eye calibration input
-
-    Returns:
-        hand_eye_output: Hand-Eye calibration result
-
-    """
-    print("Performing eye-to-hand calibration")
-    hand_eye_output = zivid.calibration.calibrate_eye_to_hand(hand_eye_input)
-    return hand_eye_output
-
-
 def assisted_capture(camera: zivid.Camera) -> zivid.Frame:
-    """Acquire frame with capture assistant.
-
-    Args:
-        camera: Zivid camera
-
-    Returns:
-        frame: Zivid frame
-
-    """
     suggest_settings_parameters = zivid.capture_assistant.SuggestSettingsParameters(
         max_capture_time=datetime.timedelta(milliseconds=800),
         ambient_light_frequency=zivid.capture_assistant.SuggestSettingsParameters.AmbientLightFrequency.none,
@@ -65,13 +23,6 @@ def assisted_capture(camera: zivid.Camera) -> zivid.Frame:
 
 
 def main():
-    try:
-        prev_result = zivid.Matrix4x4()
-        prev_result.load(file_path="transform.yaml")
-        print_result(prev_result)
-    except:
-        print("Failed to load previous result")
-
     rospy.init_node('zivid_calib')
 
     tfw = TF2Wrapper()
@@ -83,49 +34,58 @@ def main():
 
     current_pose_id = 0
     hand_eye_input = []
+    board_in_cam_list = []
+    robot_to_hand_transforms = []
 
-    while current_pose_id < 10:
+    n_poses = 10
+    while current_pose_id < n_poses:
         frame = assisted_capture(camera)
 
         pc = frame.point_cloud()
 
-        rgba = pc.copy_data('rgba')
-        rgb = rgba[:, :, :3]
-
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
-        bgr = cv2.resize(bgr, (0, 0), fx=0.5, fy=0.5)
-        cv2.imshow('rgb', bgr)
-        cv2.waitKey(1)
-
         try:
-            robot_pose = enter_robot_pose(tfw, current_pose_id)
+            transform = tfw.get_transform('hdt_michigan_root', 'drive7')
+            transform[:3, 3] *= 1000
+            robot_to_hand_transforms.append(transform)
+            robot_pose = zivid.calibration.Pose(transform)
 
             print("Detecting checkerboard in point cloud")
             detection_result = zivid.calibration.detect_feature_points(pc)
 
             if detection_result.valid():
-                detection_result.pose().to_matrix()
+                board_in_cam = detection_result.pose().to_matrix()
+                board_in_cam_list.append(board_in_cam)
                 print("Calibration board detected")
                 hand_eye_input.append(zivid.calibration.HandEyeInput(robot_pose, detection_result))
                 current_pose_id += 1
+
+                print(f"{current_pose_id}/{n_poses} poses collected, press enter to continue or ctrl+c to exit")
+                input("Move robot to next pose and press enter to continue")
+
             else:
                 print("Failed to detect calibration board, ensure that the entire board is in the view of the camera")
         except ValueError as ex:
             print(ex)
 
-        rospy.sleep(5)
+    raw_inputs = {
+        'board_in_cam_list':        board_in_cam_list,
+        'robot_to_hand_transforms': robot_to_hand_transforms
+    }
+    with open("latest_raw_inputs.pkl", "wb") as f:
+        pickle.dump(raw_inputs, f)
 
-    calibration_result = perform_calibration(hand_eye_input)
-    transform = calibration_result.transform()
-    print_result(transform)
-    transform_file_path = Path(Path(__file__).parent / "transform.yaml")
-    assert_affine_matrix_and_save(transform, transform_file_path)
+    calibration_result = zivid.calibration.calibrate_eye_to_hand(hand_eye_input)
 
     if calibration_result.valid():
         print("Hand-Eye calibration OK")
         print(f"Result:\n{calibration_result}")
     else:
         print("Hand-Eye calibration FAILED")
+        return
+
+    print(calibration_result)
+    transform = calibration_result.transform()
+    print_result(transform)
 
 
 def print_result(prev_result: zivid.Matrix4x4):

@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 import torch
 import zivid
+import PIL
 from arm_segmentation.predictor import Predictor
 from cdcpd_torch.core.deformable_object_configuration import RopeConfiguration
 from cdcpd_torch.core.tracking_map import TrackingMap
@@ -207,6 +208,7 @@ class CDCPDTorchNode:
             xyz = xyz_mm / 1000.0
             rgb = rgba[:, :, :3]
             depth = xyz[:, :, 2]
+            # PIL.Image.fromarray(rgb).save(f"imgs/rgb_{int(now):.4f}.png")
 
             self.viz_pc(depth, rgb, xyz)
 
