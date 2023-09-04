@@ -130,14 +130,16 @@ def main():
         if scenario == val_untangle:
             phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
         else:
-            val = RealValCommander(phy.o.robot)
             cdcpd_sub = Listener("/cdcpd_pred", MarkerArray)
 
             m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
             d = mujoco.MjData(m)
             phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
+            val = RealValCommander(phy.o.robot)
 
+            mujoco.mj_forward(phy.m, phy.d)
             skeletons = get_real_untangle_skeletons(phy)
+            viz.skeletons(skeletons)
             mov = None
             set_up_real_scene(val, phy, viz)
 
@@ -145,7 +147,7 @@ def main():
         goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
 
         cdcpd_pred = cdcpd_sub.get()
-        set_mujoco_rope_state_from_cdcpd(cdcpd_pred, phy, viz)
+        # set_mujoco_rope_state_from_cdcpd(cdcpd_pred, phy, viz)
 
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
         traps = TrapDetection()
@@ -196,6 +198,8 @@ def main():
             viz.viz(phy)
 
             do_grasp_dynamics(phy)
+
+            # val.send_vel_command(phy.m, command)
 
             mppi.roll()
 

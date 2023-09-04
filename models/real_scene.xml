@@ -14,7 +14,7 @@
     <include file="cc_sphere.xml"/>
     <include file="val_eq_constraints.xml"/>
     <worldbody>
-        <body pos="0.576179 0.875 0.775053" euler="-0.1 1.5 0" name="rope">
+        <body pos="0.576179 0.871 0.775053" euler="-0.1 1.5 0" name="rope">
             <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
             <composite type="cable" curve="s" count="12 1 1" size="1.24 0.22 1">
                 <joint kind="main" damping=".015"/>

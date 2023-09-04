@@ -227,11 +227,11 @@ def get_real_untangle_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
     return {
-        "loop1": d.geom("leg1").xpos - dz(m.geom("leg1").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("top").size[0]) * 2,
-            dz(m.geom("leg1").size[2] * 2),
-            -dy(m.geom("top").size[0] * 2),
-            dz(-m.geom("leg1").size[2] * 2),
-            ], axis=0),
+        "loop1": np.array([
+            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
+            d.geom("leg1").xpos + dz(m.geom("leg1").size[2]),
+            d.geom("leg4").xpos + dz(m.geom("leg4").size[2]),
+            d.geom("leg4").xpos - dz(m.geom("leg4").size[2]),
+            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
+            ]),
     }
