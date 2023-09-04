@@ -9,7 +9,7 @@ import rerun as rr
 from arc_utilities import ros_init
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import activate_grasp
-from mjregrasping.move_to_joint_config import pid_to_joint_config, execute_grasp_plan
+from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
@@ -28,12 +28,12 @@ def randomize_rack(original_path: Path, rng: np.random.RandomState):
     attach = mxml.get_e("body", "attach")
     attach_pos = mxml.get_vec(attach, 'pos')
     attach_pos[0] += rng.uniform(-0.05, 0.05)
-    attach_pos[1] += rng.uniform(-0.05, 0.05)
+    attach_pos[2] += rng.uniform(-0.05, 0.05)
     mxml.set_vec(attach, attach_pos, 'pos')
 
     # shrink the computer rack in the X axis
     # h will be the half-size in X of the bottom/top geoms of the rack
-    h = rng.uniform(0.2, 0.45)
+    h = rng.uniform(0.2, 0.40)
     rack1_bottom = mxml.get_e("geom", "rack1_bottom")
     rack1_post1 = mxml.get_e("geom", "rack1_post1")
     post_size = mxml.get_vec(rack1_post1, 'size')
@@ -86,6 +86,10 @@ def randomize_rack(original_path: Path, rng: np.random.RandomState):
     c_y1 = h - case_size[1] / 2
     computer_pos[1] = rng.uniform(c_y0, c_y1)
     mxml.set_vec(computer, computer_pos, 'pos')
+
+    # move the wall to be to the left of rack
+    left_wall = mxml.get_e("body", "left_wall")
+    mxml.set_vec_i(left_wall, 'pos', 1, y1 + 0.26)
 
     tmp_path = mxml.save_tmp()
     m = mujoco.MjModel.from_xml_path(str(tmp_path))
@@ -144,11 +148,11 @@ def main():
             phy.d.act[phy.m.actuator("joint41_vel").id] = np.deg2rad(-30)
 
             mujoco.mj_step(phy.m, phy.d, 500)
-            viz.viz(phy, is_planning=True)
+            viz.viz(phy, is_planning=False)
 
+            fixed = grasp_rrt.fix_start_state_in_place(phy, viz)
             for j in range(5):
-                loc = rng.uniform(0.5, 1.0)
-                grasp_rrt.fix_start_state_in_place(phy, viz)
+                loc = np.clip(rng.uniform(0.5, 1.5), 0, 1)
                 res, scene_msg = grasp_rrt.plan(phy, [Strategies.STAY, Strategies.NEW_GRASP], [-1, loc], viz,
                                                 pos_noise=0.2)
                 if res.error_code.val == MoveItErrorCodes.SUCCESS:

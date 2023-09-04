@@ -2,9 +2,7 @@
 from itertools import cycle
 
 import mujoco
-import networkx as nx
 import numpy as np
-from matplotlib import pyplot as plt
 from vedo import Line, Text2D
 
 import rospy
@@ -164,6 +162,8 @@ def viz_h(xml_path, phy, skeletons, graph, h, loops):
 
 
 def get_h_for_drones(phy, skeletons):
+    from time import perf_counter
+    t0 = perf_counter()
     graph = create_graph_nodes(phy)
     rope_points = get_rope_points(phy)
     # points tracing the robot arms from tip to base [n_arms, n_points, 3]
@@ -179,6 +179,7 @@ def get_h_for_drones(phy, skeletons):
                                     collapse_empty_gripper_cycles=False,
                                     gripper_ids_in_h_signature=False,
                                     connect_via_floor=False)
+    print(f'dt: {perf_counter() - t0:.3f}')
     return graph, h, loops
 
 

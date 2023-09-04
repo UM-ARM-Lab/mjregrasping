@@ -17,8 +17,12 @@ def compute_eq_errors(phy: Physics):
 def compute_eq_error(phy, eq):
     b2 = phy.d.body(eq.obj2id)
     b1 = phy.d.body(eq.obj1id)
-    b1_offset = eq.data[0:3]
-    b2_offset = eq.data[3:6]
+    if eq.type == mujoco.mjtEq.mjEQ_CONNECT:
+        b1_offset = eq.data[0:3]
+        b2_offset = eq.data[3:6]
+    elif eq.type == mujoco.mjtEq.mjEQ_WELD:
+        b1_offset = eq.data[3:6]
+        b2_offset = eq.data[0:3]
     b1_offset_in_world = np.zeros(3)
     mujoco.mju_trnVecPose(b1_offset_in_world, b1.xpos, b1.xquat, b1_offset)
     b2_offset_in_world = np.zeros(3)

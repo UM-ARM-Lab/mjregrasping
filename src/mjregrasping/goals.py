@@ -139,12 +139,14 @@ class GraspLocsGoal:
 
     def __init__(self, current_locs):
         self.locs = current_locs
+        self.history = [current_locs]
 
     def get_grasp_locs(self):
         return self.locs
 
     def set_grasp_locs(self, grasp_locs):
         self.locs = grasp_locs
+        self.history.append(grasp_locs)
 
 
 class ObjectPointGoal(ObjectPointGoalBase):
@@ -181,9 +183,8 @@ class ObjectPointGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight']
 
-        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                              current_locs, grasp_locs,
-                                                              grasp_xpos, tools_pos, rope_points)
+        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping, current_locs, grasp_locs,
+                                                              grasp_xpos, tools_pos)
 
         gripper_to_goal_cost = np.sum(norm(tools_pos - self.goal_point, axis=-1) * is_grasping, axis=-1)
         gripper_to_goal_cost = gripper_to_goal_cost * hp['gripper_to_goal_weight']
@@ -191,6 +192,8 @@ class ObjectPointGoal(ObjectPointGoalBase):
         smoothness_cost = get_smoothness_cost(u_sample)
 
         contact_cost = sum(contact_cost)
+
+        nongrasping_rope_dist_cost = get_nongrasping_near_cost(is_grasping, rope_points, tools_pos)
 
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
@@ -210,6 +213,7 @@ class ObjectPointGoal(ObjectPointGoalBase):
             grasp_finger_cost,
             grasp_pos_cost,
             nongrasping_rope_contact_cost,
+            nongrasping_rope_dist_cost,
             gripper_to_goal_cost,
             ever_not_grasping_cost,
             smoothness_cost,
@@ -224,6 +228,7 @@ class ObjectPointGoal(ObjectPointGoalBase):
             "grasp_finger",
             "grasp_pos",
             "nongrasping_rope_contact",
+            "nongrasping_rope_dist",
             "gripper_to_goal",
             "ever_not_grasping",
             "smoothness",
@@ -244,6 +249,13 @@ def perturb_locs(strategy, locs):
     next_locs = np.clip(next_locs, 0, 1)
     next_locs = np.where([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy], next_locs, locs)
     return next_locs
+
+
+def get_nongrasping_near_cost(is_grasping, rope_points, tools_pos):
+    min_dists_to_rope = np.min(np.abs(pairwise_squared_distances(rope_points, tools_pos) - 0.10), axis=1)
+    nongrasping_rope_dist_cost = np.sum(min_dists_to_rope * np.logical_not(is_grasping), axis=-1)
+    nongrasping_rope_dist_cost = sum(nongrasping_rope_dist_cost) * hp['nongrasping_rope_dist_weight']
+    return nongrasping_rope_dist_cost
 
 
 class ThreadingGoal(ObjectPointGoalBase):
@@ -298,13 +310,10 @@ class ThreadingGoal(ObjectPointGoalBase):
 
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost * hp['nongrasping_rope_contact_weight'])
 
-        min_dists_to_rope = np.min(np.abs(pairwise_squared_distances(rope_points, tools_pos) - 0.10), axis=1)
-        nongrasping_rope_dist_cost = np.sum(min_dists_to_rope * np.logical_not(is_grasping), axis=-1)
-        nongrasping_rope_dist_cost = sum(nongrasping_rope_dist_cost) * hp['nongrasping_rope_dist_weight']
+        nongrasping_rope_dist_cost = get_nongrasping_near_cost(is_grasping, rope_points, tools_pos)
 
-        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping,
-                                                              current_locs, grasp_locs,
-                                                              grasp_xpos, tools_pos, rope_points)
+        grasp_finger_cost, grasp_pos_cost = get_regrasp_costs(finger_qs, is_grasping, current_locs, grasp_locs,
+                                                              grasp_xpos, tools_pos)
         grasp_finger_cost = sum(grasp_finger_cost)
         grasp_pos_cost = sum(grasp_pos_cost)
 

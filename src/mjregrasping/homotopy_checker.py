@@ -13,6 +13,7 @@ from multiset import Multiset
 
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
+from mjregrasping.grasping import get_grasp_eq_offset, WrongEQType
 from mjregrasping.homotopy_utils import passes_through, floorify, from_to, check_new_cycle, NO_HOMOTOPY, pairwise, \
     has_gripper_gripper_edge, get_h_signature, make_h_desired
 from mjregrasping.mujoco_objects import parents_points
@@ -134,7 +135,10 @@ def create_graph_nodes(phy: Physics):
         eq = phy.m.eq(eq_idx)
         if eq.active:
             body_idx = int(eq.obj2id)
-            offset = eq.data[3]
+            try:
+                offset = get_grasp_eq_offset(eq)
+            except WrongEQType:
+                continue
             xmat = phy.d.xmat[body_idx].reshape(3, 3)
             xpos = np.squeeze(phy.d.xpos[body_idx] + xmat[:, 0] * offset)
             loc = float(grasp_indices_to_locations(phy.o.rope.body_indices, body_idx) + (offset / rope_length))

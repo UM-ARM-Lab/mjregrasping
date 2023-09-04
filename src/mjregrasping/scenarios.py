@@ -109,30 +109,6 @@ def make_pull_goal(viz):
     return goal
 
 
-def setup_conq_hose(phy, viz):
-    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
-    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
-    rope_ball_q_indices = phy.o.rope.qpos_indices[7:].reshape((-1, 4))
-    phy.d.qpos[rope_xyz_q_indices] = np.array([2.0, 1.33, 0.25])
-    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0, np.pi)
-    for j in range(rope_ball_q_indices.shape[0]):
-        if 2 < j < 8:
-            phy.d.qpos[rope_ball_q_indices[j]] = quaternion_from_euler(0, 0, np.deg2rad(18))
-        else:
-            phy.d.qpos[rope_ball_q_indices[j]] = quaternion_from_euler(0, 0, 0)
-    mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
-    attach_eq = phy.m.eq('attach')
-    attach_eq.data[3:6] = 0
-    attach_eq.active = True
-    settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
-
-
-def make_conq_hose_goal(viz):
-    goal_point = np.array([1.5, -0.75, 0.04])
-    goal = ObjectPointGoal(goal_point, goal_radius=0.15, loc=1, viz=viz)
-    return goal
-
 
 def dx(x):
     return np.array([x, 0, 0])

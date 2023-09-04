@@ -99,7 +99,7 @@ def main():
         ])
         pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
 
-        loc = rng.uniform(0.91, 0.96)
+        loc = rng.uniform(0.93, 0.96)
         activate_grasp(phy, 'right', loc)
         settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
 
@@ -109,6 +109,7 @@ def main():
         skeletons = get_threading_skeletons(phy)
 
         save_trial(i, phy, scenario, None, skeletons)
+        print(f"Saved trial {i}")
 
 
 if __name__ == "__main__":

@@ -2,11 +2,14 @@
     <worldbody>
         <body name="computer_rack" pos="0 0.8 -0.445" quat="0.707 0 0 0.707">
             <body name="wall">
-                <geom name="wall" type="box" pos="0 0.7 0.975" size="5 0.01 1" rgba="0.8 0.8 0.8 1"/>
-                <geom name="wall2" type="box" pos="0.6 0 0.975" size="0.01 5 1" rgba="0.8 0.8 0.8 1"/>
-            </body>
-            <body name="attach" pos="0 0.30 0.59">
-                <geom name="rack_attach" type="box" size="0.005 0.005 0.005" rgba="0.5 0 0 1"/>
+                <body name="left_wall" pos="0 0.7 0.975">
+                    <geom name="left_wall" type="box" size="5 0.01 1" rgba="0.8 0.8 0.8 1"/>
+                    <body name="attach" pos="-0.05 -0.035 -0.3">
+                        <geom name="rack_attach" type="box" size="0.005 0.005 0.005" rgba="0.5 0 0 1"/>
+                        <geom name="cover" class="visual" type="box" size="0.04 0.02 0.04" rgba="0.5 0.1 0.1 1"/>
+                    </body>
+                </body>
+                <geom name="front_wall" type="box" pos="0.6 0 0.975" size="0.01 5 1" rgba="0.8 0.8 0.8 1"/>
             </body>
             <body name="racks" pos="0 0 0.03">
                 <body name="rack1">

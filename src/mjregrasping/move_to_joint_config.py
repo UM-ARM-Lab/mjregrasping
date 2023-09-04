@@ -31,7 +31,7 @@ def warn_about_limits(q_target, phy):
         offending_idx = np.argmin(high - q_target)
         name = phy.m.actuator(offending_idx).name
         print(f"q_target {q_target[offending_idx]} is above actuator limit {high[offending_idx]} for joint {name}!")
-    if np.any(q_target < low):
+    if np.any(q_target < low - 0.03):
         offending_idx = np.argmin(q_target - low)
         name = phy.m.actuator(offending_idx).name
         print(f"q_target {q_target[offending_idx]} is below actuator limit {low[offending_idx]} for joint {name}!")

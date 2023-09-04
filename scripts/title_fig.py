@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from time import perf_counter
 
 import mujoco
 import numpy as np
@@ -6,11 +7,10 @@ from vedo import Line
 
 import rospy
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
-from mjregrasping.homotopy_utils import load_skeletons
 from mjregrasping.mjvedo import MjVedo, COLORS
-from mjregrasping.mujoco_objects import MjObjects
-from mjregrasping.physics import Physics
-from mjregrasping.scenarios import val_untangle, setup_untangle
+from mjregrasping.scenarios import val_untangle
+from mjregrasping.trials import load_trial
+from mjregrasping.viz import make_viz
 
 
 def main():
@@ -20,20 +20,21 @@ def main():
 
     scenario = val_untangle
 
-    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
+    viz = make_viz(scenario)
+    gl_ctx = mujoco.GLContext(1280, 720)
+    gl_ctx.make_current()
 
-    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
-    phy = Physics(m, mujoco.MjData(m), objects)
-    mujoco.mj_forward(phy.m, phy.d)
-    skeletons = load_skeletons("models/computer_rack_skeleton.hjson")
+    trial_idx = 5
+    phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
 
-    setup_untangle(phy, None)
+    t0 = perf_counter()
     h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
+    print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
 
     mjvedo = MjVedo(scenario.xml_path)
     set_cam(mjvedo)
     mjvedo.viz(phy)
-    mjvedo.plotter.render().screenshot("title_fig_scene.png", scale=3)
+    mjvedo.plotter.render().screenshot(f"title_fig_scene_{trial_idx}.png", scale=3)
 
     mjvedo = MjVedo(scenario.xml_path)
     set_cam(mjvedo)
@@ -43,12 +44,13 @@ def main():
         mjvedo.plotter += Line(skel, lw=lw, c='k')
     for i, loop in enumerate(loops):
         mjvedo.plotter += Line(loop, lw=lw, c=COLORS[i % len(COLORS)])
-    mjvedo.plotter.render().screenshot("title_fig_skel.png", scale=3)
+    mjvedo.plotter.render().screenshot(f"title_fig_skel_{trial_idx}.png", scale=3)
 
 
 def set_cam(mjvedo):
     mjvedo.plotter.camera.SetFocalPoint(0, 0.7, 0)
     mjvedo.plotter.camera.SetPosition(2.0, -0.3, 1.8)
+    mjvedo.plotter.camera.SetViewUp(0, 0, 1)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import multiprocessing
 from concurrent.futures.thread import ThreadPoolExecutor
+from time import perf_counter
 from typing import Optional
 
 import mujoco
@@ -48,8 +49,10 @@ class OnStuckTamp(BaseOnStuckMethod):
         self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
 
     def on_stuck(self, phy, viz, mov):
+        planning_t0 = perf_counter()
         sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        self.planner.planning_times.append(perf_counter() - planning_t0)
 
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             viz.viz(best_grasp.phy, is_planning=True)
@@ -70,7 +73,8 @@ class OnStuckOurs(BaseOnStuckMethod):
 
     def on_stuck(self, phy, viz, mov):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        planning_t0 = perf_counter()
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -79,6 +83,7 @@ class OnStuckOurs(BaseOnStuckMethod):
             print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
             self.planner.update_blacklists(phy)
             best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        self.planner.planning_times.append(perf_counter() - planning_t0)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             viz.viz(best_grasp.phy, is_planning=True)
             # now execute the plan
@@ -103,7 +108,7 @@ def main():
     gl_ctx.make_current()
 
     viz = make_viz(scenario)
-    for trial_idx in range(2, 10):
+    for trial_idx in range(0, 10):
         phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
@@ -115,8 +120,9 @@ def main():
                            noise_sigma=val_untangle.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
-        # osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal)
-        osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal)
+        osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal)
+        # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal)
+        mpc_times = []
 
         goal.viz_goal(phy)
 
@@ -139,7 +145,7 @@ def main():
 
             is_stuck = traps.check_is_stuck(phy)
             needs_reset = False
-            if is_stuck:  # FIXME: DEBUGGING!!!
+            if is_stuck:
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
                 osm.on_stuck(phy, viz, mov)
                 needs_reset = True
@@ -148,7 +154,9 @@ def main():
                 mppi.reset()
                 traps.reset_trap_detection()
 
+            mpc_t0 = perf_counter()
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
+            mpc_times.append(perf_counter() - mpc_t0)
             mppi_viz(mppi, goal, phy, command, sub_time_s)
 
             control_step(phy, command, sub_time_s, mov=mov)
@@ -161,9 +169,13 @@ def main():
             itr += 1
 
         metrics = {
-            'itr':     itr,
-            'success': success,
-            'time':    phy.d.time
+            'itr':            itr,
+            'success':        success,
+            'sim_time':       phy.d.time,
+            'planning_times': osm.planner.planning_times,
+            'mpc_times':      mpc_times,
+            'grasp_history':  np.array(grasp_goal.history).tolist(),
+            'method':        osm.__class__.__name__,
         }
         mov.close(metrics)
 

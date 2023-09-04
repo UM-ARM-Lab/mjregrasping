@@ -21,12 +21,14 @@ def deactivate_release(phy, strategy, viz: Optional[Viz], is_planning: bool, mov
     deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
 
 
-def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning: bool,
+                                  mov: Optional[MjMovieMaker] = None):
     needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
     deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
 
 
-def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool,
+                          mov: Optional[MjMovieMaker] = None):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -35,7 +37,7 @@ def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: b
         if release_i:
             eq.active = 0
             ctrl[ctrl_i] = 0.4
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 10, mov=mov)
+    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov)
     settle_with_checks(phy, viz, is_planning, mov)
 
 
@@ -62,7 +64,7 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
     last_q = get_q(phy)
     max_t = 50
     for t in range(max_t):
-        control_step(phy, ctrl, sub_time_s=5 * DEFAULT_SUB_TIME_S, mov=mov)
+        control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S, mov=mov)
         rope_points = get_rope_points(phy)
         q = get_q(phy)
         if viz:
@@ -70,7 +72,9 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
         rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
         robot_displacements = np.abs(q - last_q)
         is_unstable = phy.d.warning.number.sum() > 0
-        if np.max(rope_displacements) < 0.01 and np.max(robot_displacements) < np.deg2rad(1) or is_unstable:
+        rope_settled = np.max(rope_displacements) < 0.02
+        robot_settled = np.max(robot_displacements) < np.deg2rad(1)
+        if robot_settled and rope_settled or is_unstable:
             return
         last_rope_points = rope_points
         last_q = q

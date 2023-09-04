@@ -34,6 +34,7 @@ class HomotopyRegraspPlanner:
             skeletons:
             seed:
         """
+        self.planning_times = []
         self.key_loc = key_loc
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
@@ -61,10 +62,13 @@ class HomotopyRegraspPlanner:
         return sim_grasps
 
     def simulate_grasps(self, grasps_inputs, phy, viz, viz_execution):
+        from time import perf_counter
+        t0 = perf_counter()
         sim_grasps = []
         for grasp_input in grasps_inputs:
             sim_grasp = self.simulate_grasp(phy, viz, grasp_input, viz_execution)
             sim_grasps.append(sim_grasp)
+        print(f'simulate_grasps: {perf_counter() - t0:.4f}')
         return sim_grasps
 
     def sample_grasp_inputs(self, phy):
@@ -82,7 +86,7 @@ class HomotopyRegraspPlanner:
                     sample_loc = self.key_loc
                 elif i == 1:
                     sample_loc = 0
-                elif i == 2:
+                elif i == 2 and self.key_loc != 1:
                     sample_loc = 1
                 else:
                     sample_loc = self.rng.uniform(0, 1)

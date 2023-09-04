@@ -1,0 +1,48 @@
+<mujoco model="op3 scene">
+
+    <include file="op3.xml"/>
+
+    <statistic center="0 0 0.2" extent="0.6"/>
+
+    <visual>
+        <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+        <rgba haze="0.15 0.25 0.35 1"/>
+        <global azimuth="160" elevation="-20"/>
+    </visual>
+
+    <asset>
+        <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+        <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+                 markrgb="0.8 0.8 0.8" width="300" height="300"/>
+        <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+    </asset>
+
+    <worldbody>
+        <light pos="0.25 0 1.5" dir="0 0 -1" directional="true"/>
+        <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+        <body name="obstacles">
+            <body name="rack" pos="0.22 0.08 0">
+                <body name="rack_bottom" pos="0 0 0.005">
+                    <geom name="rack_bottom" size="0.105 0.205 0.005" type="box" rgba="0.2 0.2 0.1 1.0"/>
+                </body>
+                <body name="rack_middle" pos="0 0 0.2">
+                    <geom name="rack_middle" size="0.1 0.2 0.005" type="box" rgba="0.2 0.2 0.1 1.0"/>
+                    <body name="crate" pos="-0.02 -0.08 0.04">
+                        <geom name="crate" size="0.05 0.07 0.04" type="box" rgba="0.5 0.2 0.2 1.0"/>
+                    </body>
+                </body>
+                <geom name="rack_top" size="0.105 0.205 0.005" type="box" pos="0 0 0.40" rgba="0.2 0.2 0.1 1.0"/>
+                <geom name="post1" size="0.005 0.005 0.2" type="box" pos="0.1 0.2 0.2" rgba="0.9 0.9 0.9 1.0"/>
+                <geom name="post2" size="0.005 0.005 0.2" type="box" pos="0.1 -0.2 0.2" rgba="0.9 0.9 0.9 1.0"/>
+                <geom name="post3" size="0.005 0.005 0.2" type="box" pos="-0.1 0.2 0.2" rgba="0.9 0.9 0.9 1.0"/>
+                <geom name="post4" size="0.005 0.005 0.2" type="box" pos="-0.1 -0.2 0.2" rgba="0.9 0.9 0.9 1.0"/>
+            </body>
+        </body>
+    </worldbody>
+    <keyframe>
+        <key name="inside"
+             qpos='-0.0139357 0.00826693 0.215276 -0.984507 0.00935907 -0.175011 -0.00535551 -0.0462513 0.343673 -1.49508 1.36204 -0.507388 1.58549 -1.35875 0.346845 -0.000693661 -0.00778458 -1.23006 1.61214 0.687884 0.0145861 -0.00445929 -0.00805309 1.17235 -1.55486 -0.741223 0.0103703'/>
+        <key name="outside"
+             qpos='0.0165234 -0.0291011 0.21189 -0.983535 0.0114318 -0.180313 -0.00383222 -0.0530373 0.355843 -1.51167 0.94248 -0.996289 1.49717 -0.94248 1.34169 -0.00132946 -0.00876702 -1.24113 1.63019 0.698267 0.0147465 -0.00511636 -0.00903626 1.18345 -1.57253 -0.751099 0.0105211'/>
+    </keyframe>
+</mujoco>

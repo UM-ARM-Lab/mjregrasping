@@ -126,7 +126,7 @@ def get_keypoint(phy, body_idx, offset):
     return keypoint
 
 
-def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, regrasp_xpos, tools_pos, rope_points):
+def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, regrasp_xpos, tools_pos):
     """
 
     Args:
@@ -136,7 +136,6 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
         desired_locs:  Whether the gripper should grasp ∈ [0-1]
         regrasp_xpos: The 3d position in space corresponding to the regrasp_locs
         tools_pos: The current 3d position of the tool tips
-        rope_points: The 3d position of all the rope points
 
     Returns:
         Costs for finger joint angles, and distance to desired rope positions
@@ -149,7 +148,7 @@ def get_regrasp_costs(finger_qs, is_grasping, current_grasp_locs, desired_locs, 
 
     desired_open = check_should_be_open(current_grasp_locs, is_grasping, desired_locs, desired_is_grasping)
     # Double the q_open, so we are encouraged to open a lot more than the minimum required to release the rope
-    desired_finger_qs = np.where(desired_open, 2 * hp['finger_q_open'], hp['finger_q_closed'])
+    desired_finger_qs = np.where(desired_open, 1.5 * hp['finger_q_open'], hp['finger_q_closed'])
     regrasp_finger_cost = (np.sum(np.abs(finger_qs - desired_finger_qs), axis=-1)) * hp['grasp_finger_weight']
 
     return regrasp_finger_cost, regrasp_pos_cost
