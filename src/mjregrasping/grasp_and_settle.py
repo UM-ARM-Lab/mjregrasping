@@ -72,7 +72,7 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
         rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
         robot_displacements = np.abs(q - last_q)
         is_unstable = phy.d.warning.number.sum() > 0
-        rope_settled = np.max(rope_displacements) < 0.02
+        rope_settled = np.max(rope_displacements) < 0.01
         robot_settled = np.max(robot_displacements) < np.deg2rad(1)
         if robot_settled and rope_settled or is_unstable:
             return

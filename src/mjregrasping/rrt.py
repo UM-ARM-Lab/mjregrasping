@@ -48,12 +48,13 @@ class GraspRRT:
         return self.rrt.is_state_valid(scene_msg)
 
     def fix_start_state_in_place(self, phy: Physics, viz: Optional[Viz] = None):
-        for _ in range(5):
+        for _ in range(10):
             valid = self.is_state_valid(phy)
             if valid:
                 return True
             q_new, is_fixed = self.get_fixed_qpos(phy, viz)
-            pid_to_joint_config(phy, viz, val_dedup(q_new), DEFAULT_SUB_TIME_S, is_planning=False)
+            if is_fixed:
+                pid_to_joint_config(phy, viz, val_dedup(q_new), DEFAULT_SUB_TIME_S, is_planning=False)
         return False
 
     def get_fixed_qpos(self, phy: Physics, viz: Optional[Viz] = None):

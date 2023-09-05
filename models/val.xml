@@ -121,10 +121,10 @@
                                                                    range="-0.01 1"
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper" friction="0.00001"
-                                                                  rgba="0.8 0.8 0.8 1" group="1"/>
+                                                                  rgba="0.8 0.8 0.8 1"/>
                                                             <body name="left_finger_pad" pos="0.052 0.1 0">
                                                                 <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad"
-                                                                      rgba="0.6 0.4 0.2 1" group="1"/>
+                                                                      rgba="0.6 0.4 0.2 1"/>
                                                             </body>
                                                         </body>
                                                         <body name="leftgripper2" pos="0 -0.0135 0.068553"
@@ -134,10 +134,10 @@
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper2"
                                                                   friction="0.00001"
-                                                                  rgba="0.8 0.8 0.8 1" group="1"/>
+                                                                  rgba="0.8 0.8 0.8 1"/>
                                                             <body name="left_finger_pad2" pos="0.052 0.1 0">
                                                                 <geom type="mesh" mesh="FINGER_PAD" name="left_finger_pad2"
-                                                                      rgba="0.6 0.4 0.2 1" group="1"/>
+                                                                      rgba="0.6 0.4 0.2 1"/>
                                                             </body>
                                                         </body>
                                                     </body>
@@ -221,10 +221,10 @@
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper"
                                                                   friction="0.00001"
-                                                                  rgba="0.9 0.9 0.9 1" group="1"/>
+                                                                  rgba="0.9 0.9 0.9 1"/>
                                                             <body name="right_finger_pad" pos="0.052 0.1 0">
                                                                 <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad"
-                                                                      rgba="0.6 0.4 0.2 1" group="1"/>
+                                                                      rgba="0.6 0.4 0.2 1"/>
                                                             </body>
                                                         </body>
                                                         <body name="rightgripper2" pos="0 -0.0135 0.068553"
@@ -234,10 +234,10 @@
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper2"
                                                                   friction="0.00001"
-                                                                  rgba="0.9 0.9 0.9 1" group="1"/>
+                                                                  rgba="0.9 0.9 0.9 1"/>
                                                             <body name="right_finger_pad2" pos="0.052 0.1 0">
                                                                 <geom type="mesh" mesh="FINGER_PAD" name="right_finger_pad2"
-                                                                      rgba="0.6 0.4 0.2 1" group="1"/>
+                                                                      rgba="0.6 0.4 0.2 1"/>
                                                             </body>
                                                         </body>
                                                     </body>

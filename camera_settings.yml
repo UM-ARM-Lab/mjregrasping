@@ -4,10 +4,10 @@ __version__:
 Settings:
   Acquisitions:
     - Acquisition:
-        Aperture: 1.83
+        Aperture: 2.18
         Brightness: 1
-        ExposureTime: 5000
-        Gain: 3.5
+        ExposureTime: 8333
+        Gain: 3
   Diagnostics:
     Enabled: no
   Experimental:
@@ -44,7 +44,7 @@ Settings:
           Enabled: yes
           Threshold: 3
         Repair:
-          Enabled: no
+          Enabled: yes
         Suppression:
           Enabled: no
       Outlier:

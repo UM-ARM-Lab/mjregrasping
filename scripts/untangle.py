@@ -80,7 +80,8 @@ class OnStuckOurs(BaseOnStuckMethod):
     def on_stuck(self, phy, viz, mov):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+        print("DEBUGGING VIZ_EXECUTION=TRUE")
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -148,7 +149,7 @@ def main():
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
         goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
 
-        cdcpd_pred = cdcpd_sub.get()
+        # cdcpd_pred = cdcpd_sub.get()
         # set_mujoco_rope_state_from_cdcpd(cdcpd_pred, phy, viz)
 
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
