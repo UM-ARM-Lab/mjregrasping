@@ -62,38 +62,6 @@ threading = Scenario(
 )
 
 
-def setup_untangle(phy, viz):
-    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
-    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
-    mujoco.mj_forward(phy.m, phy.d)
-    phy.d.qpos[rope_xyz_q_indices] = phy.d.body("attach").xpos
-    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0, 0)
-    # update the attach constraint
-    phy.m.eq("attach").data[3:6] = 0
-    mujoco.mj_forward(phy.m, phy.d)
-
-    robot_q1 = np.array([
-        -0.7, 0.1,  # torso
-        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
-        0,  # left gripper
-        0.0, -0.2, 0, -0.30, 0, -0.2, 0,  # right arm
-        0.3,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, robot_q1, sub_time_s=DEFAULT_SUB_TIME_S)
-    robot_q2 = np.array([
-        -0.5, 0.4,  # torso
-        -0.4, 0.3, -0.3, 0.5, 0, 0, 0,  # left arm
-        0.1,  # left gripper
-        1.2, -0.2, 0, -0.90, 0, -0.6, 1.5707,  # right arm
-        0.3,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-
-    activate_grasp(phy, 'right', 1.0)
-    robot_q2[-1] = 0.05  # close right gripper
-    pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-
-
 def setup_pull(phy, viz):
     # set the rope pose
     phy.d.qpos[20:23] = np.array([1.0, 0.2, 0])
@@ -116,7 +84,6 @@ def make_pull_goal(viz):
     goal_point = np.array([0.8, 0.21, 0.2])
     goal = ObjectPointGoal(goal_point, 0.03, goal_rope_loc, viz)
     return goal
-
 
 
 def dx(x):
@@ -233,5 +200,5 @@ def get_real_untangle_skeletons(phy: Physics):
             d.geom("leg4").xpos + dz(m.geom("leg4").size[2]),
             d.geom("leg4").xpos - dz(m.geom("leg4").size[2]),
             d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
-            ]),
+        ]),
     }

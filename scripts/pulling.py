@@ -15,7 +15,7 @@ from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-from mjregrasping.move_to_joint_config import execute_grasp_plan
+from mjregrasping.move_to_joint_config import pid_to_joint_configs
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
@@ -115,7 +115,7 @@ def main():
             viz.viz(best_grasp.phy, is_planning=True)
             # now execute the plan
             deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-            execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
+            pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
             grasp_goal.set_grasp_locs(best_grasp.locs)
 

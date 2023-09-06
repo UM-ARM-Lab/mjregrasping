@@ -63,7 +63,8 @@ def main():
                 input("Move robot to next pose and press enter to continue")
 
             else:
-                print("Failed to detect calibration board, ensure that the entire board is in the view of the camera")
+                print("Failed!!!")
+                input("Move robot to a better pose and press enter to continue")
         except ValueError as ex:
             print(ex)
 

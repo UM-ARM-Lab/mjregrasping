@@ -1,4 +1,5 @@
 import time
+from typing import Optional
 
 import numpy as np
 import rerun as rr
@@ -13,6 +14,7 @@ from mjregrasping.grasping import get_grasp_eqs, get_finger_qs, activate_grasp
 from mjregrasping.math import softmax
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
+from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
 
@@ -172,7 +174,7 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     return results, cost, costs_by_term
 
 
-def do_grasp_dynamics(phy: Physics):
+def do_grasp_dynamics(phy: Physics, val_cmd: Optional[RealValCommander] = None):
     tools_pos = get_tool_points(phy)
     finger_qs = get_finger_qs(phy)
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop
@@ -185,6 +187,7 @@ def do_grasp_dynamics(phy: Physics):
             if finger_q > hp['finger_q_open']:
                 eq.active = 0
                 did_new_grasp = True
+                val_cmd.set_cdcpd_grippers(phy)
         else:
             # compute the loc [0, 1] of the closest point on the rope to the gripper
             # to do this, finely discretize into a piecewise linear function that maps loc ∈ [0,1] to R^3
@@ -198,6 +201,7 @@ def do_grasp_dynamics(phy: Physics):
             # if we're close enough and gripper angle is small enough, activate the grasp constraint
             if best_d < hp["grasp_goal_radius"] and abs(finger_q - hp['finger_q_closed']) < np.deg2rad(5):
                 activate_grasp(phy, eq.name, best_loc)
+                val_cmd.set_cdcpd_grippers(phy)
                 did_new_grasp = True
 
     return did_new_grasp

@@ -29,6 +29,8 @@ def make_planning_scene(phy: Physics):
     for geom_id in geom_indices:
         geom_bodyid = phy.m.geom_bodyid[geom_id]
         geom_name = phy.m.geom(geom_id).name
+        if phy.m.geom(geom_id).group[0] == 2: # Visual only elements
+            continue
         parent_name, child_name = get_parent_child_names(geom_bodyid, phy.m)
 
         co = CollisionObject()

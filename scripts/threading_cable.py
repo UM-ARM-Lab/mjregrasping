@@ -20,7 +20,7 @@ from mjregrasping.homotopy_checker import get_full_h_signature_from_phy, through
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.homotopy_utils import skeleton_field_dir, NO_HOMOTOPY, make_h_desired, h2array
 from mjregrasping.ik import BIG_PENALTY
-from mjregrasping.move_to_joint_config import execute_grasp_plan
+from mjregrasping.move_to_joint_config import pid_to_joint_configs
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.regrasp_planner_utils import SimGraspInput, SimGraspCandidate, get_will_be_grasping
@@ -431,7 +431,7 @@ class ThreadingMethodOurs(ThreadingMethod):
 
 def execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov):
     deactivate_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-    execute_grasp_plan(phy, best_grasp.res, viz, is_planning=False, mov=mov)
+    pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
     grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
     deactivate_release(phy, best_grasp.strategy, viz=viz, is_planning=False, mov=mov)
     grasp_goal.set_grasp_locs(best_grasp.locs)

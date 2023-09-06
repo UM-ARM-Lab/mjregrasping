@@ -6,7 +6,8 @@ import numpy as np
 from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_full_q
+from mjregrasping.real_val import RealValCommander
 
 DEFAULT_SUB_TIME_S = 0.1
 
@@ -15,7 +16,7 @@ def no_results(*args, **kwargs):
     return (None,)
 
 
-def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None):
+def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
     m = phy.m
     d = phy.d
 
@@ -36,6 +37,10 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
             mov.render(d)
     else:
         mujoco.mj_step(m, d, nstep=n_sub_time)
+
+    if val_cmd:
+        val_cmd.send_pos_command(get_full_q(phy))
+        val_cmd.pull_rope_towards_cdcpd(phy, n_sub_time)
 
 
 def slow_when_eqs_bad(phy):

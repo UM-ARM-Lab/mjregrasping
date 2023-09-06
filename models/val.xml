@@ -75,7 +75,7 @@
                                         </body>
                                         <body name="leftforearm" pos="0.06758 0 0.0486304" quat="0 -0.707107 0 0.707107">
                                             <joint name="joint44" type="hinge" pos="0 0 0" axis="0 0 1" limited="true"
-                                                   range="-3.14159 1.0"
+                                                   range="-4 1.0"
                                                    damping="8" frictionloss="1"/>
                                             <geom type="mesh" mesh="FOREARM_BRACKET" name="left_forearm_bracket"
                                                   rgba="0.2 0.2 0.2 1"/>
@@ -173,7 +173,7 @@
                                         </body>
                                         <body name="rightforearm" pos="0.06758 0 0.0486304" quat="0.707107 0 -0.707107 0">
                                             <joint name="joint4" type="hinge" pos="0 0 0" axis="0 0 -1" limited="true"
-                                                   range="-3.14159 1.0"
+                                                   range="-4 1.0"
                                                    damping="8" frictionloss="1"/>
                                             <geom type="mesh" mesh="FOREARM_BRACKET" name="right_forearm_bracket"
                                                   rgba="0.2 0.2 0.2 1"/>
@@ -267,7 +267,7 @@
                      forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint43_vel" joint="joint43" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
                      forcelimited="true" forcerange="-10 10"/>
-        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 1.0" kp="1000"
+        <intvelocity name="joint44_vel" joint="joint44" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-4 1.0" kp="1000"
                      forcelimited="true" forcerange="-10 10"/>
         <!--  6 -->
         <intvelocity name="joint45_vel" joint="joint45" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"
@@ -286,7 +286,7 @@
                      forcelimited="true" forcerange="-15 15"/>
         <intvelocity name="joint3_vel" joint="joint3" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-6.2 6.2" kp="5000"
                      forcelimited="true" forcerange="-10 10"/>
-        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-3.14159 1.0" kp="1000"
+        <intvelocity name="joint4_vel" joint="joint4" ctrllimited="true" ctrlrange="-0.45 0.45" actrange="-4 1.0" kp="1000"
                      forcelimited="true" forcerange="-8 8"/>
         <!--  14 -->
         <intvelocity name="joint5_vel" joint="joint5" ctrllimited="true" ctrlrange="-2 2" actrange="-6.2 6.2" kp="100" forcelimited="true"

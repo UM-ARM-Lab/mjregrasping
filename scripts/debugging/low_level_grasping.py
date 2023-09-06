@@ -24,7 +24,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.real_val import RealValCommander, update_mujoco_qpos
+from mjregrasping.real_val import RealValCommander
 from mjregrasping.rviz import plot_points_rviz
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.viz import make_viz, Viz
@@ -57,11 +57,11 @@ def main():
     d = mujoco.MjData(m)
     phy = Physics(m, d, objects)
 
-    val = RealValCommander(phy.o.robot)
+    val = RealValCommander(phy)
 
     pc_pub = rospy.Publisher('grasp_pc', PointCloud2, queue_size=1)
 
-    tool_idx = 0
+    tool_idx = 1
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
     joint_indices_for_tool = np.array([
@@ -109,7 +109,7 @@ def main():
         print(f"{dt=:.3f}")
 
         # Set mujoco state to match the real robot
-        update_mujoco_qpos(phy, val)
+        val.update_mujoco_qpos(phy)
 
         points_rgb, points_xyz, rgb = read_realsense(FAR_THRESHOLD, pipe)
 

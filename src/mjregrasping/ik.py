@@ -1,15 +1,7 @@
-from typing import Optional, Callable
-
 import mujoco
 import numpy as np
-from numpy.linalg import norm
 
-from mjregrasping.geometry import pairwise_squared_distances
-from mjregrasping.goal_funcs import get_contact_cost
-from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_gripper_ctrl_indices
-from mjregrasping.rollout import control_step, no_results
-from mjregrasping.viz import Viz
+from mjregrasping.physics import get_gripper_ctrl_indices
 
 BIG_PENALTY = 100
 

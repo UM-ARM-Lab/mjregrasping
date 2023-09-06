@@ -3,7 +3,7 @@
         <joint stiffness="0.5"/>
         <geom friction="0.01"/>
         <default class="visual">
-            <!--             any geom with the class "visual" will not collide with anything -->
+            <!-- any geom with the class "visual" will not collide with anything -->
             <geom contype="0" conaffinity="0" group="2"/>
         </default>
     </default>
@@ -14,10 +14,10 @@
     <include file="cc_sphere.xml"/>
     <include file="val_eq_constraints.xml"/>
     <worldbody>
-        <body pos="0.576179 0.871 0.775053" euler="-0.1 1.5 0" name="rope">
+        <body pos="0.39 0.845 0.74" euler="0.1 -1.4 0" name="rope">
             <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
-            <composite type="cable" curve="s" count="12 1 1" size="1.24 0.22 1">
-                <joint kind="main" damping=".015"/>
+            <composite type="cable" curve="s" count="25 1 1" size="1.24 0.22 1">
+                <joint kind="main" damping=".015" stiffness="0.1"/>
                 <geom type="capsule" size=".01" rgba="0.8 0.2 0.1 1" condim="1"/>
             </composite>
             <joint type="free"/>
@@ -30,5 +30,32 @@
     </worldbody>
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
+
+        <!-- constraints to pull the mujoco rope towards where CDCPD says the rope is -->
+        <connect body1="world" body2="B_first" name="B_0" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_1" name="B_1" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_2" name="B_2" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_3" name="B_3" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_4" name="B_4" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_5" name="B_5" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_6" name="B_6" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_7" name="B_7" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_8" name="B_8" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_9" name="B_9" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_10" name="B_10" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_11" name="B_11" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_12" name="B_12" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_13" name="B_13" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_14" name="B_14" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_15" name="B_15" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_16" name="B_16" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_17" name="B_17" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_18" name="B_18" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_19" name="B_19" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_20" name="B_20" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_21" name="B_21" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_22" name="B_22" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_last" name="B_23" anchor="0 0 0" active="false" solref="0.2 1"/>
+        <connect body1="world" body2="B_last" name="B_24" anchor="0 0 0" active="false" solref="0.2 1"/>
     </equality>
 </mujoco>

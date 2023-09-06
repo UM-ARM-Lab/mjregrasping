@@ -30,7 +30,7 @@ class GraspRRT:
         self.fix_start_rng = np.random.RandomState(0)
 
     def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
-             pos_noise=0.04):
+             pos_noise=0.05):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 

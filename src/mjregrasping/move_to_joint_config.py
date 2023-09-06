@@ -5,13 +5,14 @@ import numpy as np
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
+from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MotionPlanResponse
 
 
-def execute_grasp_plan(phy: Physics, res: MotionPlanResponse, viz: Viz, is_planning: bool,
-                       mov: Optional[MjMovieMaker] = None, reached_tol=3.0):
+def pid_to_joint_configs(phy: Physics, res: MotionPlanResponse, viz: Viz, is_planning: bool,
+                         mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None, reached_tol=3.0):
     qs = np.array([p.positions for p in res.trajectory.joint_trajectory.points])
     for q in qs[:-1]:
         q_current = get_q(phy)
@@ -20,8 +21,8 @@ def execute_grasp_plan(phy: Physics, res: MotionPlanResponse, viz: Viz, is_plann
         reached = np.rad2deg(max_joint_error) < reached_tol
         if reached:
             continue
-        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, reached_tol=reached_tol, stopped_tol=10)
-    pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov)
+        pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, val_cmd, reached_tol=reached_tol, stopped_tol=10)
+    pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov, val_cmd)
 
 
 def warn_about_limits(q_target, phy):
@@ -38,7 +39,7 @@ def warn_about_limits(q_target, phy):
 
 
 def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, is_planning: bool = False,
-                        mov: Optional[MjMovieMaker] = None, reached_tol=1.0, stopped_tol=0.5):
+                        mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None, reached_tol=1.0, stopped_tol=0.5):
     q_prev = get_q(phy)
     for i in range(75):
         if viz:
@@ -47,7 +48,7 @@ def pid_to_joint_config(phy: Physics, viz: Optional[Viz], q_target, sub_time_s, 
         command = hp['joint_kp'] * (q_target - q_current)
 
         # take the step on the real phy
-        control_step(phy, command, sub_time_s=sub_time_s, mov=mov)
+        control_step(phy, command, sub_time_s=sub_time_s, mov=mov, val_cmd=val_cmd)
 
         # get the new current q
         q_current = get_q(phy)

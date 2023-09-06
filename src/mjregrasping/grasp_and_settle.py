@@ -7,28 +7,31 @@ from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.physics import get_gripper_ctrl_indices, get_q, Physics
+from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.viz import Viz
 
 
-def deactivate_moving(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def deactivate_moving(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
+                      val_cmd: Optional[RealValCommander] = None):
     needs_release = [s == Strategies.MOVE for s in strategy]
-    deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd)
 
 
-def deactivate_release(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def deactivate_release(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
+                       val_cmd: Optional[RealValCommander] = None):
     needs_release = [s == Strategies.RELEASE for s in strategy]
-    deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd)
 
 
 def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning: bool,
-                                  mov: Optional[MjMovieMaker] = None):
+                                  mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
     needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
-    deactivate_and_settle(phy, needs_release, viz, is_planning, mov)
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd)
 
 
 def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool,
-                          mov: Optional[MjMovieMaker] = None):
+                          mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -37,11 +40,18 @@ def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: b
         if release_i:
             eq.active = 0
             ctrl[ctrl_i] = 0.4
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov)
-    settle_with_checks(phy, viz, is_planning, mov)
+    if val_cmd:
+        val_cmd.set_cdcpd_grippers(phy)
+    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov, val_cmd=val_cmd)
+    settle_with_checks(phy, viz, is_planning, mov, val_cmd)
+    if val_cmd:
+        # CDCPD does not do a great job when the rope moves really fast, such as when we drop it. This
+        # basically resets CDCPD to what mujoco thinks the rope looks like after it has dropped
+        val_cmd.set_cdcpd_from_mj_rope(phy)
 
 
-def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
+                     val_cmd: Optional[RealValCommander] = None):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -50,11 +60,17 @@ def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov
             continue
         ctrl[ctrl_i] = -0.4
         activate_grasp(phy, eq_name, grasp_loc_i)
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov)
-    settle_with_checks(phy, viz, is_planning, mov)
+    if val_cmd:
+        val_cmd.set_cdcpd_grippers(phy)
+    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov, val_cmd=val_cmd)
+    settle_with_checks(phy, viz, is_planning, mov, val_cmd)
+    if val_cmd:
+        print("Resetting CDCPD to mujoco match rope state post grasp")
+        val_cmd.set_cdcpd_from_mj_rope(phy)
 
 
-def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None):
+def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
+                       val_cmd: Optional[RealValCommander] = None):
     """
     In contrast to settle(), which steps for a fixed number of steps, this function steps until the rope and robot
     have settled.
@@ -64,7 +80,7 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
     last_q = get_q(phy)
     max_t = 50
     for t in range(max_t):
-        control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S, mov=mov)
+        control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S, mov=mov, val_cmd=val_cmd)
         rope_points = get_rope_points(phy)
         q = get_q(phy)
         if viz:
