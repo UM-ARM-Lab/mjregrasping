@@ -15,9 +15,7 @@ from geometry_msgs.msg import PointStamped
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasping import activate_grasp, get_grasp_locs
 from mjregrasping.physics import Physics
-from arm_robots_msgs.msg import GripperConstraint
 from sensor_msgs.msg import JointState
-from arm_robots_msgs.srv import SetCDCPDState, SetCDCPDStateRequest, SetGripperConstraints, SetGripperConstraintsRequest
 from visualization_msgs.msg import MarkerArray
 
 
@@ -44,6 +42,7 @@ class RealValCommander:
             self.mj_order.append(js.name.index(mj_name))
 
         self.cdcpd_sub = Listener("/cdcpd_pred", MarkerArray)
+        from arm_robots_msgs.srv import SetCDCPDState, SetGripperConstraints
         self.set_cdcpd_srv = rospy.ServiceProxy("set_cdcpd_state", SetCDCPDState)
         self.set_cdcpd_grippers_srv = rospy.ServiceProxy("set_gripper_constraints", SetGripperConstraints)
         self.tfw = TF2Wrapper()
@@ -162,6 +161,7 @@ class RealValCommander:
             eq.active = 0
 
     def set_cdcpd_from_mj_rope(self, phy: Physics):
+        from arm_robots_msgs.srv import SetCDCPDStateRequest
         set_cdcpd_req = SetCDCPDStateRequest()
         for v in get_rope_points(phy):
             p_in_world = PointStamped()
@@ -175,6 +175,8 @@ class RealValCommander:
 
     def set_cdcpd_grippers(self, phy: Physics):
         """ Set the CDCPD grasp constraints based on the current grasp locations. """
+        from arm_robots_msgs.msg import GripperConstraint
+        from arm_robots_msgs.srv import SetGripperConstraintsRequest
         req = SetGripperConstraintsRequest()
         locs = get_grasp_locs(phy)
         for eq_name, loc in zip(phy.o.rd.rope_grasp_eqs, locs):

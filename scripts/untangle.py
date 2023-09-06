@@ -53,7 +53,7 @@ def main():
         num_samples = hp['n_samples']
         osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        print(f"Running method {osm.method_name()}")
+        print(Fore.GREEN + f"Running method {osm.method_name()}" + Fore.RESET)
         mpc_times = []
 
         goal.viz_goal(phy)

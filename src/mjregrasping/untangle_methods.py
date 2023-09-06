@@ -76,7 +76,7 @@ class OnStuckOurs(BaseOnStuckMethod):
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
         new_dist_is_lower = new_geodesic_dist < initial_geodesic_dist - hp['grasp_loc_diff_thresh']
-        print(f"{new_geodesic_dist=:.3f} {initial_geodesic_dist=:.3f}: {new_dist_is_lower}")
+        print(f"{new_geodesic_dist=:.3f} {initial_geodesic_dist=:.3f}: {new_dist_is_lower=}")
         if not new_dist_is_lower:
             print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
             self.planner.update_blacklists(phy)
