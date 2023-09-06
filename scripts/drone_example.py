@@ -6,6 +6,7 @@ import numpy as np
 from vedo import Line, Text2D
 
 import rospy
+from mjregrasping.drone_homotopy import get_tree_skeletons, get_h_for_drones
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.homotopy_checker import get_full_h_signature, create_graph_nodes
 from mjregrasping.mjvedo import MjVedo
@@ -29,7 +30,7 @@ def main():
     mujoco.mj_forward(phy.m, phy.d)
     skeletons = get_tree_skeletons(phy)
     graph, h, loops = get_h_for_drones(phy, skeletons)
-    viz_h(xml_path, phy, skeletons, graph, h, loops)
+    viz_h(xml_path, phy, skeletons, graph, h, loops, 'initial')
 
     # Release and move away from the pipe
     m.eq('drone1').active = False
@@ -39,7 +40,7 @@ def main():
     phy = Physics(m, mujoco.MjData(m), objects)
     mujoco.mj_forward(phy.m, phy.d)
     graph, h, loops = get_h_for_drones(phy, skeletons)
-    viz_h(xml_path, phy, skeletons, graph, h, loops)
+    viz_h(xml_path, phy, skeletons, graph, h, loops, 'release')
 
     # Grasp the end, on the other side of the tree
     m.eq('drone1').active = True
@@ -52,30 +53,14 @@ def main():
     mujoco.mj_forward(phy.m, phy.d)
     graph, h, loops = get_h_for_drones(phy, skeletons)
 
-    viz_h(xml_path, phy, skeletons, graph, h, loops)
+    viz_h(xml_path, phy, skeletons, graph, h, loops, 'grasp')
 
 
-def get_tree_skeletons(phy):
-    skeletons = {
-        'loop1': np.array([
-            phy.d.site("branch0").xpos,
-            phy.d.site("branch1").xpos,
-            phy.d.site("branch2").xpos,
-            phy.d.site("branch3").xpos,
-            phy.d.site("branch4").xpos,
-            phy.d.site("branch5").xpos,
-            phy.d.site("branch0").xpos,
-        ])
-    }
-    return skeletons
-
-
-def viz_h(xml_path, phy, skeletons, graph, h, loops):
+def viz_h(xml_path, phy, skeletons, graph, h, loops, name):
     mjvedo = MjVedo(xml_path)
     print(h)
 
     mjvedo.plotter += Text2D(f"Example: Carrying a Draining Tube with Drones \n{h=}", 'top-center')
-    # mjvedo.plotter.show()
 
     colors = [
         'red',
@@ -141,6 +126,9 @@ def viz_h(xml_path, phy, skeletons, graph, h, loops):
         plotter.camera.SetFocalPoint(cx, cy, 0)
         plotter.camera.SetViewUp(0, 0, 1)
 
+        if t == 1:
+            mjvedo.plotter.screenshot("results/drone_example.png")
+
         if spin_idx == 1:
             disappear_alpha = np.exp(-8 * (t % frames_per_spin) / frames_per_spin)
             tree.alpha(disappear_alpha)
@@ -154,33 +142,13 @@ def viz_h(xml_path, phy, skeletons, graph, h, loops):
             for loop_line in loop_lines:
                 loop_line.alpha(appear_alpha)
 
-    mjvedo.record("results/drone_example.mp4", num_frames=num_frames, anim_func=anim)
+
+    mjvedo.record(f"results/drone_example_{name}.mp4", num_frames=num_frames, anim_func=anim)
+
 
     # plt.figure()
     # nx.draw(graph, with_labels=True, font_weight='bold')
     # plt.show()
-
-
-def get_h_for_drones(phy, skeletons):
-    from time import perf_counter
-    t0 = perf_counter()
-    graph = create_graph_nodes(phy)
-    rope_points = get_rope_points(phy)
-    # points tracing the robot arms from tip to base [n_arms, n_points, 3]
-    base_xpos = phy.d.xpos[phy.m.body("drones").id][None]
-    drone1_rope = MjObject(phy.m, 'drone1_rope')
-    drone1_points = np.concatenate((phy.d.xpos[drone1_rope.body_indices[::-1]], base_xpos), 0)
-    drone2_rope = MjObject(phy.m, 'drone2_rope')
-    drone2_points = np.concatenate((phy.d.xpos[drone2_rope.body_indices[::-1]], base_xpos), 0)
-    drone3_rope = MjObject(phy.m, 'drone3_rope')
-    drone3_points = np.concatenate((phy.d.xpos[drone3_rope.body_indices[::-1]], base_xpos), 0)
-    arm_points = np.stack([drone1_points, drone2_points, drone3_points])
-    h, loops = get_full_h_signature(skeletons, graph, rope_points, arm_points,
-                                    collapse_empty_gripper_cycles=False,
-                                    gripper_ids_in_h_signature=False,
-                                    connect_via_floor=False)
-    print(f'dt: {perf_counter() - t0:.3f}')
-    return graph, h, loops
 
 
 if __name__ == "__main__":

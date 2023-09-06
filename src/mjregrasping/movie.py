@@ -16,8 +16,7 @@ class MjMovieMaker:
         self.m = m
         self.r = MjRenderer(gl_ctx, m)
         self.writer = None
-        self.qpos_path = None
-        self.metrics_path = None
+        self.filename = None
         self.qpos_list = []
 
     def render(self, d: mujoco.MjData):
@@ -28,16 +27,21 @@ class MjMovieMaker:
     def start(self, filename: Path):
         """ Set up the writer and filenames  """
         fps = int(1 / self.m.opt.timestep)
-        self.qpos_path = filename.parent / f"{filename.stem}_qpos.npy"
-        self.metrics_path = filename.parent / f"{filename.stem}_metrics.json"
+        self.filename = filename
         self.writer = imageio.get_writer(filename, fps=fps)
 
     def close(self, metrics):
         """ Finish the movie file and save the qpos data as .npy """
         self.writer.close()
-        with self.qpos_path.open('wb') as f:
+        method = metrics.get('method', 'method_missing')
+        success = metrics.get('success', 'success_missing')
+        d = self.filename.parent
+        stem = self.filename.stem
+        qpos_path = d / f"{stem}_{method}_qpos.npy"
+        metrics_path = d / f"{stem}_{method}_{success}.json"
+        with qpos_path.open('wb') as f:
             np.save(f, np.array(self.qpos_list))
-        with self.metrics_path.open('w') as f:
+        with metrics_path.open('w') as f:
             json.dump(metrics, f, indent=2)
 
 

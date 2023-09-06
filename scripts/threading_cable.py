@@ -163,7 +163,7 @@ def main():
 
     grasp_rrt = GraspRRT()
 
-    for i in range(10):
+    for i in range(0, 10):
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
@@ -178,6 +178,7 @@ def main():
         mppi.reset()
 
         mpc_times = []
+        overall_t0 = perf_counter()
 
         end_loc = 1.0
         goals = [
@@ -190,8 +191,9 @@ def main():
 
         traps = TrapDetection()
 
-        # method = ThreadingMethod(grasp_rrt, skeletons, traps, end_loc)
-        method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
+        method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
+        print(f"Running method {method.__class__.__name__}")
+        # method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
 
         itr = 0
 
@@ -210,6 +212,7 @@ def main():
 
             if isinstance(goal, ObjectPointGoal):
                 if goal.satisfied(phy):
+                    success = False
                     print(Fore.GREEN + "Task complete!" + Fore.RESET)
                     break
             else:
@@ -250,9 +253,10 @@ def main():
         metrics = {
             'itr':            itr,
             'success':        success,
-            'time':           phy.d.time,
+            'sim_time':       phy.d.time,
             'planning_times': method.planning_times,
             'mpc_times':      mpc_times,
+            'overall_time':   perf_counter() - overall_t0,
             'grasp_history':  np.array(grasp_goal.history).tolist(),
             'method':         method.__class__.__name__,
         }
@@ -261,7 +265,7 @@ def main():
 
 class ThreadingMethod:
 
-    def __init__(self, grasp_rrt: GraspRRT, skeletons: Dict, traps: TrapDetection, end_loc: int):
+    def __init__(self, grasp_rrt: GraspRRT, skeletons: Dict, traps: TrapDetection, end_loc: float):
         self.grasp_rrt = grasp_rrt
         self.skeletons = skeletons
         self.traps = traps
@@ -301,7 +305,8 @@ class ThreadingMethodWang(ThreadingMethod):
             strategy = [Strategies.STAY, Strategies.MOVE]
             locs = np.array([-1, self.end_loc])
             planning_t0 = perf_counter()
-            res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz, pos_noise=1e-3)  # This method cant handle noise
+            res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz,
+                                                 pos_noise=1e-3)  # This method cant handle noise
             if res.error_code.val == MoveItErrorCodes.SUCCESS:
                 self.planning_times.append(perf_counter() - planning_t0)
                 teleport_to_end_of_plan(phy, res)
@@ -314,16 +319,17 @@ class ThreadingMethodWang(ThreadingMethod):
 
             # If we fail, try to scootch down the rope
             locs = grasp_goal.get_grasp_locs()
-            locs[1] -= hp['scootch_fraction']
+            locs[1] -= hp['wang_scootch_fraction']
             for _ in range(5):
-                res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz, pos_noise=1e-3)  # This method cant handle noise
+                res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz,
+                                                     pos_noise=1e-3)  # This method cant handle noise
                 if res.error_code.val == MoveItErrorCodes.SUCCESS:
                     self.planning_times.append(perf_counter() - planning_t0)
                     teleport_to_end_of_plan(phy, res)
                     grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
                     deactivate_release(phy, strategy, viz=viz, is_planning=False, mov=mov)
                     grasp_goal.set_grasp_locs(locs)
-                    goal.loc -= hp['scootch_fraction']
+                    goal.loc -= hp['wang_scootch_fraction']
                     return
         else:
             # 2) alternate grippers and actually move the arms
@@ -348,10 +354,10 @@ class ThreadingMethodWang(ThreadingMethod):
                 return
 
             # If we fail, try to scootch down the rope
-            goal.loc -= hp['scootch_fraction']
+            goal.loc = max(goal.loc - hp['wang_scootch_fraction'], max(get_grasp_locs(phy)))
             strategy = []
             locs = []
-            loc_i = np.min(np.abs(grasp_goal.get_grasp_locs())) - hp['scootch_fraction']
+            loc_i = np.min(np.abs(grasp_goal.get_grasp_locs())) - hp['wang_scootch_fraction']
             for g_i in get_is_grasping(phy):
                 if g_i:
                     strategy.append(Strategies.RELEASE)
@@ -382,7 +388,6 @@ class ThreadingMethodWang(ThreadingMethod):
 class ThreadingMethodOurs(ThreadingMethod):
 
     def on_disc(self, phy, goal, grasp_goal, viz, mov):
-        goal.loc -= hp['scootch_fraction']
         planner = HomotopyThreadingPlanner(self.end_loc, self.grasp_rrt, self.skeletons, goal.skeleton_names)
         print(f"Planning with {planner.key_loc=}...")
         planning_t0 = perf_counter()
@@ -398,6 +403,9 @@ class ThreadingMethodOurs(ThreadingMethod):
             else:
                 print("Not through the goal skeleton!")
         else:
+            # if we've reached the goal but can't grasp the end, scootch down the rope
+            # but don't scootch past where we are currently grasping it.
+            goal.loc = max(goal.loc - hp['ours_scootch_fraction'], max(get_grasp_locs(phy)))
             print("No plans found!")
 
     def on_stuck(self, phy, goal, grasp_goal, viz, mov):
@@ -418,6 +426,7 @@ class ThreadingMethodOurs(ThreadingMethod):
         if through_skels(self.skeletons, goal.skeleton_names, phy):
             print(f"Through {goal.skeleton_names}!")
             return True
+        return False
 
 
 def execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov):

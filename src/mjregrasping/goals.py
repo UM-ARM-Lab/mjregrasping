@@ -41,7 +41,6 @@ def get_angle_cost(skel, loc, rope_points):
     rope_deltas = rope_points[1:] - rope_points[:-1]  # [t-1, n, 3]
     bfield_dirs_flat = skeleton_field_dir(skel, rope_points[:-1].reshape(-1, 3))
     bfield_dirs = bfield_dirs_flat.reshape(rope_deltas.shape)  # [t-1, n, 3]
-    # no_motion_cost = np.exp(-100 * np.linalg.norm(rope_deltas, axis=-1))
     angle_cost = angle_between(rope_deltas, bfield_dirs)
     # weight by the geodesic distance from each rope point to the loc we're threading through
     w = np.exp(-hp['thread_geodesic_w'] * np.abs(np.linspace(0, 1, rope_points.shape[1]) - loc))
@@ -49,18 +48,8 @@ def get_angle_cost(skel, loc, rope_points):
     # self.viz.arrow('bfield_dir', rope_points[0, -1], 0.5 * bfield_dirs[0, -1], cm.Reds(angle_cost[0] / np.pi))
     # self.viz.arrow('delta', rope_points[0, -1], rope_deltas[0, -1], cm.Reds(angle_cost[0] / np.pi))
     angle_cost = sum(angle_cost)
-    return angle_cost
-
-
-def get_pull_through_cost(loc, rope_points, goal_dir):
-    rope_deltas = rope_points[1:] - rope_points[:-1]  # [t-1, n, 3]
-    angle_cost = angle_between(rope_deltas, goal_dir)
-    # weight by the geodesic distance from each rope point to the loc we're threading through
-    w = np.exp(-hp['thread_geodesic_w'] * np.abs(np.linspace(0, 1, rope_points.shape[1]) - loc))
-    angle_cost = angle_cost @ w * hp['angle_cost_weight']
-    # self.viz.arrow('bfield_dir', rope_points[0, -1], 0.5 * bfield_dirs[0, -1], cm.Reds(angle_cost[0] / np.pi))
-    # self.viz.arrow('delta', rope_points[0, -1], rope_deltas[0, -1], cm.Reds(angle_cost[0] / np.pi))
-    angle_cost = sum(angle_cost)
+    if np.any(~np.isfinite(angle_cost)):
+        return 100
     return angle_cost
 
 
@@ -144,9 +133,10 @@ class GraspLocsGoal:
     def get_grasp_locs(self):
         return self.locs
 
-    def set_grasp_locs(self, grasp_locs):
+    def set_grasp_locs(self, grasp_locs, is_planning=False):
         self.locs = grasp_locs
-        self.history.append(grasp_locs)
+        if not is_planning:
+            self.history.append(grasp_locs)
 
 
 class ObjectPointGoal(ObjectPointGoalBase):

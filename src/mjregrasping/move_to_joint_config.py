@@ -27,7 +27,7 @@ def execute_grasp_plan(phy: Physics, res: MotionPlanResponse, viz: Viz, is_plann
 def warn_about_limits(q_target, phy):
     low = phy.m.actuator_actrange[:, 0]
     high = phy.m.actuator_actrange[:, 1]
-    if np.any(q_target > high):
+    if np.any(q_target > high + 0.03):
         offending_idx = np.argmin(high - q_target)
         name = phy.m.actuator(offending_idx).name
         print(f"q_target {q_target[offending_idx]} is above actuator limit {high[offending_idx]} for joint {name}!")

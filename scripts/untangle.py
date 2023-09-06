@@ -56,7 +56,7 @@ class OnStuckTamp(BaseOnStuckMethod):
 
     def on_stuck(self, phy, viz, mov):
         planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         self.planner.planning_times.append(perf_counter() - planning_t0)
 
@@ -143,6 +143,8 @@ def main():
             mov = None
             set_up_real_scene(val, phy, viz)
 
+        overall_t0 = perf_counter()
+
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
         goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
 
@@ -155,8 +157,8 @@ def main():
                            noise_sigma=val_untangle.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
-        osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal)
+        # osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         mpc_times = []
 
         goal.viz_goal(phy)
@@ -168,7 +170,7 @@ def main():
         success = False
         viz.viz(phy)
         while True:
-            if itr >= 200:
+            if itr >= 300:
                 print(Fore.RED + "Task failed!" + Fore.RESET)
                 break
 
@@ -211,6 +213,7 @@ def main():
             'sim_time':       phy.d.time,
             'planning_times': osm.planner.planning_times,
             'mpc_times':      mpc_times,
+            'overall_time':  perf_counter() - overall_t0,
             'grasp_history':  np.array(grasp_goal.history).tolist(),
             'method':        osm.__class__.__name__,
         }

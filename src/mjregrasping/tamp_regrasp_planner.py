@@ -51,7 +51,7 @@ class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
         phy_plan = sim_grasp.phy.copy_data()
 
-        self.goal.grasp_goal.set_grasp_locs(sim_grasp.locs)
+        self.goal.grasp_goal.set_grasp_locs(sim_grasp.locs, is_planning=True)
 
         # now we run the MPPI planner for a fixed horizon and take the final cost
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
@@ -59,7 +59,7 @@ class TAMPRegraspPlanner(HomotopyRegraspPlanner):
                            noise_sigma=self.scenario.noise_sigma, temp=hp['temp'])
         mppi.reset()
 
-        for t in range(10):
+        for t in range(hp['tamp_horizon']):
             command, sub_time_s = mppi.command(phy_plan, self.goal, hp['n_samples'], viz=viz)
             control_step(phy_plan, command, sub_time_s)
             if viz and viz_execution:

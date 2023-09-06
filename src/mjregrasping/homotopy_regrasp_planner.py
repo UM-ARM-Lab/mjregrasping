@@ -62,13 +62,10 @@ class HomotopyRegraspPlanner:
         return sim_grasps
 
     def simulate_grasps(self, grasps_inputs, phy, viz, viz_execution):
-        from time import perf_counter
-        t0 = perf_counter()
         sim_grasps = []
         for grasp_input in grasps_inputs:
             sim_grasp = self.simulate_grasp(phy, viz, grasp_input, viz_execution)
             sim_grasps.append(sim_grasp)
-        print(f'simulate_grasps: {perf_counter() - t0:.4f}')
         return sim_grasps
 
     def sample_grasp_inputs(self, phy):

@@ -3,7 +3,7 @@ from mjregrasping.cfg import ParamsConfig
 
 # These values are considered const by convention
 hp = {
-    "n_grasp_samples":                 10,
+    "n_grasp_samples":                 20,
     "horizon":                         15,
     "n_samples":                       50,
     "temp":                            0.15,
@@ -30,7 +30,7 @@ hp = {
     "contact_exponent":                0.5,
     "nongrasping_rope_contact_weight": 0.5,
     "nongrasping_rope_dist_weight":    0.15,
-    "gripper_to_goal_weight":          0.2,
+    "gripper_to_goal_weight":          1.0,
     "robot_dq_weight":                 0.3,
     "rope_dq_weight":                  6.0,
     "max_contact_cost":                1,
@@ -49,5 +49,8 @@ hp = {
     "joint_kp":                        6.0,
     "act_windup_limit":                0.02,
     "start_state_jiggle_deg":          2,
-    "scootch_fraction":                0.03,
+    "wang_scootch_fraction":           0.03,
+    "ours_scootch_fraction":           0.005,
+    # Use 5 for a 'fast' baseline (still slower than our method), and 50 for strong baseline
+    "tamp_horizon":                    5, # 50,
 }
