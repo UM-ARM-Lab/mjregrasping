@@ -16,6 +16,7 @@ def count_grasps(x):
 def main():
     untangle_trials_dirs = [
         Path("results/Untangle/untangle_ours_v2"),
+        Path("results/Untangle/untangle_tamp5_v1"),
         Path("results/Untangle/untangle_tamp50_v1"),
     ]
 
@@ -55,17 +56,16 @@ def load_data(trials_dirs):
             with json_path.open("r") as f:
                 data = json.load(f)
             # add data in the order of headers
-            row = []
+            row = [trials_dir.name]
             for header in headers:
                 row.append(data.get(header, np.nan))
             rows.append(row)
+    headers.insert(0, 'dirname')
     df = pd.DataFrame(rows, columns=headers)
     return df
 
 
 def print_results_table(df):
-    # Create a table with the mean and std of the planning times, mpc times, and overall times, as well as number of successes
-    # grouped by method
     agg = {
         'success':        ['sum'],
         'overall_time':   ['mean', 'std'],
@@ -74,13 +74,14 @@ def print_results_table(df):
         'mpc_times':      list_mean,
         'grasp_history':  count_grasps,
     }
-    table_data = df.groupby(['method']).agg(agg)
+    table_data = df.groupby(['dirname']).agg(agg)
 
     # make a latex table out of the summary data above
-    print("")
-    for method, row in table_data.iterrows():
+    print()
+    print("Method & Success & Wall Time (m) & Sim Time (m) & Grasps \\\\")
+    for dirname, row in table_data.iterrows():
         x = [
-            f"{method}",
+            f"{dirname}",
             f"{row['success']['sum']:.0f}",
             f"{row['overall_time']['mean'] / 60:.0f} ({row['overall_time']['std'] / 60:.0f})",
             f"{row['sim_time']['mean'] / 60:.1f} ({row['sim_time']['std'] / 60:.1f})",

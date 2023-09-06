@@ -16,7 +16,6 @@ from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.move_to_joint_config import pid_to_joint_configs
-from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
@@ -28,31 +27,19 @@ from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle, real_untangle, get_real_untangle_skeletons
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
-from mjregrasping.viz import make_viz, Viz
+from mjregrasping.untangle_methods import BaseOnStuckMethod
+from mjregrasping.viz import make_viz
 from moveit_msgs.msg import MoveItErrorCodes
 
 
-class BaseOnStuckMethod:
-
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
-        self.scenario = scenario
-        self.skeletons = skeletons
-        self.goal = goal
-        self.grasp_goal = grasp_goal
-        self.grasp_rrt = grasp_rrt
-
-    def on_stuck(self, phy: Physics, viz: Viz, mov: Optional[MjMovieMaker], val_cmd: Optional[RealValCommander]):
-        raise NotImplementedError()
-
-
-class OnStuckOurs(BaseOnStuckMethod):
+class OnStuckReal(BaseOnStuckMethod):
 
     def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
         super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
         self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
 
-    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander]):
+    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
         # print("DEBUGGING VIZ_EXECUTION=TRUE")
@@ -111,11 +98,12 @@ def main():
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    hp['horizon'] = 8; hp['n_samples'] = 36
+    hp['horizon'] = 8;
+    hp['n_samples'] = 36
     mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
-    osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+    osm = OnStuckReal(scenario, skeletons, goal, grasp_goal, grasp_rrt)
 
     goal.viz_goal(phy)
 

@@ -2,111 +2,24 @@
 import multiprocessing
 from concurrent.futures.thread import ThreadPoolExecutor
 from time import perf_counter
-from typing import Optional
 
 import mujoco
 import numpy as np
 import rerun as rr
 from colorama import Fore
 
-# noinspection PyUnresolvedReferences
-import tf2_geometry_msgs
 from arc_utilities import ros_init
-from arc_utilities.tf2wrapper import TF2Wrapper
-from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
-from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.move_to_joint_config import pid_to_joint_configs
-from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
-from mjregrasping.real_val import RealValCommander
-from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
-from mjregrasping.viz import make_viz, Viz
-from moveit_msgs.msg import MoveItErrorCodes
-from ros_numpy import numpify
-from visualization_msgs.msg import MarkerArray
-
-
-class BaseOnStuckMethod:
-
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
-        self.scenario = scenario
-        self.skeletons = skeletons
-        self.goal = goal
-        self.grasp_goal = grasp_goal
-        self.grasp_rrt = grasp_rrt
-
-    def on_stuck(self, phy: Physics, viz: Viz, mov: Optional[MjMovieMaker], val_cmd: Optional[RealValCommander] = None):
-        raise NotImplementedError()
-
-
-class OnStuckTamp(BaseOnStuckMethod):
-
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
-        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
-        self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
-
-    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
-        planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
-        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
-        self.planner.planning_times.append(perf_counter() - planning_t0)
-
-        if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            viz.viz(best_grasp.phy, is_planning=True)
-            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-            pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
-            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
-            self.grasp_goal.set_grasp_locs(best_grasp.locs)
-        else:
-            print(Fore.RED + "Failed to find a plan." + Fore.RESET)
-
-
-class OnStuckOurs(BaseOnStuckMethod):
-
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
-        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
-
-    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
-        initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
-        planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
-        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
-        new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
-        # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
-        if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
-            print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
-            print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
-            self.planner.update_blacklists(phy)
-            best_grasp = self.planner.get_best(sim_grasps, viz=viz)
-        self.planner.planning_times.append(perf_counter() - planning_t0)
-        if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            viz.viz(best_grasp.phy, is_planning=True)
-            # now execute the plan
-            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-            pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
-            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
-            self.grasp_goal.set_grasp_locs(best_grasp.locs)
-        else:
-            print(Fore.RED + "Failed to find a plan." + Fore.RESET)
-
-
-def set_mujoco_rope_state_from_cdcpd(cdcpd_pred: MarkerArray, phy: Physics, viz: Viz):
-    cdcpd_np = []
-    for marker in cdcpd_pred.markers:
-        cdcpd_np.append(numpify(marker.pose.position))
-    cdcpd_np = np.array(cdcpd_np)
+from mjregrasping.untangle_methods import OnStuckOurs
+from mjregrasping.viz import make_viz
 
 
 @ros_init.with_ros("untangle")
@@ -124,7 +37,7 @@ def main():
     grasp_rrt = GraspRRT()
 
     viz = make_viz(scenario)
-    for trial_idx in range(0, 10):
+    for trial_idx in range(0, 25):
         phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
 
         overall_t0 = perf_counter()
@@ -138,8 +51,9 @@ def main():
                            noise_sigma=val_untangle.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
-        # osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        print(f"Running method {osm.method_name()}")
         mpc_times = []
 
         goal.viz_goal(phy)
@@ -192,9 +106,10 @@ def main():
             'sim_time':       phy.d.time,
             'planning_times': osm.planner.planning_times,
             'mpc_times':      mpc_times,
-            'overall_time':  perf_counter() - overall_t0,
+            'overall_time':   perf_counter() - overall_t0,
             'grasp_history':  np.array(grasp_goal.history).tolist(),
-            'method':         osm.__class__.__name__,
+            'method':         osm.method_name(),
+            'hp':             hp,
         }
         print(metrics)
         if mov:

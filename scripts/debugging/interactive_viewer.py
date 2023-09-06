@@ -19,7 +19,6 @@ from geometry_msgs.msg import Pose, Quaternion
 from mjregrasping.basic_3d_pose_marker import Basic3DPoseInteractiveMarker
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.jacobian_ctrl import get_w_in_tool, warn_near_joint_limits
-from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
 from mjregrasping.physics import Physics, get_q

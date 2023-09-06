@@ -65,7 +65,7 @@ def main():
     root.mkdir(exist_ok=True, parents=True)
 
     rng = np.random.RandomState(0)
-    for i in range(10):
+    for i in range(10, 50):
         # Configure the model before we construct the data and physics object
         m = randomize_loop_positions(scenario.xml_path, rng)
 
