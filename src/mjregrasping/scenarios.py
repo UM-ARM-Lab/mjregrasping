@@ -61,6 +61,15 @@ threading = Scenario(
     noise_sigma=np.deg2rad(1),
 )
 
+val_pulling = Scenario(
+    name="Pulling",
+    xml_path=Path("models/pulling_scene.xml"),
+    obstacle_name="obstacles",
+    robot_data=val,
+    rope_name="rope",
+    noise_sigma=np.deg2rad(1),
+)
+
 
 def setup_pull(phy, viz):
     # set the rope pose
@@ -125,6 +134,9 @@ def get_threading_skeletons(phy: Physics):
         ], axis=0),
     }
 
+
+def get_pulling_skeletons(phy: Physics):
+    return {}
 
 def get_untangle_skeletons(phy: Physics):
     d = phy.d

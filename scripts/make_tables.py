@@ -15,7 +15,7 @@ def count_grasps(x):
 
 def main():
     untangle_trials_dirs = [
-        Path("results/Untangle/untangle_ours_v2"),
+        Path("results/Untangle/untangle_ours_v3"),
         Path("results/Untangle/untangle_tamp5_v1"),
         Path("results/Untangle/untangle_tamp50_v1"),
     ]
@@ -67,7 +67,7 @@ def load_data(trials_dirs):
 
 def print_results_table(df):
     agg = {
-        'success':        ['sum'],
+        'success':        ['sum', 'count'],
         'overall_time':   ['mean', 'std'],
         'sim_time':      ['mean', 'std'],
         'planning_times': list_mean,
@@ -82,10 +82,10 @@ def print_results_table(df):
     for dirname, row in table_data.iterrows():
         x = [
             f"{dirname}",
-            f"{row['success']['sum']:.0f}",
+            f"{row['success']['sum']:.0f}/{row['success']['count']:.0f}",
             f"{row['overall_time']['mean'] / 60:.0f} ({row['overall_time']['std'] / 60:.0f})",
             f"{row['sim_time']['mean'] / 60:.1f} ({row['sim_time']['std'] / 60:.1f})",
-            f"{row['grasp_history']['count_grasps']}",
+            f"{row['grasp_history']['count_grasps']:.1f}",
         ]
         print(' & '.join(x) + " \\\\")
 

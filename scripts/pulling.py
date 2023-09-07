@@ -1,32 +1,25 @@
 #!/usr/bin/env python3
 import multiprocessing
-import time
 from concurrent.futures.thread import ThreadPoolExecutor
-from pathlib import Path
+from time import perf_counter
 
 import mujoco
 import numpy as np
 import rerun as rr
 from colorama import Fore
 
-import rospy
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
-from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasping import get_grasp_locs
-from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-from mjregrasping.move_to_joint_config import pid_to_joint_configs
-from mjregrasping.movie import MjMovieMaker
-from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
-from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
+from mjregrasping.scenarios import val_untangle, val_pulling
 from mjregrasping.trap_detection import TrapDetection
+from mjregrasping.trials import load_trial
+from mjregrasping.untangle_methods import OnStuckOurs
 from mjregrasping.viz import make_viz
-from moveit_msgs.msg import MoveItErrorCodes
 
 
 @ros_init.with_ros("pulling")
@@ -37,112 +30,89 @@ def main():
     rr.connect()
 
     scenario = val_pulling
-    viz = make_viz(scenario)
 
-    root = Path("results") / scenario.name
-    root.mkdir(exist_ok=True, parents=True)
+    gl_ctx = mujoco.GLContext(1280, 720)
+    gl_ctx.make_current()
 
-    seed = 0
-    m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
-    d = mujoco.MjData(m)
-    objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
-    phy = Physics(m, d, objects)
-
-    mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
-
-    skeletons = {}
-    # setup_pulling(phy, viz)
-
-    grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
-    # Subtract a small amount from the radius so the rope is more clearly "inside" the goal region
-    goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
-
-    mov = MjMovieMaker(m)
-    now = int(time.time())
-    mov_path = root / f'seed_{seed}_{now}.mp4'
-    print(f"Saving movie to {mov_path}")
-    mov.start(mov_path)
-
-    pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
-    traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=seed, horizon=hp['horizon'], noise_sigma=scenario.noise_sigma,
-                       temp=hp['temp'])
-    num_samples = hp['n_samples']
     grasp_rrt = GraspRRT()
 
-    planner = HomotopyRegraspPlanner(goal.loc, grasp_rrt, skeletons, None)
+    viz = make_viz(scenario)
+    for trial_idx in range(0, 25):
+        phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
 
-    goal.viz_goal(phy)
+        overall_t0 = perf_counter()
 
-    mppi.reset()
-    traps.reset_trap_detection()
+        grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
+        goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
 
-    itr = 0
-    max_iters = 100
-    command = None
-    sub_time_s = None
-    viz.viz(phy)
-    while True:
-        if rospy.is_shutdown():
-            mov.close()
-            return False
-
-        if itr > max_iters:
-            break
+        pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
+        traps = TrapDetection()
+        mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=trial_idx + 1, horizon=hp['horizon'],
+                           noise_sigma=val_untangle.noise_sigma, temp=hp['temp'])
+        num_samples = hp['n_samples']
+        osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        print(Fore.BLUE + f"Running method {osm.method_name()}" + Fore.RESET)
+        mpc_times = []
 
         goal.viz_goal(phy)
-        if goal.satisfied(phy):
-            print(Fore.GREEN + "Goal reached!" + Fore.RESET)
-            break
 
-        is_stuck = traps.check_is_stuck(phy)
-        needs_reset = False
-        if is_stuck:
-            print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
-            initial_geodesic_cost = get_geodesic_dist(grasp_goal.get_grasp_locs(), goal.loc)
-            sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
-            best_grasp = planner.get_best(sim_grasps, viz=None)
-            new_geodesic_cost = get_geodesic_dist(best_grasp.locs, goal.loc)
-            # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
-            if initial_geodesic_cost - new_geodesic_cost < 0.01:  # less than 1% closer to the keypoint
-                print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
-                print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
-                planner.update_blacklists(phy)
-                best_grasp = planner.get_best(sim_grasps, viz=None)
-            if best_grasp.res.error_code.val != MoveItErrorCodes.SUCCESS:
-                print(Fore.RED + "Failed to find a plan." + Fore.RESET)
-            viz.viz(best_grasp.phy, is_planning=True)
-            # now execute the plan
-            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-            pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
-            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
-            grasp_goal.set_grasp_locs(best_grasp.locs)
+        mppi.reset()
+        traps.reset_trap_detection()
 
-            # save_data_and_eq(phy, Path(f'states/CableHarness/stuck1.pkl'))
-            needs_reset = True
+        itr = 0
+        success = False
+        viz.viz(phy)
+        while True:
+            if itr >= 300:
+                print(Fore.RED + "Task failed!" + Fore.RESET)
+                break
 
-        n_warmstart = max(1, min(hp['warmstart'], int((1 - stuck_frac) * 5)))
+            goal.viz_goal(phy)
+            if goal.satisfied(phy):
+                success = True
+                print(Fore.GREEN + "Task Complete!" + Fore.RESET)
+                break
 
-        if needs_reset:
-            mppi.reset()
-            traps.reset_trap_detection()
-            n_warmstart = hp['warmstart']
+            is_stuck = traps.check_is_stuck(phy) or np.all(grasp_goal.get_grasp_locs() == -1)
+            needs_reset = False
+            if is_stuck:
+                print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
+                osm.on_stuck(phy, viz, mov)
+                needs_reset = True
 
-        for k in range(n_warmstart):
+            if needs_reset:
+                mppi.reset()
+                traps.reset_trap_detection()
+
+            mpc_t0 = perf_counter()
             command, sub_time_s = mppi.command(phy, goal, num_samples, viz=viz)
             mppi_viz(mppi, goal, phy, command, sub_time_s)
+            mpc_times.append(perf_counter() - mpc_t0)
 
-        control_step(phy, command, sub_time_s, mov=mov)
-        viz.viz(phy)
+            control_step(phy, command, sub_time_s, mov=mov)
+            viz.viz(phy)
 
-        results = goal.get_results(phy)
-        do_grasp_dynamics(phy, results)
+            do_grasp_dynamics(phy)
 
-        mppi.roll()
+            mppi.roll()
 
-        itr += 1
-    mov.close()
+            itr += 1
+
+        metrics = {
+            'itr':            itr,
+            'success':        success,
+            'sim_time':       phy.d.time,
+            'planning_times': osm.planner.planning_times,
+            'mpc_times':      mpc_times,
+            'overall_time':   perf_counter() - overall_t0,
+            'grasp_history':  np.array(grasp_goal.history).tolist(),
+            'method':         osm.method_name(),
+            'hp':             hp,
+        }
+        print(metrics)
+        if mov:
+            mov.close(metrics)
 
 
 if __name__ == "__main__":

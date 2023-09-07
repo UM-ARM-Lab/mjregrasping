@@ -40,7 +40,7 @@ class OnStuckTamp(BaseOnStuckMethod):
         self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
 
     def method_name(self):
-        return f"Tamp{hp['tamp_horizon']}'"
+        return f"Tamp{hp['tamp_horizon']}"
 
     def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
         planning_t0 = perf_counter()
