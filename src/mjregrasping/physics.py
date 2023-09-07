@@ -51,8 +51,30 @@ def get_total_contact_force(phy: Physics):
 
 def get_q(phy: Physics):
     """ only gets the q for actuated joints"""
-    qpos_for_act = phy.m.actuator_trnid[:, 0]
-    return copy(phy.d.qpos[qpos_for_act])
+    qpos_ids_for_actuators = get_qpos_ids_for_actuators(phy)
+    return copy(phy.d.qpos[qpos_ids_for_actuators])
+
+
+def get_qpos_for_actuators(phy):
+    ids = get_qpos_ids_for_actuators(phy)
+    return phy.d.qpos[ids]
+
+
+def get_qpos_for_actuator(phy, actuator_name: str):
+    idx = get_qpos_id_for_actuator(phy, actuator_name)
+    return phy.d.qpos[idx]
+
+
+def get_qpos_ids_for_actuators(phy):
+    joint_ids_for_actuators = phy.m.actuator_trnid[:, 0]
+    qpos_ids_for_actuators = phy.m.jnt_qposadr[joint_ids_for_actuators]
+    return qpos_ids_for_actuators
+
+
+def get_qpos_id_for_actuator(phy, actuator_name: str):
+    joint_id_for_actuator = phy.m.actuator(actuator_name).trnid[0]
+    qpos_id_for_actuator = phy.m.jnt_qposadr[joint_id_for_actuator]
+    return qpos_id_for_actuator
 
 
 def get_full_q(phy: Physics):
@@ -75,4 +97,3 @@ def get_parent_child_names(geom_bodyid: int, m: mujoco.MjModel):
 
 def get_gripper_ctrl_indices(phy):
     return [phy.m.actuator(a).id for a in phy.o.rd.gripper_actuator_names]
-

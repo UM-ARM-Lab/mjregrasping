@@ -223,7 +223,7 @@ def main():
                 disc_rad = 0.05  # TODO: compute the radius of the disc
 
                 disc_penetrated = goal.satisfied(phy, disc_center, disc_normal, disc_rad)
-                is_stuck = traps.check_is_stuck(phy)
+                is_stuck = traps.check_is_stuck(phy, grasp_goal)
                 if disc_penetrated:
                     print("Disc penetrated!")
                     mppi.reset()

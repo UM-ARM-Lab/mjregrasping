@@ -71,7 +71,7 @@ class OnStuckOurs(BaseOnStuckMethod):
     def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -84,6 +84,7 @@ class OnStuckOurs(BaseOnStuckMethod):
         self.planner.planning_times.append(perf_counter() - planning_t0)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             viz.viz(best_grasp.phy, is_planning=True)
+            print(f"Changing from {best_grasp.initial_locs} to {best_grasp.locs}")
             # now execute the plan
             deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
             pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)

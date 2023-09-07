@@ -15,7 +15,6 @@
     <include file="computer_rack.xml"/>
     <include file="floor.xml"/>
     <include file="rope.xml"/>
-    <include file="cc_sphere.xml"/>
     <include file="val_eq_constraints.xml"/>
     <worldbody>
         <!-- used for recording what happens in the simulation -->

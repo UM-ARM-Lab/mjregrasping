@@ -27,7 +27,7 @@ from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle, real_untangle, get_real_untangle_skeletons
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
-from mjregrasping.untangle_methods import BaseOnStuckMethod
+from mjregrasping.point_reaching_methods import BaseOnStuckMethod
 from mjregrasping.viz import make_viz
 from moveit_msgs.msg import MoveItErrorCodes
 
@@ -124,7 +124,7 @@ def main():
             print(Fore.GREEN + "Task Complete!" + Fore.RESET)
             break
 
-        is_stuck = traps.check_is_stuck(phy)
+        is_stuck = traps.check_is_stuck(phy, grasp_goal)
         needs_reset = False
         if itr == 10 or is_stuck:
             print("DEBUGGING!!!")

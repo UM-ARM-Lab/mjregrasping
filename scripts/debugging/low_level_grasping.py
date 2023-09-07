@@ -23,7 +23,7 @@ from mjregrasping.movie import MjRGBD
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_qpos_for_actuator
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rviz import plot_points_rviz
 from mjregrasping.scenarios import val_untangle
@@ -92,7 +92,6 @@ def main():
     max_v_norm = 0.03
     gripper_kp = 0.2
 
-    gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
     tool_frame_name = phy.o.rd.tool_sites[tool_idx]
 
     camera_name = phy.o.rd.camera_names[tool_idx]
@@ -139,7 +138,7 @@ def main():
 
         rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
 
-        gripper_q = phy.d.qpos[gripper_q_indices[tool_idx]]
+        gripper_q = np.array([get_qpos_for_actuator(phy, a) for a in phy.o.rd.gripper_actuator_names])
 
         grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool)
 

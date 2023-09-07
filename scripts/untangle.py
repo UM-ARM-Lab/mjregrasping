@@ -18,7 +18,7 @@ from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
-from mjregrasping.untangle_methods import OnStuckOurs, OnStuckTamp
+from mjregrasping.point_reaching_methods import OnStuckOurs, OnStuckTamp
 from mjregrasping.viz import make_viz
 
 
@@ -75,7 +75,7 @@ def main():
                 print(Fore.GREEN + "Task Complete!" + Fore.RESET)
                 break
 
-            is_stuck = traps.check_is_stuck(phy)
+            is_stuck = traps.check_is_stuck(phy, grasp_goal)
             needs_reset = False
             if is_stuck:
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)

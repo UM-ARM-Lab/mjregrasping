@@ -14,24 +14,24 @@
         </body>
         <light name="top" pos="0 0 105" mode="trackcom" />
         <body name="obstacles">
-            <body name="wall" pos="-1.0438921462933213 0.0 0.5">
+            <body name="wall" pos="-1.0382684435816807 0.0 0.5">
                 <geom name="wall" type="box" size="0.05 2.5 1.0" rgba="0.5 0.5 0.5 1" />
-                <body name="attach" pos="0.05 0.7039615522579518 -0.7940055701750427">
+                <body name="attach" pos="0.05 0.49237063534554726 -0.7142875082495432">
                     <geom name="attach" class="visual" type="box" size="0.01 0.03 0.03" rgba="1 0 0 1" />
                     <body pos="0.03 0 0" euler="0 0 0" name="rope">
-                        <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001" />
+                        <inertial pos="0 0 0" quat="1 0 0 0" mass="0.5" diaginertia="0.001 0.001 0.001" />
                         <composite type="cable" curve="s" count="15 1 1" size="3 0.22 1">
                             <joint kind="main" damping=".02" />
-                            <geom type="capsule" size=".02" rgba=".8 .2 .1 1" condim="1" group="1" />
+                            <geom type="capsule" size=".018" rgba=".8 .2 .1 1" condim="1" group="1" />
                         </composite>
                         <joint type="ball" damping=".02" />
                     </body>
                 </body>
             </body>
         </body>
-        <body name="mess" pos="0.4 0.6 -0.445">
+        <body name="mess" pos="-0.02287479232381359 0.49037927406673343 -0.445">
             <body name="goal">
-                <geom name="goal" class="visual" type="sphere" pos="0 0 0.03" size="0.05" rgba="1 0 1 0.3" />
+                <geom name="goal" class="visual" type="sphere" pos="0 0 0.03" size="0.08" rgba="1 0 1 0.3" />
             </body>
         </body>
     </worldbody>
@@ -272,13 +272,6 @@
 <worldbody>
         <body pos="0 0 -0.445" name="floor">
             <geom type="plane" name="floor" size="50 50 0.1" material="cream-plaster" />
-        </body>
-    </worldbody>
-<worldbody>
-        <body pos="0 0 0" name="cc_sphere">
-            
-            <geom type="sphere" name="cc_sphere" size="0.005" rgba="1 1 1 0.1" />
-            <joint type="free" name="cc_sphere" damping="0.1" />
         </body>
     </worldbody>
 <equality>

@@ -16,7 +16,6 @@
         <light name="top" pos="-1 0 105" mode="trackcom"/>
     </worldbody>
     <include file="val.xml"/>
-    <include file="cc_sphere.xml"/>
     <include file="floor.xml"/>
     <include file="threading_obstacles.xml"/>
     <include file="cable.xml"/>

@@ -6,7 +6,7 @@ import numpy as np
 from mjregrasping.eq_errors import compute_eq_errors
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics, get_full_q
+from mjregrasping.physics import Physics, get_full_q, get_qpos_for_actuators
 from mjregrasping.real_val import RealValCommander
 
 DEFAULT_SUB_TIME_S = 0.1
@@ -16,7 +16,8 @@ def no_results(*args, **kwargs):
     return (None,)
 
 
-def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
+def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None,
+                 val_cmd: Optional[RealValCommander] = None):
     m = phy.m
     d = phy.d
 
@@ -51,11 +52,5 @@ def slow_when_eqs_bad(phy):
 
 
 def limit_actuator_windup(phy):
-    qpos_for_act_indices = get_act_indices(phy)
-    qpos_for_act = phy.d.qpos[qpos_for_act_indices]
+    qpos_for_act = get_qpos_for_actuators(phy)
     phy.d.act = qpos_for_act + np.clip(phy.d.act - qpos_for_act, -hp['act_windup_limit'], hp['act_windup_limit'])
-
-
-def get_act_indices(phy):
-    qpos_for_act_indices = phy.o.robot.qpos_indices[0] + phy.m.actuator_trnid[:, 0]
-    return qpos_for_act_indices

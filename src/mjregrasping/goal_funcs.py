@@ -6,7 +6,7 @@ from mjregrasping.geometry import point_to_line_segment
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_qpos_for_actuators
 
 
 def get_nongrasping_rope_contact_cost(phy: Physics, desired_grasp_locs):
@@ -62,8 +62,7 @@ def get_action_cost(joint_positions):
 
 
 def get_results_common(phy: Physics):
-    joint_indices_for_actuators = phy.m.actuator_trnid[:, 0]
-    joint_positions = phy.d.qpos[joint_indices_for_actuators]
+    joint_positions = get_qpos_for_actuators(phy)
     contact_cost = get_contact_cost(phy)
     tools_pos = get_tool_points(phy)
     is_unstable = phy.d.warning.number.sum() > 0

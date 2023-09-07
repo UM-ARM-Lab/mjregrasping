@@ -2,7 +2,7 @@ import mujoco
 import numpy as np
 
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_indices_to_locations
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_qpos_for_actuator
 from mjregrasping.rope_length import get_rope_length
 
 
@@ -53,7 +53,7 @@ def activate_grasp(phy: Physics, name, loc):
 
 
 def get_finger_qs(phy: Physics):
-    qs = [phy.d.qpos[phy.m.actuator(actuator_name).trnid[0]] for actuator_name in phy.o.rd.gripper_actuator_names]
+    qs = [get_qpos_for_actuator(phy, actuator_name) for actuator_name in phy.o.rd.gripper_actuator_names]
     return np.stack(qs, axis=0)
 
 

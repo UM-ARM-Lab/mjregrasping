@@ -12,13 +12,13 @@ from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.params import hp
+from mjregrasping.point_reaching_methods import OnStuckOurs
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle, val_pulling
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
-from mjregrasping.untangle_methods import OnStuckOurs
 from mjregrasping.viz import make_viz
 
 
@@ -35,6 +35,16 @@ def main():
     gl_ctx.make_current()
 
     grasp_rrt = GraspRRT()
+
+    # For the pulling task, the rope is a lot thicker.
+    # NOTE: it seems like stuff like this and rope length could be computed from the model.
+    #  but it should only be done once, not every time step or whenever we need to read the value.
+    #  so perhaps this is more motivation for a extension/wrapper around the MjModel class that computes and stores
+    #  things like this. You could imagine the same thing for MjData that gets computed every time we step.
+    hp['finger_q_open'] = 0.6
+    hp['finger_q_closed'] = 0.2
+    # FIXME: see how this param change effects other experiments?
+    hp['robot_dq_weight'] = 0.1
 
     viz = make_viz(scenario)
     for trial_idx in range(0, 25):
@@ -74,7 +84,7 @@ def main():
                 print(Fore.GREEN + "Task Complete!" + Fore.RESET)
                 break
 
-            is_stuck = traps.check_is_stuck(phy) or np.all(grasp_goal.get_grasp_locs() == -1)
+            is_stuck = traps.check_is_stuck(phy, grasp_goal)
             needs_reset = False
             if is_stuck:
                 print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)

@@ -36,6 +36,12 @@ def randomize(original_path: Path, rng: np.random.RandomState):
     wall_pos[0] += rng.uniform(-0.05, 0.05)
     mxml.set_vec(wall, wall_pos, 'pos')
 
+    mess = mxml.get_e("body", "mess")
+    mess_pos = mxml.get_vec(mess, 'pos')
+    mess_pos[0] += rng.uniform(-0.05, 0.05)
+    mess_pos[1] += rng.uniform(-0.05, 0.05)
+    mxml.set_vec(mess, mess_pos, 'pos')
+
     tmp_path = mxml.save_tmp()
     m = mujoco.MjModel.from_xml_path(str(tmp_path))
     return m
@@ -80,18 +86,17 @@ def main():
         # randomly shove the rope around
         eq = phy.m.eq("perturb")
         eq.active = 1
-        workspace_min = np.array([-0.25, 0.3, 0.0])
-        workspace_max = np.array([1.5, 1.5, 0.3])
+        workspace_min = np.array([0.5, 0.5, -0.1])
+        workspace_max = np.array([1.5, 1.5, 0.1])
         eq.data[0:3] = (workspace_max + workspace_min) / 2
-        for loc in rng.uniform(0, 1, 6):
+        for loc in rng.uniform(0.5, 1, 6):
             activate_grasp(phy, 'perturb', loc)
             dx, dy = rng.normal(0, 0.3, 2)
             eq.data[0:3] += np.array([dx, dy, 0])
             # clip to workspace
             eq.data[0:3] = np.clip(eq.data[0:3], workspace_min, workspace_max)
-            for t in range(10):
-                mujoco.mj_step(phy.m, phy.d, 10)
-                viz.viz(phy)
+            mujoco.mj_step(phy.m, phy.d, 100)
+            viz.viz(phy)
 
         eq.active = 0
         for t in range(50):
