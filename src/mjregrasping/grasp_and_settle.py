@@ -44,7 +44,9 @@ def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: b
     if val_cmd:
         val_cmd.set_cdcpd_grippers(phy)
     control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov, val_cmd=val_cmd)
-    settle_with_checks(phy, viz, is_planning, mov, val_cmd)
+    # We only want to settle, not move the robot, and because CDCPD is likely wrong when releasing,
+    # we certainly don't want the mujoco rope to be constrained to stay close to CDCPD
+    settle_with_checks(phy, viz, is_planning, mov, val_cmd=None)
     if val_cmd:
         # CDCPD does not do a great job when the rope moves really fast, such as when we drop it. This
         # basically resets CDCPD to what mujoco thinks the rope looks like after it has dropped
@@ -64,7 +66,7 @@ def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov
     if val_cmd:
         val_cmd.set_cdcpd_grippers(phy)
     control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov, val_cmd=val_cmd)
-    settle_with_checks(phy, viz, is_planning, mov, val_cmd)
+    settle_with_checks(phy, viz, is_planning, mov, val_cmd=None)
     if val_cmd:
         print("Resetting CDCPD to mujoco match rope state post grasp")
         val_cmd.set_cdcpd_from_mj_rope(phy)

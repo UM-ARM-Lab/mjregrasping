@@ -14,6 +14,7 @@ import tf2_geometry_msgs
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
+from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.move_to_joint_config import pid_to_joint_configs
 from mjregrasping.movie import MjMovieMaker
@@ -56,7 +57,7 @@ class OnStuckOurs(BaseOnStuckMethod):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
         # print("DEBUGGING VIZ_EXECUTION=TRUE")
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -72,6 +73,10 @@ class OnStuckOurs(BaseOnStuckMethod):
             # now execute the plan
             deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+            ##################################################
+            # Run a low level controller to actually grasp
+
+            ##################################################
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             self.grasp_goal.set_grasp_locs(best_grasp.locs)
         else:
@@ -104,6 +109,7 @@ def main():
     skeletons = get_real_untangle_skeletons(phy)
     viz.skeletons(skeletons)
 
+    val_cmd.set_cdcpd_grippers(phy)
     val_cmd.set_cdcpd_from_mj_rope(phy)
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
@@ -111,7 +117,10 @@ def main():
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    hp['horizon'] = 8; hp['n_samples'] = 36
+    hp['horizon'] = 8
+    hp['n_samples'] = 36
+    # I think the rope is super noisy because of CDCPD so I'm turning this down?
+    hp['trap_q_rope_weight'] = 0.05
     mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
@@ -121,6 +130,20 @@ def main():
 
     mppi.reset()
     traps.reset_trap_detection()
+
+    # DEBUGGING IK and Releasing
+    # val_cmd.pull_rope_towards_cdcpd(phy, 5000)
+    # viz.viz(phy)
+    #
+    # phy_plan = phy.copy_all()
+    # strategy = [Strategies.STAY, Strategies.MOVE]
+    # candidate_locs = np.array([-1, 0.28])
+    # res, scene_msg = grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
+    # print(res.error_code.val)
+    # grasp_rrt.display_result(viz, res, scene_msg)
+    # deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
+
+    val_cmd.start_record()
 
     itr = 0
     viz.viz(phy)
@@ -138,8 +161,7 @@ def main():
 
         is_stuck = traps.check_is_stuck(phy)
         needs_reset = False
-        if itr == 10 or is_stuck:
-            print("DEBUGGING!!!")
+        if True or is_stuck:
             print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
             osm.on_stuck(phy, viz, mov, val_cmd)
             needs_reset = True
@@ -166,6 +188,8 @@ def main():
         mppi.roll()
 
         itr += 1
+
+    val_cmd.stop_record()
 
 
 if __name__ == "__main__":

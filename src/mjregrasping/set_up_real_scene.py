@@ -14,11 +14,9 @@ def set_up_real_scene(val_cmd: RealValCommander, phy: Physics, viz: Viz):
     val_cmd.update_mujoco_qpos(phy)
     viz.viz(phy, False)
     pid_to_joint_config(phy, viz, val_dedup(pos_in_mj_order), DEFAULT_SUB_TIME_S, reached_tol=2)
-    for _ in range(200):
-        mujoco.mj_step(phy.m, phy.d, 5)
-        viz.viz(phy, False)
+    mujoco.mj_step(phy.m, phy.d, 1000)
+    viz.viz(phy, False)
     activate_grasp(phy, 'right', 1)
-    for _ in range(50):
-        mujoco.mj_step(phy.m, phy.d, 5)
-        viz.viz(phy, False)
+    mujoco.mj_step(phy.m, phy.d, 250)
+    viz.viz(phy, False)
     pid_to_joint_config(phy, viz, val_dedup(pos_in_mj_order), DEFAULT_SUB_TIME_S, reached_tol=2)

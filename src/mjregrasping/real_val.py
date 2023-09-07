@@ -11,6 +11,7 @@ import numpy as np
 import rospy
 from arc_utilities.listener import Listener
 from arc_utilities.tf2wrapper import TF2Wrapper
+from arm_video_recorder.srv import TriggerVideoRecording, TriggerVideoRecordingRequest
 from geometry_msgs.msg import PointStamped
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasping import activate_grasp, get_grasp_locs
@@ -46,7 +47,23 @@ class RealValCommander:
         self.cdcpd_sub = Listener("/cdcpd_pred", MarkerArray)
         self.set_cdcpd_srv = rospy.ServiceProxy("set_cdcpd_state", SetCDCPDState)
         self.set_cdcpd_grippers_srv = rospy.ServiceProxy("set_gripper_constraints", SetGripperConstraints)
+        self.set_cdcpd_srv.wait_for_service()
+        self.set_cdcpd_grippers_srv.wait_for_service()
+        self.record_srv = rospy.ServiceProxy("vidoe_recorder", TriggerVideoRecording)
         self.tfw = TF2Wrapper()
+
+    def start_record(self):
+        req = TriggerVideoRecordingRequest()
+        now = int(time.time())
+        req.filename = f'/home/peter/recordings/peter/real_untangle_{now}.mp4'
+        req.record = True
+        req.timeout_in_sec = 10 * 60
+        self.record_srv(req)
+
+    def stop_record(self):
+        req = TriggerVideoRecordingRequest()
+        req.record = False
+        self.record_srv(req)
 
     def get_latest_joint_state(self) -> JointState:
         return self.js_listener.get()
@@ -182,6 +199,6 @@ class RealValCommander:
             if eq.active:
                 c = GripperConstraint()
                 c.tf_frame_name = f'{eq_name}_tool'
-                c.cdcpd_node_index = int(loc * 24)
+                c.cdcpd_node_index = int(np.round(loc * 24))
                 req.constraints.append(c)
         self.set_cdcpd_grippers_srv(req)

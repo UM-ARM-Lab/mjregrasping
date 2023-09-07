@@ -29,14 +29,15 @@ class GraspRRT:
         client.update_configuration({"maximum_waypoint_distance": 0.2})
         self.fix_start_rng = np.random.RandomState(0)
 
-    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
-             pos_noise=0.05):
+    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], pos_noise=0.03, **kwargs):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
         scene_msg = make_planning_scene(phy_plan)
-        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time,
-                                                pos_noise)
+        if viz:
+            for k, v in goals.items():
+                viz.sphere(f"rrt_plan/{k}", v, 0.03, color=[1, 1, 1, 0.1])
+        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), pos_noise=pos_noise, **kwargs)
         return res, scene_msg
 
     def display_result(self, viz, res, scene_msg):
@@ -88,19 +89,31 @@ def plan_to_grasp(candidate_locs, phy_plan, strategy):
     q0 = get_full_q(phy_plan)
     goals = {}
     is_grasping0 = get_is_grasping(phy_plan)
-    in_planning = []
+    has_goal = []
+    can_move = []
     for tool_name, s, is_grasping0_i, p in zip(phy_plan.o.rd.tool_sites, strategy, is_grasping0, candidate_pos):
         if s in [Strategies.NEW_GRASP, Strategies.MOVE]:
             goals[tool_name] = p
-            in_planning.append(True)
+            has_goal.append(True)
+            can_move.append(True)
+        elif s == Strategies.STAY and not is_grasping0_i:
+            has_goal.append(False)
+            can_move.append(True)
         else:
-            in_planning.append(False)
-    if all(in_planning) or not any(is_grasping0):
+            has_goal.append(False)
+            can_move.append(False)
+    if all(has_goal) or not any(is_grasping0):
         group_name = "both_arms"
-    elif in_planning[0]:
-        group_name = 'left_arm'
-    elif in_planning[1]:
-        group_name = 'right_arm'
+    elif has_goal[0]:
+        if can_move[1]:
+            group_name = 'left_side'
+        else:
+            group_name = 'left_arm'
+    elif has_goal[1]:
+        if can_move[0]:
+            group_name = 'right_side'
+        else:
+            group_name = 'right_arm'
     else:
         raise NoArmsMoving('No arms are moving!')
     return goals, group_name, q0
