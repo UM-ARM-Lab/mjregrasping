@@ -16,8 +16,8 @@ def count_grasps(x):
 def main():
     untangle_trials_dirs = [
         Path("results/Untangle/untangle_ours_v3"),
-        Path("results/Untangle/untangle_tamp5_v1"),
-        Path("results/Untangle/untangle_tamp50_v1"),
+        Path("results/Untangle/untangle_tamp5_v2"),
+        Path("results/Untangle/untangle_tamp50_v1"),  # waiting on new results from  Freya
     ]
 
     df = load_data(untangle_trials_dirs)
@@ -69,7 +69,7 @@ def print_results_table(df):
     agg = {
         'success':        ['sum', 'count'],
         'overall_time':   ['mean', 'std'],
-        'sim_time':      ['mean', 'std'],
+        'sim_time':       ['mean', 'std'],
         'planning_times': list_mean,
         'mpc_times':      list_mean,
         'grasp_history':  count_grasps,
