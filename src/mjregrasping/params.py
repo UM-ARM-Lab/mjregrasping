@@ -52,5 +52,6 @@ hp = {
     "wang_scootch_fraction":           0.03,
     "ours_scootch_fraction":           0.005,
     # Use 5 for a 'fast' baseline (still slower than our method), and 50 for strong baseline
-    "tamp_horizon":                    5, # 50,
+    "tamp_horizon":                    5,  # 50,
+    "untangle_max_iters":              300,
 }

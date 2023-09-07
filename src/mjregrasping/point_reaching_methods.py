@@ -31,25 +31,10 @@ class BaseOnStuckMethod:
     def on_stuck(self, phy: Physics, viz: Viz, mov: Optional[MjMovieMaker], val_cmd: Optional[RealValCommander] = None):
         raise NotImplementedError()
 
-
-class OnStuckTamp(BaseOnStuckMethod):
-
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
-        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
-        self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
-
-    def method_name(self):
-        return f"Tamp{hp['tamp_horizon']}"
-
-    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
-        planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
-        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
-        self.planner.planning_times.append(perf_counter() - planning_t0)
-
+    def execute_best_grasp(self, best_grasp, mov, phy, viz):
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             viz.viz(best_grasp.phy, is_planning=True)
+            print(f"Changing from {best_grasp.initial_locs} to {best_grasp.locs}")
             deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
             pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
@@ -82,13 +67,37 @@ class OnStuckOurs(BaseOnStuckMethod):
             self.planner.update_blacklists(phy)
             best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         self.planner.planning_times.append(perf_counter() - planning_t0)
-        if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            viz.viz(best_grasp.phy, is_planning=True)
-            print(f"Changing from {best_grasp.initial_locs} to {best_grasp.locs}")
-            # now execute the plan
-            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
-            pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
-            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
-            self.grasp_goal.set_grasp_locs(best_grasp.locs)
-        else:
-            print(Fore.RED + "Failed to find a plan." + Fore.RESET)
+        self.execute_best_grasp(best_grasp, mov, phy, viz)
+
+
+class OnStuckTamp(BaseOnStuckMethod):
+
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
+        self.planner = TAMPRegraspPlanner(scenario, goal, self.grasp_rrt, skeletons)
+
+    def method_name(self):
+        return f"Tamp{hp['tamp_horizon']}"
+
+    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
+        planning_t0 = perf_counter()
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        self.planner.planning_times.append(perf_counter() - planning_t0)
+        self.execute_best_grasp(best_grasp, mov, phy, viz)
+
+
+class OnStuckAlwaysBlacklist(OnStuckOurs):
+
+    def method_name(self):
+        return "Always Blacklist"
+
+    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
+        planning_t0 = perf_counter()
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        print("Blacklisting")
+        self.planner.update_blacklists(phy)
+        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        self.planner.planning_times.append(perf_counter() - planning_t0)
+        self.execute_best_grasp(best_grasp, mov, phy, viz)

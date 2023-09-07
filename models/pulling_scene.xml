@@ -14,7 +14,7 @@
     <worldbody>
         <!-- used for recording what happens in the simulation -->
         <body name="mycamera">
-            <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4"/>
+            <camera mode="fixed" name="mycamera" xyaxes="-0.839 0.544 -0.000 -0.372 -0.573 0.730" pos="1.584 3.270 1.947"/>
         </body>
         <light name="top" pos="0 0 105" mode="trackcom"/>
         <body name="obstacles">
