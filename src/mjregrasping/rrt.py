@@ -36,7 +36,7 @@ class GraspRRT:
         scene_msg = make_planning_scene(phy_plan)
         if viz:
             for k, v in goals.items():
-                viz.sphere(f"rrt_plan/{k}", v, 0.03, color=[1, 1, 1, 0.1])
+                viz.sphere(f"rrt_plan/{k}", v, 0.03, color=[1, 1, 1, 0.2])
         res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), pos_noise=pos_noise, **kwargs)
         return res, scene_msg
 

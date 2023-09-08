@@ -13,7 +13,7 @@
                     <body name="tv" pos="0 -0.05 0.64">
                         <geom name="tv" type="box" pos="0 0 0" size="0.6 0.05 0.3" rgba="0 0 0 1"/>
                     </body>
-                    <body name="attach" pos="0.52 -0.06 0.15">
+                    <body name="attach" pos="0.52 -0.06 0.14">
                         <geom name="attach" type="box" size="0.02 0.005 0.02" rgba="0.5 0 0 1"/>
                     </body>
                 </body>
@@ -23,13 +23,13 @@
             </body>
             <body name="table" pos="-0.30 0.715 0">
                 <geom name="top" type="box" pos="0 0 0.70" size="0.81 0.255 0.038" rgba="0.35 0.45 0.5 1.0"/>
-                <geom name="leg1" type="box" pos="0.76 0.17 0.36" euler="0 0 0.785" size="0.06 0.0275 0.35"
+                <geom name="leg1" type="box" pos="0.74 0.17 0.36" euler="0 0 0.785" size="0.06 0.0275 0.35"
                       material="metal"/>
-                <geom name="leg2" type="box" pos="-0.76 0.17 0.36" euler="0 0 -0.785" size="0.06 0.0275 0.35"
+                <geom name="leg2" type="box" pos="-0.74 0.17 0.36" euler="0 0 -0.785" size="0.06 0.0275 0.35"
                       material="metal"/>
-                <geom name="leg3" type="box" pos="-0.76 -0.17 0.36" euler="0 0 0.785" size="0.06 0.0275 0.35"
+                <geom name="leg3" type="box" pos="-0.74 -0.17 0.36" euler="0 0 0.785" size="0.06 0.0275 0.35"
                       material="metal"/>
-                <geom name="leg4" type="box" pos="0.76 -0.17 0.36" euler="0 0 -0.785" size="0.06 0.0275 0.35"
+                <geom name="leg4" type="box" pos="0.74 -0.17 0.36" euler="0 0 -0.785" size="0.06 0.0275 0.35"
                       material="metal"/>
             </body>
         </body>

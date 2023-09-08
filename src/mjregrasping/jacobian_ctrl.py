@@ -39,6 +39,7 @@ def get_jacobian_ctrl(phy: Physics, tool_site, desired_mat_in_tool, v_in_tool, j
     current_full_q = get_full_q(phy)[joint_indices]
     zero_vels = -current_full_q * jnt_lim_avoidance
     warn_near_joint_limits(current_q, phy)
+    # NOTE: not sure if pinv include the singularity avoidance, could write that term out myself
     ctrl = J_pinv @ twist_in_tool + (np.eye(len(joint_indices)) - J_pinv @ J_gripper) @ zero_vels
     return ctrl, w_in_tool
 

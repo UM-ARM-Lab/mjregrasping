@@ -47,15 +47,13 @@ class RealValCommander:
         self.cdcpd_sub = Listener("/cdcpd_pred", MarkerArray)
         self.set_cdcpd_srv = rospy.ServiceProxy("set_cdcpd_state", SetCDCPDState)
         self.set_cdcpd_grippers_srv = rospy.ServiceProxy("set_gripper_constraints", SetGripperConstraints)
-        self.set_cdcpd_srv.wait_for_service()
-        self.set_cdcpd_grippers_srv.wait_for_service()
-        self.record_srv = rospy.ServiceProxy("vidoe_recorder", TriggerVideoRecording)
+        self.record_srv = rospy.ServiceProxy("video_recorder", TriggerVideoRecording)
         self.tfw = TF2Wrapper()
 
     def start_record(self):
         req = TriggerVideoRecordingRequest()
         now = int(time.time())
-        req.filename = f'/home/peter/recordings/peter/real_untangle_{now}.mp4'
+        req.filename = f'/home/peter/recordings/peter/real_untangle_{now}.avi'
         req.record = True
         req.timeout_in_sec = 10 * 60
         self.record_srv(req)

@@ -14,25 +14,27 @@ from mjregrasping.viz import Viz
 
 
 def deactivate_moving(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
-                      val_cmd: Optional[RealValCommander] = None):
+                      val_cmd: Optional[RealValCommander] = None, **kwargs):
     needs_release = [s == Strategies.MOVE for s in strategy]
-    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd)
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd, **kwargs)
 
 
 def deactivate_release(phy, strategy, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
-                       val_cmd: Optional[RealValCommander] = None):
+                       val_cmd: Optional[RealValCommander] = None, **kwargs):
     needs_release = [s == Strategies.RELEASE for s in strategy]
-    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd)
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd, **kwargs)
 
 
 def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning: bool,
-                                  mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
+                                  mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None,
+                                  **kwargs):
     needs_release = [s in [Strategies.MOVE, Strategies.RELEASE] for s in strategy]
-    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd)
+    deactivate_and_settle(phy, needs_release, viz, is_planning, mov, val_cmd, **kwargs)
 
 
 def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool,
-                          mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
+                          mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None,
+                          n_open_steps: int = 5):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -43,7 +45,8 @@ def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: b
             ctrl[ctrl_i] = 0.4
     if val_cmd:
         val_cmd.set_cdcpd_grippers(phy)
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov, val_cmd=val_cmd)
+    for _ in range(n_open_steps):
+        control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S, mov=mov, val_cmd=val_cmd)
     # We only want to settle, not move the robot, and because CDCPD is likely wrong when releasing,
     # we certainly don't want the mujoco rope to be constrained to stay close to CDCPD
     settle_with_checks(phy, viz, is_planning, mov, val_cmd=None)
@@ -54,7 +57,7 @@ def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: b
 
 
 def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
-                     val_cmd: Optional[RealValCommander] = None):
+                     val_cmd: Optional[RealValCommander] = None, n_close_steps: int = 5):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -65,7 +68,8 @@ def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov
         activate_grasp(phy, eq_name, grasp_loc_i)
     if val_cmd:
         val_cmd.set_cdcpd_grippers(phy)
-    control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S * 5, mov=mov, val_cmd=val_cmd)
+    for _ in range(n_close_steps):
+        control_step(phy, ctrl, sub_time_s=DEFAULT_SUB_TIME_S, mov=mov, val_cmd=val_cmd)
     settle_with_checks(phy, viz, is_planning, mov, val_cmd=None)
     if val_cmd:
         print("Resetting CDCPD to mujoco match rope state post grasp")
