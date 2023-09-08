@@ -14,6 +14,7 @@ import tf2_geometry_msgs
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
+from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.low_level_grasping import run_grasp_controller
 from mjregrasping.move_to_joint_config import pid_to_joint_configs
@@ -80,7 +81,9 @@ class OnStuckOurs(BaseOnStuckMethod):
             pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             ##################################################
             # Run a low level controller to actually grasp
-            run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.0)
+            for i, s_i in enumerate(best_grasp.strategy):
+                if s_i in [Strategies.MOVE, Strategies.RELEASE]:
+                    run_grasp_controller(val_cmd, phy, tool_idx=i, viz=viz, finger_q_open=0.5, finger_q_closed=0.0)
             ##################################################
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             self.grasp_goal.set_grasp_locs(best_grasp.locs)
@@ -124,8 +127,11 @@ def main():
     traps = TrapDetection()
     hp['horizon'] = 8
     hp['n_samples'] = 36
+    hp['n_grasp_samples'] = 30
+    hp['robot_dq_weight'] = 0.1
     # I think the rope is super noisy because of CDCPD so I'm turning this down?
     hp['trap_q_rope_weight'] = 0.05
+    hp['frac_dq_threshold'] = 0.3
     mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
@@ -168,7 +174,7 @@ def main():
 
         is_stuck = traps.check_is_stuck(phy)
         needs_reset = False
-        if is_stuck:
+        if itr == 0 or is_stuck:
             print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
             osm.on_stuck(phy, viz, mov, val_cmd)
             needs_reset = True

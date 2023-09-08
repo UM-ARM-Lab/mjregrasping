@@ -28,7 +28,8 @@ from sensor_msgs.msg import PointCloud2, Image
 
 def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int, viz: Viz, finger_q_closed: float,
                          finger_q_open: float):
-    rgb_pub = rospy.Publisher("rgb", Image, queue_size=10)
+    rgb_pub = rospy.Publisher("grasp_rgb", Image, queue_size=10)
+    mask_pub = rospy.Publisher("grasp_mask", Image, queue_size=10)
     pc_pub = rospy.Publisher("grasp_pc", PointCloud2, queue_size=10)
 
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
@@ -79,33 +80,43 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         # Set mujoco state to match the real robot
         val_cmd.update_mujoco_qpos(phy)
 
-        points_xyz_masked = read_and_segment(FAR_THRESHOLD, pipe, predictor, camera_frame, pc_pub, rgb_pub)
-
-        if len(points_xyz_masked) == 0:
-            print("No points found!")
-            continue
-
-        rope_points_in_cam = points_xyz_masked
-
-        rope_points_in_cam = filter_by_volume(rope_points_in_cam)
-
         dcam_site = phy.d.site(camera_site_name)
 
         tool2world_mat = tool_site.xmat.reshape(3, 3)
         tool_site_pos = tool_site.xpos
 
-        rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
-
         gripper_q = phy.d.qpos[gripper_q_indices[tool_idx]]
 
-        grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool, grasp_pos_inset=0.03)
+        rope_points_in_cam = read_and_segment(FAR_THRESHOLD, pipe, predictor, camera_frame, pc_pub, rgb_pub, mask_pub)
+        rope_found = len(rope_points_in_cam) > 0
 
-        radius = 0.01
-        grasp_z_in_tool = grasp_mat_in_tool[:, 2]
-        skeleton = make_ring_skeleton(grasp_pos_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
+        if rope_found:
+            rope_points_in_cam = filter_by_volume(rope_points_in_cam)
 
-        v_in_tool = get_v_in_tool(skeleton, v_scale, max_v_norm)
+            rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
+
+            plot_points_rviz(viz.markers_pub, rope_points_in_cam, idx=0, frame_id=camera_frame, label='rope_in_cam', s=0.2)
+            plot_points_rviz(viz.markers_pub, rope_points_in_tool, idx=0, frame_id=tool_site_name,
+                             label='rope points in tool', s=0.1)
+
+            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool, grasp_pos_inset=0.03)
+            # q_wxyz = np.zeros(4)
+            # mujoco.mju_mat2Quat(q_wxyz, grasp_mat_in_tool.flatten())
+            # tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
+
+            radius = 0.01
+            grasp_z_in_tool = grasp_mat_in_tool[:, 2]
+            skeleton = make_ring_skeleton(grasp_pos_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
+            viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
+
+            v_in_tool = get_v_in_tool(skeleton, v_scale, max_v_norm)
+        else:
+            print("No points found! Backing up ")
+            grasp_mat_in_tool = np.eye(3)
+            v_in_tool = np.array([0, 0, -max_v_norm])
+
         v_in_world = tool2world_mat @ v_in_tool
+        viz.arrow("v", tool_site_pos, v_in_world, 'w')
 
         ctrl, w_in_tool = get_jacobian_ctrl(phy, tool_site, grasp_mat_in_tool, v_in_tool, joint_indices,
                                             w_scale=w_scale, jnt_lim_avoidance=jnt_lim_avoidance)
@@ -117,7 +128,6 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         desired_gripper_q = gripper_q_mix * finger_q_open + (1 - gripper_q_mix) * finger_q_closed
         gripper_gripper_vel = gripper_kp * (desired_gripper_q - gripper_q)
         ctrl[-1] = gripper_gripper_vel
-        print(desired_gripper_q, gripper_q, gripper_gripper_vel)
 
         # rescale to respect velocity limits
         ctrl = rescale_ctrl(phy, ctrl, act_indices)
@@ -125,19 +135,10 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         full_ctrl = np.zeros(phy.m.nu)
         full_ctrl[act_indices] = ctrl
 
-        plot_points_rviz(viz.markers_pub, rope_points_in_cam, idx=0, frame_id=camera_frame, label='rope_in_cam', s=0.2)
-        plot_points_rviz(viz.markers_pub, rope_points_in_tool, idx=0, frame_id=tool_site_name,
-                         label='rope points in tool', s=0.1)
-        viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
-        viz.arrow("v", tool_site_pos, v_in_world, 'w')
-        q_wxyz = np.zeros(4)
-        mujoco.mju_mat2Quat(q_wxyz, grasp_mat_in_tool.flatten())
-        tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
-
         # send commands to the robot
         val_cmd.send_vel_command(phy.m, full_ctrl)
 
-        if is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed):
+        if is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed) and rope_found:
             print("Grasp successful!")
             break
 
@@ -152,7 +153,8 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
 
 def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: str,
                      pc_pub: Optional[rospy.Publisher] = None,
-                     rgb_pub: Optional[rospy.Publisher] = None):
+                     rgb_pub: Optional[rospy.Publisher] = None,
+                     mask_pub: Optional[rospy.Publisher] = None):
     frames = pipe.wait_for_frames()
     align = rs.align(rs.stream.color)
     aligned_frames = align.process(frames)
@@ -196,10 +198,10 @@ def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: st
     if pc_pub:
         publish_pointcloud(camera_frame, pc_pub, points_rgb, points_xyz)
 
-    if rgb_pub:
+    if mask_pub:
         rgb[~seg_mask] = 0
-        rgb_msg = ros_numpy.msgify(Image, rgb, encoding='rgb8')
-        rgb_pub.publish(rgb_msg)
+        mask_msg = ros_numpy.msgify(Image, rgb, encoding='rgb8')
+        mask_pub.publish(mask_msg)
 
     return points_xyz_masked
 

@@ -186,7 +186,11 @@ class RealValCommander:
             p_in_world.header.frame_id = "world"
             p_in_cam = self.tfw.transform_to_frame(p_in_world, target_frame='zivid_optical_frame')
             set_cdcpd_req.vertices.append(p_in_cam.point)
-        self.set_cdcpd_srv(set_cdcpd_req)
+
+        # HACK!
+        for _ in range(5):
+            self.set_cdcpd_srv(set_cdcpd_req)
+            rospy.sleep(0.01)
 
     def set_cdcpd_grippers(self, phy: Physics):
         """ Set the CDCPD grasp constraints based on the current grasp locations. """
