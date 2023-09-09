@@ -16,8 +16,10 @@ def count_grasps(x):
 def main():
     untangle_trials_dirs = [
         Path("results/Untangle/untangle_ours_v3"),
+        Path("results/Untangle/untangle_no_signature_v1"),
         Path("results/Untangle/untangle_tamp5_v2"),
-        Path("results/Untangle/untangle_tamp50_v1"),  # waiting on new results from  Freya
+        Path("results/Untangle/untangle_tamp50_v2"),  # waiting on new results from  Freya
+        Path("results/Untangle/untangle_always_blacklist_v1"),  # waiting on new results from Nova
     ]
 
     df = load_data(untangle_trials_dirs)

@@ -18,7 +18,7 @@ from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
-from mjregrasping.point_reaching_methods import OnStuckOurs, OnStuckTamp, OnStuckAlwaysBlacklist
+from mjregrasping.point_reaching_methods import OnStuckOurs, OnStuckTamp, OnStuckAlwaysBlacklist, OursNoSignature
 from mjregrasping.viz import make_viz
 
 
@@ -53,7 +53,8 @@ def main():
         num_samples = hp['n_samples']
         # osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        osm = OnStuckAlwaysBlacklist(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        # osm = OnStuckAlwaysBlacklist(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        osm = OursNoSignature(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         print(Fore.BLUE + f"Running method {osm.method_name()}" + Fore.RESET)
         mpc_times = []
 

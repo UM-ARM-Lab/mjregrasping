@@ -32,6 +32,7 @@ class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
     def costs(self, sim_grasp: SimGraspCandidate):
         # these costs are computed using the phy after the grasp but before the post-grasp motion towards the goal
+        # NOTE: even though the homotopy cost is computed, because we never blacklist anything in this baseline, it's always 0
         costs = super().costs(sim_grasp)
 
         post_motion_phy = sim_grasp.phy1

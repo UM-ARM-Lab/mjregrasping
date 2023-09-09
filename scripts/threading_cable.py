@@ -14,6 +14,7 @@ import rospy
 from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, ThreadingGoal
 from mjregrasping.grasp_and_settle import deactivate_moving, grasp_and_settle, deactivate_release
+from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy, through_skels
@@ -24,11 +25,10 @@ from mjregrasping.move_to_joint_config import pid_to_joint_configs
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.regrasp_planner_utils import SimGraspInput, SimGraspCandidate, get_will_be_grasping
-from mjregrasping.regrasping_mppi import RegraspMPPI, mppi_viz
+from mjregrasping.regrasping_mppi import RegraspMPPI, mppi_viz, do_grasp_dynamics
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import threading
-from mjregrasping.tamp_regrasp_planner import TAMPRegraspPlanner
+from mjregrasping.scenarios import threading, Scenario
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
@@ -129,14 +129,17 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
 
         phy = sim_grasp.phy
         h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
-        if h == NO_HOMOTOPY:
-            threading_homotopy_cost = BIG_PENALTY
+        if hp['use_signature_cost']:
+            if h == NO_HOMOTOPY:
+                threading_signature_cost = BIG_PENALTY
+            else:
+                h_desired = h2array(make_h_desired(self.skeletons, self.goal_skel_names))
+                h = h2array(h)
+                threading_signature_cost = sum(np.abs(np.array(h) - h_desired)) * BIG_PENALTY
         else:
-            h_desired = h2array(make_h_desired(self.skeletons, self.goal_skel_names))
-            h = h2array(h)
-            threading_homotopy_cost = sum(np.abs(np.array(h) - h_desired)) * BIG_PENALTY
+            threading_signature_cost = 0
 
-        return costs + (threading_homotopy_cost,)
+        return costs + (threading_signature_cost,)
 
     def through_skels(self, phy: Physics):
         return through_skels(self.skeletons, self.goal_skel_names, phy)
@@ -145,6 +148,58 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
         cost_names = super().get_cost_names()
         cost_names.append('threading_homotopy')
         return cost_names
+
+
+class TAMPThreadingPlanner(HomotopyThreadingPlanner):
+
+    def __init__(self, scenario: Scenario, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict,
+                 next_goal: ThreadingGoal, seed=0):
+        super().__init__(key_loc, grasp_rrt, skeletons, seed)
+        self.scenario = scenario
+        self.next_goal = next_goal
+
+    def simulate_grasp(self, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, viz_execution=False):
+        sim_grasp = super().simulate_grasp(phy, viz, grasp_input, viz_execution)
+        if sim_grasp.res.error_code.val != MoveItErrorCodes.SUCCESS:
+            sim_grasp.phy1 = sim_grasp.phy.copy_data()
+            return sim_grasp
+
+        phy_plan = sim_grasp.phy.copy_data()
+
+        self.next_goal.grasp_goal.set_grasp_locs(sim_grasp.locs, is_planning=True)
+
+        # now we run the MPPI planner for a fixed horizon and take the final cost
+        pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
+        mppi = RegraspMPPI(pool=pool, nu=phy_plan.m.nu, seed=0, horizon=hp['horizon'],
+                           noise_sigma=self.scenario.noise_sigma, temp=hp['temp'])
+        mppi.reset()
+
+        for t in range(hp['tamp_horizon']):
+            command, sub_time_s = mppi.command(phy_plan, self.next_goal, hp['n_samples'], viz=viz)
+            control_step(phy_plan, command, sub_time_s)
+            if viz and viz_execution:
+                viz.viz(phy_plan, is_planning=True)
+
+            do_grasp_dynamics(phy_plan)
+
+            mppi.roll()
+
+        sim_grasp.phy1 = phy_plan
+        return sim_grasp
+
+    def costs(self, sim_grasp: SimGraspCandidate):
+        # these costs are computed using the phy after the grasp but before the post-grasp motion towards the goal
+        # NOTE: even though the homotopy cost is computed, because we never blacklist anything in this baseline, it's always 0
+        costs = HomotopyRegraspPlanner.costs(self, sim_grasp)
+
+        post_motion_phy = sim_grasp.phy1
+        keypoint = grasp_locations_to_xpos(post_motion_phy, [self.next_goal.loc])[0]
+        final_keypoint_dist = self.next_goal.keypoint_dist_to_goal(keypoint) * hp['final_keypoint_dist_weight']
+
+        return costs + (final_keypoint_dist,)
+
+    def get_cost_names(self):
+        return HomotopyRegraspPlanner.get_cost_names(self) + ['final_keypoint_dist']
 
 
 @ros_init.with_ros("threading")
@@ -156,6 +211,8 @@ def main():
 
     scenario = threading
     hp["threading_n_samples"] = 10
+    hp["geodesic_weight"] = 100
+    hp['robot_dq_weight'] = 0.02
 
     viz = make_viz(scenario)
 
@@ -166,6 +223,7 @@ def main():
 
     for i in range(0, 10):
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
+        print("recording disabled!")
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
@@ -192,9 +250,9 @@ def main():
 
         traps = TrapDetection()
 
-        method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
-        method = ThreadingMethodTAMP(scenario, grasp_rrt, traps)
+        # method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
         # method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
+        method = ThreadingMethodTAMP(scenario, grasp_rrt, skeletons, traps, end_loc)
         print(f"Running method {method.__class__.__name__}")
 
         itr = 0
@@ -214,8 +272,8 @@ def main():
 
             if isinstance(goal, ObjectPointGoal):
                 if goal.satisfied(phy):
-                    success = False
-                    print(Fore.GREEN + "Task complete!" + Fore.RESET)
+                    success = through_skels(skeletons, goals[-2].skeleton_names, phy)
+                    print(Fore.GREEN + f"Task complete! {success=}" + Fore.RESET)
                     break
             else:
                 disc_center = np.mean(goal.skel[:4], axis=0)
@@ -227,11 +285,11 @@ def main():
                 if disc_penetrated:
                     print("Disc penetrated!")
                     mppi.reset()
-                    method.on_disc(phy, goal, grasp_goal, viz, mov)
+                    method.on_disc(phy, goal, goals[goal_idx+1], viz, mov)
                 elif is_stuck:
                     print("Stuck!")
                     mppi.reset()
-                    method.on_stuck(phy, goal, grasp_goal, viz, mov)
+                    method.on_stuck(phy, goal, viz, mov)
 
                 if method.goal_satisfied(goal, phy):
                     goal_idx += 1
@@ -261,7 +319,7 @@ def main():
             'overall_time':   perf_counter() - overall_t0,
             'grasp_history':  np.array(grasp_goal.history).tolist(),
             'method':         method.method_name(),
-            'hp': hp,
+            'hp':             hp,
         }
         mov.close(metrics)
 
@@ -278,10 +336,10 @@ class ThreadingMethod:
     def method_name(self):
         raise NotImplementedError()
 
-    def on_disc(self, phy, goal, grasp_goal, viz, mov):
+    def on_disc(self, phy, goal, next_goal, viz, mov):
         raise NotImplementedError()
 
-    def on_stuck(self, phy, goal, grasp_goal, viz, mov):
+    def on_stuck(self, phy, goal, viz, mov):
         raise NotImplementedError()
 
     def goal_satisfied(self, goal, phy):
@@ -301,7 +359,7 @@ class ThreadingMethodWang(ThreadingMethod):
     def method_name(self):
         return "Wang et al."
 
-    def on_disc(self, phy, goal, grasp_goal, viz, mov):
+    def on_disc(self, phy, goal, next_goal, viz, mov):
         self.plan_to_end_found = False
 
         self.grasp_rrt.fix_start_state_in_place(phy)
@@ -321,13 +379,13 @@ class ThreadingMethodWang(ThreadingMethod):
                 teleport_to_end_of_plan(phy, res)
                 grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
                 deactivate_release(phy, strategy, viz=viz, is_planning=False, mov=mov)
-                grasp_goal.set_grasp_locs(locs)
+                goal.grasp_goal.set_grasp_locs(locs)
                 self.traps.reset_trap_detection()
                 self.plan_to_end_found = True
                 return
 
             # If we fail, try to scootch down the rope
-            locs = grasp_goal.get_grasp_locs()
+            locs = goal.grasp_goal.get_grasp_locs()
             locs[1] -= hp['wang_scootch_fraction']
             for _ in range(5):
                 res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz,
@@ -337,7 +395,7 @@ class ThreadingMethodWang(ThreadingMethod):
                     teleport_to_end_of_plan(phy, res)
                     grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
                     deactivate_release(phy, strategy, viz=viz, is_planning=False, mov=mov)
-                    grasp_goal.set_grasp_locs(locs)
+                    goal.grasp_goal.set_grasp_locs(locs)
                     goal.loc -= hp['wang_scootch_fraction']
                     return
         else:
@@ -357,7 +415,7 @@ class ThreadingMethodWang(ThreadingMethod):
             if res.error_code.val == MoveItErrorCodes.SUCCESS:
                 self.planning_times.append(perf_counter() - planning_t0)
                 grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
-                execute_grasp_change_plan(grasp, grasp_goal, phy, viz, mov)
+                execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
                 self.traps.reset_trap_detection()
                 self.plan_to_end_found = True
                 return
@@ -366,7 +424,7 @@ class ThreadingMethodWang(ThreadingMethod):
             goal.loc = max(goal.loc - hp['wang_scootch_fraction'], max(get_grasp_locs(phy)))
             strategy = []
             locs = []
-            loc_i = np.min(np.abs(grasp_goal.get_grasp_locs())) - hp['wang_scootch_fraction']
+            loc_i = np.min(np.abs(goal.grasp_goal.get_grasp_locs())) - hp['wang_scootch_fraction']
             for g_i in get_is_grasping(phy):
                 if g_i:
                     strategy.append(Strategies.RELEASE)
@@ -378,14 +436,14 @@ class ThreadingMethodWang(ThreadingMethod):
             if res.error_code.val == MoveItErrorCodes.SUCCESS:
                 self.planning_times.append(perf_counter() - planning_t0)
                 grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
-                execute_grasp_change_plan(grasp, grasp_goal, phy, viz, mov)
+                execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
                 self.traps.reset_trap_detection()
                 return
 
         self.planning_times.append(perf_counter() - planning_t0)
         print("No plans found!")
 
-    def on_stuck(self, phy, goal, grasp_goal, viz, mov):
+    def on_stuck(self, phy, goal, viz, mov):
         pass
 
     def goal_satisfied(self, goal, phy):
@@ -396,34 +454,35 @@ class ThreadingMethodWang(ThreadingMethod):
 
 class ThreadingMethodTAMP(ThreadingMethod):
 
-    def __init__(self, grasp_rrt: GraspRRT, skeletons: Dict, traps: TrapDetection, end_loc: int):
+    def __init__(self, scenario: Scenario, grasp_rrt: GraspRRT, skeletons: Dict, traps: TrapDetection, end_loc: float):
         super().__init__(grasp_rrt, skeletons, traps, end_loc)
         self.rng = np.random.RandomState(0)
-        self.plan_found = False
+        self.plan_to_end_found = False
+        self.scenario = scenario
 
-    def on_disc(self, phy, goal, grasp_goal, viz, mov):
-        planner = TAMPRegraspPlanner(self.scenario, goal, self.grasp_rrt, self.rng.randint(0, 1000))
+    def on_disc(self, phy, goal, next_goal, viz, mov):
+        planner = TAMPThreadingPlanner(self.scenario, self.end_loc, self.grasp_rrt, self.skeletons, next_goal)
         print(f"Planning with {planner.key_loc=}...")
         planning_t0 = perf_counter()
-        sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
+        sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
         best_grasp = planner.get_best(sim_grasps, viz=viz)
         self.planning_times.append(perf_counter() - planning_t0)
-        viz.viz(best_grasp.phy, is_planning=True)
+        viz.viz(best_grasp.phy1, is_planning=True)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            if planner.through_skels(best_grasp.phy):
-                print("Executing grasp change plan")
-                execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov)
-                self.traps.reset_trap_detection()
-            else:
-                print("Not through the goal skeleton!")
+            print("Executing grasp change plan")
+            self.plan_to_end_found = True
+            execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
+            self.traps.reset_trap_detection()
         else:
             # if we've reached the goal but can't grasp the end, scootch down the rope
             # but don't scootch past where we are currently grasping it.
             goal.loc = max(goal.loc - hp['ours_scootch_fraction'], max(get_grasp_locs(phy)))
             print("No plans found!")
+            self.plan_to_end_found = False
 
-    def on_stuck(self, phy, goal, grasp_goal, viz, mov):
-        planner = HomotopyThreadingPlanner(0.94, self.grasp_rrt, self.skeletons, goal.skeleton_names)
+    def on_stuck(self, phy, goal, viz, mov):
+        loc = max(goal.grasp_goal.get_grasp_locs()) - hp['grasp_loc_diff_thresh'] * 2
+        planner = TAMPThreadingPlanner(self.scenario, loc, self.grasp_rrt, self.skeletons, goal)
 
         planning_t0 = perf_counter()
         sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
@@ -431,13 +490,15 @@ class ThreadingMethodTAMP(ThreadingMethod):
         self.planning_times.append(perf_counter() - planning_t0)
         viz.viz(best_grasp.phy, is_planning=True)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov)
+            execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
         else:
             print("No plans found!")
 
     def goal_satisfied(self, goal: ThreadingGoal, phy: Physics):
-        return self.plan_found
+        ret = self.plan_to_end_found
+        self.plan_to_end_found = False
+        return ret
 
     def method_name(self):
         return f"Tamp{hp['tamp_horizon']}'"
@@ -445,7 +506,7 @@ class ThreadingMethodTAMP(ThreadingMethod):
 
 class ThreadingMethodOurs(ThreadingMethod):
 
-    def on_disc(self, phy, goal, grasp_goal, viz, mov):
+    def on_disc(self, phy, goal, next_goal, viz, mov):
         planner = HomotopyThreadingPlanner(self.end_loc, self.grasp_rrt, self.skeletons, goal.skeleton_names)
         print(f"Planning with {planner.key_loc=}...")
         planning_t0 = perf_counter()
@@ -456,7 +517,7 @@ class ThreadingMethodOurs(ThreadingMethod):
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             if planner.through_skels(best_grasp.phy):
                 print("Executing grasp change plan")
-                execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov)
+                execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
                 self.traps.reset_trap_detection()
             else:
                 print("Not through the goal skeleton!")
@@ -466,8 +527,9 @@ class ThreadingMethodOurs(ThreadingMethod):
             goal.loc = max(goal.loc - hp['ours_scootch_fraction'], max(get_grasp_locs(phy)))
             print("No plans found!")
 
-    def on_stuck(self, phy, goal, grasp_goal, viz, mov):
-        planner = HomotopyThreadingPlanner(0.94, self.grasp_rrt, self.skeletons, goal.skeleton_names)
+    def on_stuck(self, phy, goal, viz, mov):
+        loc = max(goal.grasp_goal.get_grasp_locs()) - hp['grasp_loc_diff_thresh'] * 2
+        planner = HomotopyThreadingPlanner(loc, self.grasp_rrt, self.skeletons, goal.skeleton_names)
 
         planning_t0 = perf_counter()
         sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
@@ -475,7 +537,7 @@ class ThreadingMethodOurs(ThreadingMethod):
         self.planning_times.append(perf_counter() - planning_t0)
         viz.viz(best_grasp.phy, is_planning=True)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov)
+            execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
         else:
             print("No plans found!")
@@ -490,7 +552,7 @@ class ThreadingMethodOurs(ThreadingMethod):
         return "\\signature{}"
 
 
-def execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov):
+def execute_grasp_change_plan(best_grasp, grasp_goal: GraspLocsGoal, phy: Physics, viz: Viz, mov):
     deactivate_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov)
     pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov)
     grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)

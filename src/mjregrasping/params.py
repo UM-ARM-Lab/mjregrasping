@@ -54,4 +54,5 @@ hp = {
     # Use 5 for a 'fast' baseline (still slower than our method), and 50 for strong baseline
     "tamp_horizon":                    5,  # 50,
     "untangle_max_iters":              300,
+    "use_signature_cost":              True,
 }

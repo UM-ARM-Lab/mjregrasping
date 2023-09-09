@@ -157,12 +157,12 @@ class HomotopyRegraspPlanner:
             return cost, 0, 0, 0, 0
 
         homotopy_cost = 0
-        h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
-        rope_points_plan = get_rope_points(phy_plan)
-        for blacklisted_h in self.true_h_blacklist:
-            if h_plan == blacklisted_h:
-                homotopy_cost = BIG_PENALTY
-                break
+        if hp['use_signature_cost']:
+            h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
+            for blacklisted_h in self.true_h_blacklist:
+                if h_plan == blacklisted_h:
+                    homotopy_cost = BIG_PENALTY
+                    break
 
         geodesics_cost = get_geodesic_dist(candidate_locs, self.key_loc) * hp['geodesic_weight']
 
@@ -171,11 +171,12 @@ class HomotopyRegraspPlanner:
         for point in res.trajectory.joint_trajectory.points[1:]:
             plan_pos = point.positions
             dq += np.linalg.norm(np.array(plan_pos) - np.array(prev_plan_pos))
-        dq_cost = np.clip(dq, 0, BIG_PENALTY / 2) * hp['robot_dq_weight']
+        dq_cost = np.clip(dq, 0, BIG_PENALTY) * hp['robot_dq_weight']
 
         rope_points0 = get_rope_points(phy0)
+        rope_points_plan = get_rope_points(phy_plan)
         drope = np.linalg.norm(rope_points_plan - rope_points0, axis=-1).mean()
-        drope_cost = np.clip(drope, 0, BIG_PENALTY / 2) * hp['rope_dq_weight']
+        drope_cost = np.clip(drope, 0, BIG_PENALTY) * hp['rope_dq_weight']
 
         return 0, dq_cost, drope_cost, homotopy_cost, geodesics_cost
 

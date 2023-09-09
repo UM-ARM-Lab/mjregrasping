@@ -56,7 +56,7 @@ class OnStuckOurs(BaseOnStuckMethod):
     def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -95,9 +95,19 @@ class OnStuckAlwaysBlacklist(OnStuckOurs):
 
     def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
         planning_t0 = perf_counter()
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         print("Blacklisting")
         self.planner.update_blacklists(phy)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         self.planner.planning_times.append(perf_counter() - planning_t0)
         self.execute_best_grasp(best_grasp, mov, phy, viz)
+
+
+class OursNoSignature(OnStuckOurs):
+
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+        hp['use_signature_cost'] = False
+        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+
+    def method_name(self):
+        return "No \\signature{}"
