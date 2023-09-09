@@ -58,7 +58,7 @@ class OnStuckOurs(BaseOnStuckMethod):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
         # print("DEBUGGING VIZ_EXECUTION=TRUE")
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -83,7 +83,10 @@ class OnStuckOurs(BaseOnStuckMethod):
             # Run a low level controller to actually grasp
             for i, s_i in enumerate(best_grasp.strategy):
                 if s_i in [Strategies.MOVE, Strategies.RELEASE]:
-                    run_grasp_controller(val_cmd, phy, tool_idx=i, viz=viz, finger_q_open=0.5, finger_q_closed=0.0)
+                    success_i = run_grasp_controller(val_cmd, phy, tool_idx=i, viz=viz, finger_q_open=0.5, finger_q_closed=0.0)
+                    if not success_i:
+                        print("Grasp controller failed!")
+                        return
             ##################################################
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             self.grasp_goal.set_grasp_locs(best_grasp.locs)
@@ -112,7 +115,7 @@ def main():
     val_cmd = RealValCommander(phy)
 
     mov = None
-    set_up_real_scene(val_cmd, phy, viz)
+    set_up_real_scene(val_cmd, phy, viz, loc=1)
 
     skeletons = get_real_untangle_skeletons(phy)
     viz.skeletons(skeletons)
@@ -174,7 +177,7 @@ def main():
 
         is_stuck = traps.check_is_stuck(phy)
         needs_reset = False
-        if itr == 0 or is_stuck:
+        if is_stuck:
             print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
             osm.on_stuck(phy, viz, mov, val_cmd)
             needs_reset = True

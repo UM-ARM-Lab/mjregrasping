@@ -98,7 +98,8 @@ class MjVedo:
                 # skip the model prefix, e.g. val/my_mesh
                 if '/' in mesh_name:
                     mesh_name = mesh_name.split("/")[1]
-                mesh_name = Path(self.mj_xml_parser.get_mesh(mesh_name))
+                mesh_name, mesh_scale = self.mj_xml_parser.get_mesh(mesh_name)
+                mesh_name = Path(mesh_name)
                 if mesh_name not in self.mesh_cache:
                     self.load_and_cache_mesh(mesh_name)
 

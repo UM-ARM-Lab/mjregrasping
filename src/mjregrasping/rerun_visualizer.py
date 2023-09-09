@@ -111,7 +111,8 @@ class MjReRun:
         # skip the model prefix, e.g. val/my_mesh
         if '/' in mesh_name:
             mesh_name = mesh_name.split("/")[1]
-        mesh_file = Path(self.mj_xml_parser.get_mesh(mesh_name))
+        mesh_file, mesh_scale = self.mj_xml_parser.get_mesh(mesh_name)
+        mesh_file = Path(mesh_file)
         mesh_file = mesh_file.stem + ".glb"
         if mesh_file is None:
             raise RuntimeError(f"Mesh {mesh_name} not found in XML file")

@@ -46,7 +46,7 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
 def slow_when_eqs_bad(phy):
     eq_errors = compute_eq_errors(phy)
     max_eq_err = np.clip(np.max(eq_errors), 0, 1)
-    speed_factor = min(max(0.01 * -np.exp(250 * max_eq_err) + 1, 0), 1)
+    speed_factor = min(max(0.02 * -np.exp(250 * max_eq_err) + 1, 0), 1)
     phy.d.ctrl *= speed_factor
 
 

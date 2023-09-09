@@ -69,7 +69,8 @@ def make_planning_scene(phy: Physics):
             co.primitive_poses.append(prim_pose)
         elif geom_type == mjtGeom.mjGEOM_CYLINDER:
             prim.type = SolidPrimitive.CYLINDER
-            prim.dimensions = [geom_size[0], geom_size[1] * 2]
+            # height then radius
+            prim.dimensions = [2 * geom_size[1], geom_size[0]]
             co.primitives.append(prim)
             co.primitive_poses.append(prim_pose)
         elif geom_type == mjtGeom.mjGEOM_PLANE:

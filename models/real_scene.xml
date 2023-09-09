@@ -10,20 +10,19 @@
     <include file="materials.xml"/>
     <include file="val.xml"/>
     <!-- override the high viscosity used in sim experiments because it's unrealistic -->
-    <option viscosity="0.08" timestep="0.004"/>
+    <option viscosity="0.002" timestep="0.004"/>
     <include file="real_obs.xml"/>
     <include file="floor.xml"/>
     <include file="cc_sphere.xml"/>
-    <include file="val_eq_constraints.xml"/>
     <worldbody>
         <body pos="0.39 0.845 0.74" euler="0.1 -1.4 0" name="rope">
-            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
+            <inertial pos="0 0 0" quat="1 0 0 0" mass="0.30" diaginertia="0.002 0.002 0.002"/>
             <!-- real rope is 1.24m but since our table top is slightly oversized, we also increase rope length -->
-            <composite type="cable" curve="s" count="25 1 1" size="1.26 0.22 1">
-                <joint kind="main" damping=".015" stiffness="0.05"/>
-                <geom type="capsule" size=".01" rgba="0.8 0.2 0.1 1" condim="1"/>
+            <composite type="cable" curve="s" count="25 1 1" size="1.27 0.22 1">
+                <joint kind="main" damping=".02" stiffness="0.03"/>
+                <geom type="capsule" size=".007" rgba="0.8 0.2 0.1 1" condim="1"/>
             </composite>
-            <joint type="free"/>
+            <joint type="free" damping="100" />
         </body>
         <!-- used for recording what happens in the simulation -->
         <body name="mycamera">
@@ -32,7 +31,10 @@
         <light name="overhead1" pos="0 0 10" mode="trackcom"/>
     </worldbody>
     <equality>
-        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
+        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.165" active="false" solref="0.04 1"/>
+        <connect body1="drive10" body2="B_first" name="right" anchor="0 0 0.165" active="false" solref="0.04 1"/>
+
+        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.01 1"/>
 
         <!-- constraints to pull the mujoco rope towards where CDCPD says the rope is -->
         <connect body1="world" body2="B_first" name="B_0" anchor="0 0 0" active="false" solref="0.1 1"/>

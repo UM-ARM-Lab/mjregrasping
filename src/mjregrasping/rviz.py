@@ -135,15 +135,16 @@ class MjRViz:
                 geom_marker_msg.scale.y = geom_size[0] * 2
                 geom_marker_msg.scale.z = geom_size[0] * 2
             elif geom_type == mjtGeom.mjGEOM_MESH:
-                mesh_name = mj_id2name(
-                    phy.m, mju_str2Type("mesh"), geom_meshid
-                )
+                mesh_name = phy.m.mesh(geom_meshid).name
                 # skip the phy.m prefix, e.g. val/my_mesh
                 if '/' in mesh_name:
                     mesh_name = mesh_name.split("/")[1]
                 geom_marker_msg.type = Marker.MESH_RESOURCE
                 geom_marker_msg.mesh_use_embedded_materials = True
-                mesh_file = self.mj_xml_parser.get_mesh(mesh_name)
+                mesh_file, mesh_scale = self.mj_xml_parser.get_mesh(mesh_name)
+                geom_marker_msg.scale.x = mesh_scale[0]
+                geom_marker_msg.scale.y = mesh_scale[1]
+                geom_marker_msg.scale.z = mesh_scale[2]
                 if mesh_file is None:
                     raise RuntimeError(f"Mesh {mesh_name} not found in XML file")
                 geom_marker_msg.mesh_resource = f"package://mjregrasping/models/meshes/{mesh_file}"
@@ -157,10 +158,6 @@ class MjRViz:
                 geom_marker_msg.pose.orientation.x = body_xquat[1]
                 geom_marker_msg.pose.orientation.y = body_xquat[2]
                 geom_marker_msg.pose.orientation.z = body_xquat[3]
-
-                geom_marker_msg.scale.x = 1
-                geom_marker_msg.scale.y = 1
-                geom_marker_msg.scale.z = 1
             elif geom_type == mjtGeom.mjGEOM_PLANE:
                 geom_marker_msg.type = Marker.CUBE
                 geom_marker_msg.scale.x = 10
@@ -469,9 +466,11 @@ class MujocoXmlExpander:
             for mesh in asset.findall("mesh"):
                 name = mesh.attrib['name']
                 file = mesh.attrib['file']
+                scale_str = mesh.attrib.get('scale', "1 1 1")
+                scale = [float(x) for x in scale_str.split()]
                 if name == mesh_name:
-                    return file
-        return None
+                    return file, scale
+        return None, None
 
     # iterate over all worldbody elements
     # and all body elements within them recursively

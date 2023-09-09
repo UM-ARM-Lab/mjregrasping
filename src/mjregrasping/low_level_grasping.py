@@ -68,14 +68,14 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
     camera_site_name = f'{camera_name}_cam'
     camera_frame = camera_site_name
 
-    predictor = Predictor("model.pth")
-    tfw = TF2Wrapper()
+    predictor = Predictor("/home/peter/Documents/arm_segmentation/model.pth")
 
     last_t = perf_counter()
+    success = False
     for idx in range(50):
         t = perf_counter()
         dt = t - last_t
-        # print(f"{dt=:.3f}")
+        print(f"{dt=:.3f}")
 
         # Set mujoco state to match the real robot
         val_cmd.update_mujoco_qpos(phy)
@@ -140,6 +140,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
 
         if is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed) and rope_found:
             print("Grasp successful!")
+            success = True
             break
 
         last_t = t
@@ -149,6 +150,8 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
     # The real robot has moved whereas the mujoco robot has not,
     # so we need update mujoco to match the real robot state.
     val_cmd.update_mujoco_qpos(phy)
+
+    return success
 
 
 def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: str,
@@ -293,7 +296,7 @@ def filter_by_volume(rope_points_in_cam):
     # pcd.colors = o3d.utility.Vector3dVector(colors[:, :3])
     # o3d.visualization.draw_geometries([pcd])
     # Score each cluster by the volume and aspect ratio of its bounding box
-    best_cluster = None
+    best_cluster = rope_points_in_cam
     best_cluster_pcd = None
     best_volume = 0
     for label in range(max_label + 1):
