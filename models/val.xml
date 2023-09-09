@@ -132,37 +132,38 @@
                                                                   size="0.001"/>
                                                         </body>
                                                         <body name="leftgripper" pos="0 0.0135 0.068553"
-                                                              euler="1.15 -1.5707 0">
+                                                              euler="0 -1.5707 0">
                                                             <joint name="leftgripper" type="hinge" axis="0 0 1"
                                                                    limited="true"
                                                                    range="-0.01 1"
                                                                    damping="0.01" frictionloss="0.01"/>
-                                                            <geom type="mesh" mesh="soft_gripper_thin"
+                                                            <geom type="box" size="0.05 0.008 0.01"
+                                                                  pos="0.05 0 0"
                                                                   name="leftgripper" friction="1"
                                                                   group="1" rgba="0.8 0.8 0.8 1"/>
-                                                            <body name="left_finger_pad" pos="0.0685 0.1 -0.0005"
-                                                                  euler="3.14159 0 1.4">
-                                                                <geom type="mesh" mesh="FINGER_TIP"
-                                                                      name="left_finger_pad"
-                                                                      group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
-                                                            </body>
+                                                            <geom type="box"  size="0.005 0.015 0.01"
+                                                                  pos="0.105 -0.007 0"
+                                                                  euler="0 0 0.1"
+                                                                  name="left_finger_pad"
+                                                                  contype="0" conaffinity="1"
+                                                                  group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
                                                         </body>
                                                         <body name="leftgripper2" pos="0 -0.0135 0.068553"
-                                                              euler="1.99 1.5707 0">
+                                                              euler="0 1.5707 3.141592">
                                                             <joint name="leftgripper2" type="hinge" axis="0 0 1"
                                                                    limited="true"
                                                                    range="-0.01 1"
                                                                    damping="0.01" frictionloss="0.01"/>
-                                                            <geom type="mesh" mesh="soft_gripper_thin"
-                                                                  name="leftgripper2"
-                                                                  friction="1" group="1"
-                                                                  rgba="0.8 0.8 0.8 1"/>
-                                                            <body name="left_finger_pad2" pos="0.0685 0.1 -0.0005"
-                                                                  euler="3.14159 0 1.4">
-                                                                <geom type="mesh" mesh="FINGER_TIP"
-                                                                      name="left_finger_pad2"
-                                                                      group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
-                                                            </body>
+                                                            <geom type="box" size="0.05 0.008 0.01"
+                                                                  pos="0.05 0 0"
+                                                                  name="leftgripper2" friction="1"
+                                                                  group="1" rgba="0.8 0.8 0.8 1"/>
+                                                            <geom type="box"  size="0.005 0.015 0.01"
+                                                                  pos="0.105 -0.007 0"
+                                                                  euler="0 0 0.1"
+                                                                  name="left_finger_pad2"
+                                                                  contype="0" conaffinity="1"
+                                                                  group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
                                                         </body>
                                                     </body>
                                                 </body>
@@ -251,41 +252,39 @@
                                                                   pos="0.01 0 0.03"
                                                                   size="0.001"/>
                                                         </body>
-
                                                         <body name="rightgripper" pos="0 0.0135 0.068553"
-                                                              euler="1.15 -1.5707 0">
+                                                              euler="0 -1.5707 0">
                                                             <joint name="rightgripper" type="hinge" axis="0 0 1"
                                                                    limited="true"
                                                                    range="-0.01 1"
                                                                    damping="0.01" frictionloss="0.01"/>
-                                                            <geom type="mesh" mesh="soft_gripper_thin"
-                                                                  name="rightgripper"
-                                                                  friction="1" group="1"
-                                                                  rgba="0.9 0.9 0.9 1"/>
-                                                            <body name="right_finger_pad" pos="0.0685 0.1 -0.0005"
-                                                                  euler="3.14159 0 1.4">
-                                                                <geom type="mesh" mesh="FINGER_TIP"
-                                                                      name="right_finger_pad"
-                                                                      group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
-                                                            </body>
+                                                            <geom type="box" size="0.05 0.008 0.01"
+                                                                  pos="0.05 0 0"
+                                                                  name="rightgripper" friction="1"
+                                                                  group="1" rgba="0.8 0.8 0.8 1"/>
+                                                            <geom type="box"  size="0.005 0.015 0.01"
+                                                                  pos="0.105 -0.007 0"
+                                                                  euler="0 0 0.1"
+                                                                  name="right_finger_pad"
+                                                                  contype="0" conaffinity="1"
+                                                                  group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
                                                         </body>
                                                         <body name="rightgripper2" pos="0 -0.0135 0.068553"
-                                                              euler="1.99 1.5707 0">
+                                                              euler="0 1.5707 3.141592">
                                                             <joint name="rightgripper2" type="hinge" axis="0 0 1"
                                                                    limited="true"
                                                                    range="-0.01 1"
                                                                    damping="0.01" frictionloss="0.01"/>
-                                                            <geom type="mesh" mesh="soft_gripper_thin"
-                                                                  name="rightgripper2"
-                                                                  friction="1" group="1"
-                                                                  rgba="0.9 0.9 0.9 1"/>
-                                                            <body name="right_finger_pad2" pos="0.0685 0.1 -0.0005"
-                                                                  euler="3.14159 0 1.4">
-                                                                <geom type="mesh" mesh="FINGER_TIP"
-                                                                      name="right_finger_pad2"
-                                                                      friction="1" rgba="0.6 0.4 0.2 1"
-                                                                      group="1"/>
-                                                            </body>
+                                                            <geom type="box" size="0.05 0.008 0.01"
+                                                                  pos="0.05 0 0"
+                                                                  name="rightgripper2" friction="1"
+                                                                  group="1" rgba="0.8 0.8 0.8 1"/>
+                                                            <geom type="box"  size="0.005 0.015 0.01"
+                                                                  pos="0.105 -0.007 0"
+                                                                  euler="0 0 0.1"
+                                                                  name="right_finger_pad2"
+                                                                  contype="0" conaffinity="1"
+                                                                  group="1" friction="1" rgba="0.6 0.4 0.2 1"/>
                                                         </body>
                                                     </body>
                                                 </body>

@@ -2,8 +2,8 @@
     <worldbody>
         <body name="obstacles" pos="-0.06 -0.02 -0.43" euler="0.03 0 0.025">
             <body name="walls">
-                <body name="front_wall" pos="-0.05 0.96 1">
-                    <geom name="front_wall" type="box" size="1 0.01 1" material="cream-plaster"/>
+                <body name="front_wall" pos="-0.05 0.97 1">
+                    <geom name="front_wall" type="box" size="1 0.02 1.1" material="cream-plaster"/>
                     <body name="outlet_bar" pos="0 -0.025 0.106">
                         <geom name="outlet_bar" type="box" pos="0 0 0" size="1 0.025 0.11" material="metal"/>
                         <body name="goal" pos="0.05 -0.08 0">
@@ -17,9 +17,9 @@
                         <geom name="attach" type="box" size="0.02 0.005 0.02" rgba="0.5 0 0 1"/>
                     </body>
                 </body>
-                <geom name="right_wall" type="box" pos="0.80 0 1" size="0.01 1 1" rgba="0.5 0.1 0.1 0.1"/>
-                <geom name="left_wall" type="box" pos="-0.46 0 1" size="0.01 1 1" rgba="0.5 0.1 0.1 0.1"/>
-                <geom name="back_wall" type="box" pos="0.0 -0.26 1" size="1 0.01 1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="right_wall" type="box" pos="0.82 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="left_wall" type="box" pos="-0.48 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="back_wall" type="box" pos="0.0 -0.28 1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
             </body>
             <body name="table" pos="-0.31 0.715 0">
                 <body name="top" pos="0 0 0.70">

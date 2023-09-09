@@ -1,9 +1,10 @@
-import pickle
+import sys
 import sys
 import time
+from copy import copy
 from dataclasses import dataclass
 from enum import Enum, auto
-from pathlib import Path
+from typing import Optional
 
 import mujoco.viewer
 import numpy as np
@@ -19,13 +20,13 @@ from geometry_msgs.msg import Pose, Quaternion
 from mjregrasping.basic_3d_pose_marker import Basic3DPoseInteractiveMarker
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.jacobian_ctrl import get_w_in_tool, warn_near_joint_limits
-from mjregrasping.mjsaver import save_data_and_eq, load_data_and_eq
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
 from mjregrasping.physics import Physics, get_q
-from mjregrasping.rollout import control_step, limit_actuator_windup, slow_when_eqs_bad, DEFAULT_SUB_TIME_S
-from mjregrasping.scenarios import threading, val_untangle
-from mjregrasping.viz import make_viz
+from mjregrasping.rollout import limit_actuator_windup, slow_when_eqs_bad, DEFAULT_SUB_TIME_S
+from mjregrasping.scenarios import threading, real_untangle
+from mjregrasping.set_up_real_scene import set_up_real_scene
+from mjregrasping.viz import make_viz, Viz
 from ros_numpy import numpify, msgify
 
 
@@ -49,6 +50,24 @@ class Grasp:
 @dataclass
 class Release:
     name: str
+
+
+def let_rope_move_through_gripper_geoms(phy: Physics):
+    # set the conaffinity of the grippers to 0 so that they don't collide with the rope,
+    # let the Eq settle a bit, then set it back to 1 and let the Eq settle again.
+    from itertools import chain
+    con_states = []
+    for geom_name in chain(*phy.o.rd.gripper_geom_names):
+        con_states.append(
+            (geom_name, copy(phy.m.geom(geom_name).conaffinity), copy(phy.m.geom(geom_name).contype)))
+        phy.m.geom(geom_name).conaffinity = 0
+        phy.m.geom(geom_name).contype = 0
+
+    mujoco.mj_step(phy.m, phy.d, 250)
+    # restore
+    for geom_name, conaffinity, contype in con_states:
+        phy.m.geom(geom_name).conaffinity = conaffinity
+        phy.m.geom(geom_name).contype = contype
 
 
 class InteractiveControls(QMainWindow):
@@ -114,47 +133,17 @@ class InteractiveControls(QMainWindow):
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
     rospy.init_node("interactive_viewer")
-    scenario = threading
 
     rr.init("viewer")
     rr.connect()
 
-    trial_idx = 0
+    scenario = real_untangle
+
     viz = make_viz(scenario)
-    # trials_root = Path("trial_data") / scenario.name
-    # trial_path = trials_root / f"{scenario.name}_{trial_idx}.pkl"
-    # with trial_path.open("rb") as f:
-    #     trial_info = pickle.load(f)
-    # phy_path = trial_info['phy_path']
-    # with phy_path.open("rb") as f:
-    #     phy_loaded = pickle.load(f)
-    #
-    # new_d = mujoco.MjData(phy_loaded.m)
-    # phy = Physics(phy_loaded.m, new_d, phy_loaded.o)
+
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     d = mujoco.MjData(m)
     phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-
-    rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
-    rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
-    phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
-    phy.d.qpos[rope_quat_q_indices] = quaternion_from_euler(0, 0.2, np.pi)
-    q = np.array([
-        0.4, 0.8,  # torso
-        0.0, 0.0, 0.0, 0.0, 0, 0, 0,  # left arm
-        0,  # left gripper
-        0.0, 0.0, 0, 0.0, 0, -0.0, -0.5,  # right arm
-        0.2,  # right gripper
-    ])
-    from mjregrasping.move_to_joint_config import pid_to_joint_config
-    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-
-    activate_grasp(phy, 'attach1', 0.0)
-
-    left_im = Basic3DPoseInteractiveMarker(name='left', scale=0.1)
-    right_im = Basic3DPoseInteractiveMarker(name='right', scale=0.1)
-    init_im_pose(left_im, phy, 'left_tool')
-    init_im_pose(right_im, phy, 'right_tool')
 
     with mujoco.viewer.launch_passive(phy.m, phy.d) as viewer:
         with viewer.lock():
@@ -163,17 +152,12 @@ def main():
         app = QApplication(sys.argv)
 
         controls_window = InteractiveControls()
-        is_recording = False
-        ims_enabled = False
         now = int(time.time())
-        recording_path = Path(f"demos/{scenario.name}/{now}")
-        recording_path.mkdir(exist_ok=True, parents=True)
 
         dt = phy.m.opt.timestep * 10
         n_sub_time = int(dt / phy.m.opt.timestep)
 
         def _update_sim():
-            nonlocal is_recording, ims_enabled
             latest_cmd = controls_window.latest_cmd
 
             step_start = time.time()
@@ -186,19 +170,15 @@ def main():
             if time_until_next_step > 0:
                 time.sleep(time_until_next_step)
 
-            gripper_vel = 0.1
-            grasp_n_steps = 25
-            if latest_cmd == CmdType.SAVE:
-                print(f"Saving disabled")
-                # path = root / f"{controls_window.save_filename}.pkl"
-                # save_data_and_eq(phy, path)
             elif latest_cmd == CmdType.GRASP:
                 activate_grasp(phy, controls_window.eq_name, controls_window.loc)
+                let_rope_move_through_gripper_geoms(phy)
+
             elif latest_cmd == CmdType.RELEASE:
                 phy.m.eq(controls_window.eq_name).active = 0
 
-            # slow_when_eqs_bad(phy)
-            # limit_actuator_windup(phy)
+            slow_when_eqs_bad(phy)
+            limit_actuator_windup(phy)
             mujoco.mj_step(phy.m, phy.d, nstep=n_sub_time)
 
             # ensure events are processed only once
@@ -210,62 +190,6 @@ def main():
         timer.start(sim_step_ms)
 
         sys.exit(app.exec())
-
-
-def get_twist_for_tool(phy, im, tool_site_name, viz, w_scale=0.2):
-    pose = im.get_pose()
-    desired_position = numpify(pose.position)
-    current_position = phy.d.site(tool_site_name).xpos
-    kPos = 1
-    v_in_world = (desired_position - current_position) * kPos
-    viz.arrow(f'{tool_site_name}_v', current_position, v_in_world, color='m')
-    tool2world_mat = phy.d.site(tool_site_name).xmat.reshape(3, 3)
-    v_in_tool = tool2world_mat.T @ v_in_world
-    desired_q_in_world = numpify(pose.orientation)
-    desired_mat_in_world = xyzw_quat_to_matrix(desired_q_in_world)
-    desired_mat_in_tool = tool2world_mat.T @ desired_mat_in_world
-    w_in_tool = get_w_in_tool(desired_mat_in_tool, w_scale)
-    twist_in_tool = np.concatenate([v_in_tool, w_in_tool])
-    return twist_in_tool
-
-
-def get_val_dual_jac_ctrl(phy: Physics, twists, jnt_lim_avoidance=0.25):
-    left_J_gripper = get_site_jac(phy, 'left_tool')
-    right_J_gripper = get_site_jac(phy, 'right_tool')
-    J_gripper = np.concatenate([left_J_gripper, right_J_gripper])
-    J_pinv = np.linalg.pinv(J_gripper)
-    # use null-space projection to avoid joint limits
-    current_q = get_q(phy)
-    zero_vels = (phy.o.rd.q_home - current_q) * jnt_lim_avoidance
-    warn_near_joint_limits(current_q, phy)
-    ctrl = J_pinv @ twists + (np.eye(phy.m.nu) - J_pinv @ J_gripper) @ zero_vels
-    return ctrl
-
-
-def get_site_jac(phy, tool_site_name):
-    tool_site = phy.m.site(tool_site_name)
-    Jp = np.zeros((3, phy.m.nv))
-    Jr = np.zeros((3, phy.m.nv))
-    mujoco.mj_jacSite(phy.m, phy.d, Jp, Jr, tool_site.id)
-    J_base = np.concatenate((Jp, Jr), axis=0)
-    J_base = J_base[:, phy.m.actuator_trnid[:, 0]]
-    # Transform J from base from to gripper frame
-    tool2world_mat = phy.d.site_xmat[tool_site.id].reshape(3, 3)
-    J_gripper = block_diag(tool2world_mat.T, tool2world_mat.T) @ J_base
-    return J_gripper
-
-
-def init_im_pose(im, phy, tool_site_name):
-    current_pose = Pose()
-    current_position = phy.d.site(tool_site_name).xpos
-    current_mat = phy.d.site(tool_site_name).xmat.reshape(3, 3)
-    current_pose.position.x = current_position[0]
-    current_pose.position.y = current_position[1]
-    current_pose.position.z = current_position[2]
-    current_mat_full = np.eye(4)
-    current_mat_full[:3, :3] = current_mat
-    current_pose.orientation = msgify(Quaternion, xyzw_quat_from_matrix(current_mat_full))
-    im.set_pose(current_pose)
 
 
 if __name__ == '__main__':
