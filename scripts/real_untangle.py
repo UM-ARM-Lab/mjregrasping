@@ -113,35 +113,18 @@ def main():
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     d = mujoco.MjData(m)
     phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-    # val_cmd = RealValCommander(phy)
-    val_cmd = None
+    val_cmd = RealValCommander(phy)
+    # val_cmd = None
 
     mov = None
-    # set_up_real_scene(val_cmd, phy, viz, loc=1)
-
-    mujoco.mj_forward(m, d)
-    viz.viz(phy)
-    q = np.array([
-        0.0, -0.2,  # torso
-        -0.9, 0.0, 0.0, 0.3, 0, 0, 0,  # left arm
-        0.3,  # left gripper
-        -0.9, 0.0, 0.2, 0.3, 0, 0.0, 1.5707,  # right arm
-        0.5,  # right gripper
-    ])
-    phy.d.qpos[phy.o.robot.qpos_indices] = val_dup(q)
-    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-    # activate_grasp(phy, 'right', 0.96)
-    # q[-1] = -1
-    # pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-    phy.d.ctrl[:] = 0
-    mujoco.mj_step(phy.m, phy.d, 1000)
-    viz.viz(phy, False)
+    set_up_real_scene(val_cmd, phy, viz, loc=0.98)
 
     skeletons = get_real_untangle_skeletons(phy)
     viz.skeletons(skeletons)
 
-    # val_cmd.set_cdcpd_grippers(phy)
-    # val_cmd.set_cdcpd_from_mj_rope(phy)
+    val_cmd.set_cdcpd_grippers(phy)
+    val_cmd.set_cdcpd_from_mj_rope(phy)
+    return
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
     goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)

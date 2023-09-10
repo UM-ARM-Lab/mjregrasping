@@ -1,3 +1,5 @@
+from copy import copy
+
 import mujoco
 import numpy as np
 
@@ -115,3 +117,21 @@ def get_eq_points(phy: Physics, eq):
         body2_pos = phy.d.xpos[eq.obj2id][0] + body2_offset_in_world
         return body1_pos, body2_pos
     raise WrongEQType(f"Unknown eq type {eq.type}")
+
+
+def let_rope_move_through_gripper_geoms(phy: Physics, nsteps: int):
+    # set the conaffinity of the grippers to 0 so that they don't collide with the rope,
+    # let the Eq settle a bit, then set it back to 1 and let the Eq settle again.
+    from itertools import chain
+    con_states = []
+    for geom_name in chain(*phy.o.rd.gripper_geom_names):
+        con_states.append(
+            (geom_name, copy(phy.m.geom(geom_name).conaffinity), copy(phy.m.geom(geom_name).contype)))
+        phy.m.geom(geom_name).conaffinity = 0
+        phy.m.geom(geom_name).contype = 0
+
+    mujoco.mj_step(phy.m, phy.d, nsteps)
+    # restore
+    for geom_name, conaffinity, contype in con_states:
+        phy.m.geom(geom_name).conaffinity = conaffinity
+        phy.m.geom(geom_name).contype = contype

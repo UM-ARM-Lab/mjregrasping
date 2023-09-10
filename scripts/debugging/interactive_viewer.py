@@ -1,10 +1,7 @@
 import sys
-import sys
 import time
-from copy import copy
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Optional
 
 import mujoco.viewer
 import numpy as np
@@ -12,22 +9,14 @@ import rerun as rr
 from PyQt5 import uic
 from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QMainWindow, QApplication
-from scipy.linalg import block_diag
-from transformations import quaternion_from_euler
 
 import rospy
-from geometry_msgs.msg import Pose, Quaternion
-from mjregrasping.basic_3d_pose_marker import Basic3DPoseInteractiveMarker
-from mjregrasping.grasping import activate_grasp
-from mjregrasping.jacobian_ctrl import get_w_in_tool, warn_near_joint_limits
+from mjregrasping.grasping import activate_grasp, let_rope_move_through_gripper_geoms
 from mjregrasping.mujoco_objects import MjObjects
-from mjregrasping.my_transforms import xyzw_quat_from_matrix, xyzw_quat_to_matrix
-from mjregrasping.physics import Physics, get_q
-from mjregrasping.rollout import limit_actuator_windup, slow_when_eqs_bad, DEFAULT_SUB_TIME_S
-from mjregrasping.scenarios import threading, real_untangle
-from mjregrasping.set_up_real_scene import set_up_real_scene
-from mjregrasping.viz import make_viz, Viz
-from ros_numpy import numpify, msgify
+from mjregrasping.physics import Physics
+from mjregrasping.rollout import limit_actuator_windup, slow_when_eqs_bad
+from mjregrasping.scenarios import real_untangle
+from mjregrasping.viz import make_viz
 
 
 class CmdType(Enum):
@@ -50,24 +39,6 @@ class Grasp:
 @dataclass
 class Release:
     name: str
-
-
-def let_rope_move_through_gripper_geoms(phy: Physics):
-    # set the conaffinity of the grippers to 0 so that they don't collide with the rope,
-    # let the Eq settle a bit, then set it back to 1 and let the Eq settle again.
-    from itertools import chain
-    con_states = []
-    for geom_name in chain(*phy.o.rd.gripper_geom_names):
-        con_states.append(
-            (geom_name, copy(phy.m.geom(geom_name).conaffinity), copy(phy.m.geom(geom_name).contype)))
-        phy.m.geom(geom_name).conaffinity = 0
-        phy.m.geom(geom_name).contype = 0
-
-    mujoco.mj_step(phy.m, phy.d, 250)
-    # restore
-    for geom_name, conaffinity, contype in con_states:
-        phy.m.geom(geom_name).conaffinity = conaffinity
-        phy.m.geom(geom_name).contype = contype
 
 
 class InteractiveControls(QMainWindow):
