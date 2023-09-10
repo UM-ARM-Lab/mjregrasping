@@ -26,17 +26,17 @@ class GraspRRT:
         self.rrt = RRTPlanner()
         # For some reason, I can fix the RRT collision issues by setting these params
         client = Client("/ompl")
-        client.update_configuration({"maximum_waypoint_distance": 0.2})
+        client.update_configuration({"maximum_waypoint_distance": 0.15})
         self.fix_start_rng = np.random.RandomState(0)
 
     def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
-             pos_noise=0.05):
+             pos_noise=0.05, **kwargs):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
         scene_msg = make_planning_scene(phy_plan)
         res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time,
-                                                pos_noise)
+                                                pos_noise, **kwargs)
         return res, scene_msg
 
     def display_result(self, viz, res, scene_msg):

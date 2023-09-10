@@ -1,10 +1,11 @@
 from time import perf_counter
-from typing import Optional
+from typing import Optional, List
 
 from colorama import Fore
 
 from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle
 from mjregrasping.move_to_joint_config import pid_to_joint_configs
+from mjregrasping.moveit_planning import make_planning_scene
 
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
@@ -45,10 +46,12 @@ class BaseOnStuckMethod:
 
 class OnStuckOurs(BaseOnStuckMethod):
 
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT,
+                 goal_skel_names: Optional[List[str]] = None):
         super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
+        self.goal_skel_names = goal_skel_names
+        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons, self.goal_skel_names)
 
     def method_name(self):
         return "\\signature{}"
@@ -66,6 +69,9 @@ class OnStuckOurs(BaseOnStuckMethod):
             print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
             self.planner.update_blacklists(phy)
             best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        if viz:
+            scene_msg = make_planning_scene(phy)
+            self.grasp_rrt.display_result(viz, best_grasp.res, scene_msg)
         self.planner.planning_times.append(perf_counter() - planning_t0)
         self.execute_best_grasp(best_grasp, mov, phy, viz)
 

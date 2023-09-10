@@ -28,6 +28,7 @@ def main():
     threading_trials_dirs = [
         Path("results/Threading/threading_ours_v2"),
         Path("results/Threading/threading_wang1"),
+        Path("results/Threading/threading_tamp5_v1"),
     ]
 
     df = load_data(threading_trials_dirs)

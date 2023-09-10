@@ -52,7 +52,7 @@ val_untangle = Scenario(
     noise_sigma=np.deg2rad(2),
 )
 
-threading = Scenario(
+threading_cable = Scenario(
     name="Threading",
     xml_path=Path("models/threading_scene.xml"),
     obstacle_name="obstacles",
