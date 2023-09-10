@@ -15,9 +15,9 @@ from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_grasp_locs
+from mjregrasping.grasping import get_grasp_locs, activate_grasp
 from mjregrasping.low_level_grasping import run_grasp_controller
-from mjregrasping.move_to_joint_config import pid_to_joint_configs
+from mjregrasping.move_to_joint_config import pid_to_joint_configs, pid_to_joint_config
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
@@ -25,11 +25,12 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
-from mjregrasping.rollout import control_step
+from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle, real_untangle, get_real_untangle_skeletons
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
+from mjregrasping.val_dup import val_dup
 from mjregrasping.viz import make_viz, Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
@@ -58,7 +59,7 @@ class OnStuckOurs(BaseOnStuckMethod):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
         # print("DEBUGGING VIZ_EXECUTION=TRUE")
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
@@ -112,16 +113,35 @@ def main():
     m = mujoco.MjModel.from_xml_path(str(scenario.xml_path))
     d = mujoco.MjData(m)
     phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
-    val_cmd = RealValCommander(phy)
+    # val_cmd = RealValCommander(phy)
+    val_cmd = None
 
     mov = None
-    set_up_real_scene(val_cmd, phy, viz, loc=1)
+    # set_up_real_scene(val_cmd, phy, viz, loc=1)
+
+    mujoco.mj_forward(m, d)
+    viz.viz(phy)
+    q = np.array([
+        0.0, -0.2,  # torso
+        -0.9, 0.0, 0.0, 0.3, 0, 0, 0,  # left arm
+        0.3,  # left gripper
+        -0.9, 0.0, 0.2, 0.3, 0, 0.0, 1.5707,  # right arm
+        0.5,  # right gripper
+    ])
+    phy.d.qpos[phy.o.robot.qpos_indices] = val_dup(q)
+    pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+    # activate_grasp(phy, 'right', 0.96)
+    # q[-1] = -1
+    # pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
+    phy.d.ctrl[:] = 0
+    mujoco.mj_step(phy.m, phy.d, 1000)
+    viz.viz(phy, False)
 
     skeletons = get_real_untangle_skeletons(phy)
     viz.skeletons(skeletons)
 
-    val_cmd.set_cdcpd_grippers(phy)
-    val_cmd.set_cdcpd_from_mj_rope(phy)
+    # val_cmd.set_cdcpd_grippers(phy)
+    # val_cmd.set_cdcpd_from_mj_rope(phy)
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
     goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
@@ -146,25 +166,25 @@ def main():
     traps.reset_trap_detection()
 
     # DEBUGGING IK and Releasing
-    # phy_plan = phy.copy_all()
-    # from mjregrasping.grasp_strategies import Strategies
-    # strategy = [Strategies.STAY, Strategies.MOVE]
-    # locs = np.array([-1, 0.28])
+    phy_plan = phy.copy_all()
+    from mjregrasping.grasp_strategies import Strategies
     # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
-    # res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz)
-    # print(res.error_code.val)
-    # grasp_rrt.display_result(viz, res, scene_msg)
-    # deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
-    # pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
-    # run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.05)
-    # grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    strategy = [Strategies.STAY, Strategies.MOVE]
+    locs = np.array([-1, 0.25])
+    res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz)
+    print(res.error_code.val)
+    grasp_rrt.display_result(viz, res, scene_msg)
+    deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
+    pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.05)
+    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
 
-    val_cmd.start_record()
+    # val_cmd.start_record()
 
     itr = 0
     viz.viz(phy)
     while True:
-        val_cmd.update_mujoco_qpos(phy)
+        # val_cmd.update_mujoco_qpos(phy)
 
         if itr >= 300:
             print(Fore.RED + "Task failed!" + Fore.RESET)

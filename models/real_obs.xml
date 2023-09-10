@@ -1,6 +1,16 @@
 <mujoco model="real_obs">
     <worldbody>
         <body name="obstacles" pos="-0.06 -0.02 -0.43" euler="0.03 0 0.025">
+            <body name="ladder" pos="0.73 0.4 0">
+                <geom name="front_left_rail" type="box" pos="-0.18 -0.20 0.64" euler="-0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
+                <geom name="back_left_rail" type="box" pos="-0.18 0.20 0.64" euler="0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
+                <geom name="front_right_rail" type="box" pos="0.18 -0.20 0.64" euler="-0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
+                <geom name="back_right_rail" type="box" pos="0.18 0.20 0.64" euler="0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
+                <geom name="front_step1" type="box" pos="0.0 -0.05 1.13" size="0.235 0.03 0.03" material="metal"/>
+                <geom name="back_step1" type="box" pos="0.0 0.04 1.13" size="0.235 0.03 0.03" material="metal"/>
+                <geom name="front_step2" type="box" pos="0.0 -0.14 0.84" size="0.235 0.03 0.03" material="metal"/>
+                <geom name="back_step2" type="box" pos="0.0 0.14 0.84" size="0.235 0.03 0.03" material="metal"/>
+            </body>
             <body name="walls">
                 <body name="front_wall" pos="-0.05 0.97 1">
                     <geom name="front_wall" type="box" size="1 0.02 1.1" material="cream-plaster"/>
@@ -17,9 +27,9 @@
                         <geom name="attach" type="box" size="0.02 0.005 0.02" rgba="0.5 0 0 1"/>
                     </body>
                 </body>
-                <geom name="right_wall" type="box" pos="0.82 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="right_wall" type="box" pos="0.85 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
                 <geom name="left_wall" type="box" pos="-0.48 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
-                <geom name="back_wall" type="box" pos="0.0 -0.28 1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="back_wall" type="box" pos="0.0 -0.29 1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
             </body>
             <body name="table" pos="-0.31 0.715 0">
                 <body name="top" pos="0 0 0.70">
