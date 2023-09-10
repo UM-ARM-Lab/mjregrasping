@@ -1,9 +1,10 @@
 from typing import Optional
+import rerun as rr
 
 import mujoco
 import numpy as np
 
-from mjregrasping.eq_errors import compute_eq_errors
+from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q
@@ -39,15 +40,26 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
         mujoco.mj_step(m, d, nstep=n_sub_time)
 
     if val_cmd:
-        val_cmd.send_pos_command(get_full_q(phy))
+        mj_q = get_full_q(phy)
+        if abs(qvel_target[9]) < 1e-3 and abs(qvel_target[17]) < 1e-3:
+            real_q = val_cmd.get_latest_qpos_in_mj_order()
+            mj_q[9] = real_q[9]
+            mj_q[10] = real_q[10]
+            mj_q[18] = real_q[18]
+            mj_q[19] = real_q[19]
+        val_cmd.send_pos_command(mj_q)
         val_cmd.pull_rope_towards_cdcpd(phy, n_sub_time)
 
 
 def slow_when_eqs_bad(phy):
-    eq_errors = compute_eq_errors(phy)
-    max_eq_err = np.clip(np.max(eq_errors), 0, 1)
-    speed_factor = min(max(0.02 * -np.exp(250 * max_eq_err) + 1, 0), 1)
+    speed_factor = get_speed_factor(phy)
     phy.d.ctrl *= speed_factor
+
+
+def get_speed_factor(phy):
+    total_eq_error = compute_total_eq_error(phy)
+    speed_factor = np.clip(np.exp(-700 * total_eq_error), 0, 1)
+    return speed_factor
 
 
 def limit_actuator_windup(phy):

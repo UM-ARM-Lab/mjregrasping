@@ -4,7 +4,6 @@ from typing import List
 
 import numpy as np
 
-from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_is_grasping
 from mjregrasping.physics import Physics

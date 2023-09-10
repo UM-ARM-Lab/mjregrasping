@@ -5,7 +5,7 @@ import numpy as np
 import rerun as rr
 from pymjregrasping_cpp import seedOmpl
 
-from mjregrasping.goal_funcs import get_rope_points, locs_eq
+from mjregrasping.goal_funcs import get_rope_points, locs_eq, get_nongrasping_rope_contact_cost
 from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
@@ -194,33 +194,37 @@ class HomotopyRegraspPlanner:
         viz = viz if viz_execution else None
         phy_plan = phy.copy_all()
 
+        res = MotionPlanResponse()
+        res.error_code.val = MoveItErrorCodes.SUCCESS
+        point = JointTrajectoryPoint()
+        point.positions = get_q(phy_plan)
+        res.trajectory.joint_trajectory.points.append(point)
+
         # release and settle for any moving grippers
         deactivate_release_and_moving(phy_plan, strategy, viz=viz, is_planning=True)
 
-        # check if we need to move the arms at all
-        any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
-        if any_moving:
-            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
-
-            if res.error_code.val != MoveItErrorCodes.SUCCESS:
-                return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
-
-            if viz_execution and viz is not None:
-                self.grasp_rrt.display_result(viz, res, scene_msg)
-
-            # Teleport to the final planned joint configuration
-            teleport_to_end_of_plan(phy_plan, res)
-            if viz_execution:
-                viz.viz(phy_plan, is_planning=True)
+        # if the rope is still touching the grippers that should be moving or releasing, penalize this, because
+        # this means the fingers will likely tangle!
+        if get_nongrasping_rope_contact_cost(phy_plan, candidate_locs) > 0:
+            res.error_code.val = MoveItErrorCodes.START_STATE_IN_COLLISION
         else:
-            res = MotionPlanResponse()
-            res.error_code.val = MoveItErrorCodes.SUCCESS
-            point = JointTrajectoryPoint()
-            point.positions = get_q(phy_plan)
-            res.trajectory.joint_trajectory.points.append(point)
+            # check if we need to move the arms at all
+            any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
+            if any_moving:
+                res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
 
-        # Activate grasps
-        grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
+                if res.error_code.val != MoveItErrorCodes.SUCCESS:
+                    return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+
+                if viz_execution and viz is not None:
+                    self.grasp_rrt.display_result(viz, res, scene_msg)
+
+                # Teleport to the final planned joint configuration
+                teleport_to_end_of_plan(phy_plan, res)
+                if viz_execution:
+                    viz.viz(phy_plan, is_planning=True)
+            # Activate grasps
+            grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
 
         return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
 

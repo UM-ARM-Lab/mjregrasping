@@ -31,6 +31,7 @@ class RegraspMPPI:
 
         self.noise_rng = np.random.RandomState(seed)
         self.u_sigma_diag = np.ones(nu) * self.initial_noise_sigma
+        self.zero_grippers_sigma()
         self.u_mu = np.zeros([self.horizon * nu])
         self.time_sigma = 0.03
         self.time_mu = hp['sub_time_s']
@@ -40,8 +41,13 @@ class RegraspMPPI:
         self.cost = None
         self.cost_normalized = None
 
+    def zero_grippers_sigma(self):
+        self.u_sigma_diag[9] = 0
+        self.u_sigma_diag[17] = 0
+
     def reset(self):
         self.u_sigma_diag = np.ones(self.nu) * self.initial_noise_sigma
+        self.zero_grippers_sigma()
         self.u_mu = np.zeros([self.horizon * self.nu])
         self.time_mu = hp['sub_time_s']
 
@@ -100,6 +106,7 @@ class RegraspMPPI:
         # Update covariance
         u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
         self.u_sigma_diag = weights @ np.mean((u_samples_square - u_mu_square) ** 2, axis=1)
+        self.zero_grippers_sigma()
         # NOTE: we could adapt time_sigma with this: weights @ (time_samples - self.time_mu) ** 2
 
         # Update mean

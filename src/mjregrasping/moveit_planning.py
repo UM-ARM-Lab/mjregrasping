@@ -3,7 +3,7 @@ from mujoco import mju_mat2Quat, mjtGeom
 
 import rospy
 from geometry_msgs.msg import Pose
-from mjregrasping.my_transforms import np_wxyz_to_xyzw
+from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q, get_parent_child_names
 from moveit_msgs.msg import PlanningScene, CollisionObject
@@ -79,8 +79,15 @@ def make_planning_scene(phy: Physics):
             prim.dimensions = [10, 10, 0.01]
             co.primitives.append(prim)
             co.primitive_poses.append(prim_pose)
+        elif geom_type == mjtGeom.mjGEOM_CAPSULE:
+            # approximate this with a cylinder
+            prim.type = SolidPrimitive.CYLINDER
+            # height then radius
+            prim.dimensions = [2 * geom_size[1], geom_size[0]]
+            co.primitives.append(prim)
+            co.primitive_poses.append(prim_pose)
         else:
-            rospy.loginfo_once(f"Unsupported geom type {geom_type} when converting to planning scene.")
+            rospy.logwarn_once(f"Unsupported geom type {geom_type} when converting to planning scene.")
             continue
 
         scene_msg.world.collision_objects.append(co)

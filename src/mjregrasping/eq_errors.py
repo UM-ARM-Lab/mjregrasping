@@ -4,9 +4,9 @@ import numpy as np
 from mjregrasping.physics import Physics
 
 
-def compute_eq_errors(phy: Physics):
+def compute_total_eq_error(phy: Physics):
     eq_errs = []
-    for eq_name in phy.o.rd.rope_grasp_eqs:
+    for eq_name in phy.o.rd.rope_grasp_eqs + ['attach']:
         eq = phy.m.eq(eq_name)
         if eq.active:
             eq_err = compute_eq_error(phy, eq)

@@ -2,7 +2,6 @@ from time import perf_counter
 from typing import Optional
 
 import cv2
-import mujoco
 import numpy as np
 import open3d as o3d
 import pymanopt
@@ -13,11 +12,9 @@ from pymanopt.manifolds import SpecialOrthogonalGroup
 
 import ros_numpy
 import rospy
-from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.jacobian_ctrl import get_jacobian_ctrl
-from mjregrasping.my_transforms import mj_transform_points, np_wxyz_to_xyzw
-from mjregrasping.params import hp
+from mjregrasping.my_transforms import mj_transform_points
 from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rviz import plot_points_rviz
@@ -28,6 +25,10 @@ from sensor_msgs.msg import PointCloud2, Image
 
 def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int, viz: Viz, finger_q_closed: float,
                          finger_q_open: float):
+    if val_cmd is None:
+        print(f"Cannot run grasp controller without a RealValCommander! skipping")
+        return True
+
     rgb_pub = rospy.Publisher("grasp_rgb", Image, queue_size=10)
     mask_pub = rospy.Publisher("grasp_mask", Image, queue_size=10)
     pc_pub = rospy.Publisher("grasp_pc", PointCloud2, queue_size=10)
@@ -78,7 +79,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         print(f"{dt=:.3f}")
 
         # Set mujoco state to match the real robot
-        val_cmd.update_mujoco_qpos(phy)
+        # val_cmd.update_mujoco_qpos(phy)
 
         dcam_site = phy.d.site(camera_site_name)
 
@@ -95,7 +96,8 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
 
             rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
 
-            plot_points_rviz(viz.markers_pub, rope_points_in_cam, idx=0, frame_id=camera_frame, label='rope_in_cam', s=0.2)
+            plot_points_rviz(viz.markers_pub, rope_points_in_cam, idx=0, frame_id=camera_frame, label='rope_in_cam',
+                             s=0.2)
             plot_points_rviz(viz.markers_pub, rope_points_in_tool, idx=0, frame_id=tool_site_name,
                              label='rope points in tool', s=0.1)
 

@@ -1,11 +1,10 @@
-import time
 from typing import Optional
 
 import numpy as np
 
 from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import activate_grasp
+from mjregrasping.grasping import activate_grasp, let_rope_move_through_gripper_geoms
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.physics import get_gripper_ctrl_indices, get_q, Physics
 from mjregrasping.real_val import RealValCommander
@@ -34,7 +33,7 @@ def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning
 
 def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool,
                           mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None,
-                          n_open_steps: int = 5):
+                          n_open_steps: int = 20):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -66,6 +65,7 @@ def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov
             continue
         ctrl[ctrl_i] = -0.4
         activate_grasp(phy, eq_name, grasp_loc_i)
+        let_rope_move_through_gripper_geoms(phy, 200)
     if val_cmd:
         val_cmd.set_cdcpd_grippers(phy)
     for _ in range(n_close_steps):
@@ -95,7 +95,7 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
         rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
         robot_displacements = np.abs(q - last_q)
         is_unstable = phy.d.warning.number.sum() > 0
-        rope_settled = np.max(rope_displacements) < 0.001
+        rope_settled = np.max(rope_displacements) < 0.005
         robot_settled = np.max(robot_displacements) < np.deg2rad(1)
         if robot_settled and rope_settled or is_unstable:
             return

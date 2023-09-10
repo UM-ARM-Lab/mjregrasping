@@ -39,6 +39,7 @@ class MjRViz:
         self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
         self.contacts_pub = rospy.Publisher("contacts", MarkerArray, queue_size=10)
         self.pub = rospy.Publisher('all', MarkerArray, queue_size=10)
+        self.skel_pub = rospy.Publisher('skeletons', MarkerArray, queue_size=10)
         self.planning_markers_pub = rospy.Publisher('planning', MarkerArray, queue_size=10)
         self.scene_pub = rospy.Publisher("scene_viz", PlanningScene, queue_size=10)
 
@@ -282,7 +283,7 @@ class MjRViz:
 
     def skeletons(self, skeletons: Dict):
         for k, skel in skeletons.items():
-            plot_lines_rviz(self.pub, skel, k)
+            plot_lines_rviz(self.skel_pub, skel, k)
 
 
 def plot_spheres_rviz(pub, positions, colors, radius, frame_id="world", idx=0, label=""):

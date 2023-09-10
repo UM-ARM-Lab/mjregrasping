@@ -15,9 +15,9 @@ from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_grasp_locs, activate_grasp
+from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.low_level_grasping import run_grasp_controller
-from mjregrasping.move_to_joint_config import pid_to_joint_configs, pid_to_joint_config
+from mjregrasping.move_to_joint_config import pid_to_joint_configs
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
@@ -25,12 +25,11 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
-from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
+from mjregrasping.rollout import control_step, get_speed_factor
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import val_untangle, real_untangle, get_real_untangle_skeletons
+from mjregrasping.scenarios import val_untangle, real_untangle, dz, dx, z_axis
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
-from mjregrasping.val_dup import val_dup
 from mjregrasping.viz import make_viz, Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
@@ -58,14 +57,13 @@ class OnStuckOurs(BaseOnStuckMethod):
     def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander]):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
         planning_t0 = perf_counter()
-        # print("DEBUGGING VIZ_EXECUTION=TRUE")
-        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
         # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
-        if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
+        if initial_geodesic_dist - new_geodesic_dist < hp['grasp_loc_diff_thresh']:
             print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
-            print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
+            print(Fore.YELLOW + "Updating blacklist and re-evaluating cost..." + Fore.RESET)
             self.planner.update_blacklists(phy)
             best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         self.planner.planning_times.append(perf_counter() - planning_t0)
@@ -79,20 +77,61 @@ class OnStuckOurs(BaseOnStuckMethod):
             deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov, val_cmd=val_cmd,
                                           n_open_steps=15)
             input("press enter to confirm the rope has been released correctly!")
+            # Replan now that the rope has dropped
+            if val_cmd:
+                val_cmd.pull_rope_towards_cdcpd(phy, 1000)
+            new_res, _ = self.grasp_rrt.plan(phy, best_grasp.strategy, best_grasp.locs, viz)
+            if new_res.error_code.val == MoveItErrorCodes.SUCCESS:
+                best_grasp.res = new_res  # use the old plan if the new one fails
             pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             ##################################################
             # Run a low level controller to actually grasp
             for i, s_i in enumerate(best_grasp.strategy):
-                if s_i in [Strategies.MOVE, Strategies.RELEASE]:
-                    success_i = run_grasp_controller(val_cmd, phy, tool_idx=i, viz=viz, finger_q_open=0.5, finger_q_closed=0.0)
-                    if not success_i:
-                        print("Grasp controller failed!")
-                        return
+                if s_i in [Strategies.MOVE, Strategies.NEW_GRASP]:
+                    while True:
+                        try:
+                            success_i = run_grasp_controller(val_cmd, phy, tool_idx=i, viz=viz, finger_q_open=0.5,
+                                                             finger_q_closed=0.0)
+                            if not success_i:
+                                print("Grasp controller failed!")
+                                return
+                            break
+                        except RuntimeError:
+                            print("Realsense issue? Try unplugging and replugging the camera.")
+                            input("press enter when ready to try again!")
             ##################################################
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
             self.grasp_goal.set_grasp_locs(best_grasp.locs)
         else:
             print(Fore.RED + "Failed to find a plan." + Fore.RESET)
+
+
+def get_real_untangle_skeletons(phy: Physics):
+    d = phy.d
+    m = phy.m
+    return {
+        "loop1":            np.array([
+            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
+            d.geom("leg1").xpos + dz(m.geom("leg1").size[2]),
+            d.geom("leg4").xpos + dz(m.geom("leg4").size[2]),
+            d.geom("leg4").xpos - dz(m.geom("leg4").size[2]),
+            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
+        ]),
+        "ladder1":          np.array([
+            d.geom("back_step2").xpos - dx(m.geom("back_step2").size[0]) * 0.75,
+            d.geom("back_step2").xpos + dx(m.geom("back_step2").size[0]) * 0.75,
+            d.geom("back_step1").xpos + dx(m.geom("back_step1").size[0]) * 0.95,
+            d.geom("back_step1").xpos - dx(m.geom("back_step1").size[0]) * 0.95,
+            d.geom("back_step2").xpos - dx(m.geom("back_step2").size[0]) * 0.75,
+        ]),
+        "ladder_left_side": np.array([
+            d.geom("back_left_rail").xpos - z_axis(d, "back_left_rail") * m.geom("back_left_rail").size[2],
+            d.geom("back_left_rail").xpos + z_axis(d, "back_left_rail") * m.geom("back_left_rail").size[2] * 0.9,
+            d.geom("front_left_rail").xpos + z_axis(d, "front_left_rail") * m.geom("front_left_rail").size[2] * 0.9,
+            d.geom("front_left_rail").xpos - z_axis(d, "front_left_rail") * m.geom("front_left_rail").size[2],
+            d.geom("back_left_rail").xpos - z_axis(d, "back_left_rail") * m.geom("back_left_rail").size[2],
+        ])
+    }
 
 
 @ros_init.with_ros("untangle")
@@ -114,31 +153,33 @@ def main():
     d = mujoco.MjData(m)
     phy = Physics(m, d, MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name))
     val_cmd = RealValCommander(phy)
-    # val_cmd = None
 
     mov = None
-    set_up_real_scene(val_cmd, phy, viz, loc=0.98)
+    set_up_real_scene(val_cmd, phy, viz, loc=0.83)
 
     skeletons = get_real_untangle_skeletons(phy)
     viz.skeletons(skeletons)
 
     val_cmd.set_cdcpd_grippers(phy)
     val_cmd.set_cdcpd_from_mj_rope(phy)
-    return
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
     goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    hp['horizon'] = 8
+    hp['finger_q_pregrasp'] = 0.5
+    hp['finger_q_open'] = 0.5
+    hp['finger_q_closed'] = -0.15
+    hp['horizon'] = 10
     hp['n_samples'] = 36
-    hp['n_grasp_samples'] = 30
-    hp['robot_dq_weight'] = 0.1
+    hp['n_grasp_samples'] = 20
+    hp['robot_dq_weight'] = 0.2
+    hp['grasp_loc_diff_thresh'] = 0.04
     # I think the rope is super noisy because of CDCPD so I'm turning this down?
     hp['trap_q_rope_weight'] = 0.05
     hp['frac_dq_threshold'] = 0.3
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=scenario.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
     osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
@@ -148,21 +189,24 @@ def main():
     mppi.reset()
     traps.reset_trap_detection()
 
-    # DEBUGGING IK and Releasing
-    phy_plan = phy.copy_all()
-    from mjregrasping.grasp_strategies import Strategies
-    # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
-    strategy = [Strategies.STAY, Strategies.MOVE]
-    locs = np.array([-1, 0.25])
-    res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz)
-    print(res.error_code.val)
-    grasp_rrt.display_result(viz, res, scene_msg)
-    deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
-    pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
-    run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.05)
-    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    # for testing in sim
+    # val_cmd = None
 
-    # val_cmd.start_record()
+    # DEBUGGING IK and Releasing
+    # phy_plan = phy.copy_all()
+    # from mjregrasping.grasp_strategies import Strategies
+    # # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
+    # strategy = [Strategies.STAY, Strategies.MOVE]
+    # locs = np.array([-1, 0.41])
+    # res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz)
+    # print(res.error_code.val)
+    # grasp_rrt.display_result(viz, res, scene_msg)
+    # deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
+    # pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    # run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.05)
+    # grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+
+    val_cmd.start_record()
 
     itr = 0
     viz.viz(phy)
@@ -180,7 +224,7 @@ def main():
 
         is_stuck = traps.check_is_stuck(phy)
         needs_reset = False
-        if is_stuck:
+        if itr == 0 or is_stuck:
             print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
             osm.on_stuck(phy, viz, mov, val_cmd)
             needs_reset = True
@@ -201,6 +245,9 @@ def main():
 
         control_step(phy, command, sub_time_s, mov=mov, val_cmd=val_cmd)
         viz.viz(phy)
+
+        speed_factor = get_speed_factor(phy)
+        rr.log_scalar('speed_factor', speed_factor)
 
         do_grasp_dynamics(phy, val_cmd)
 

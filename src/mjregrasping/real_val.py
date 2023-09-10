@@ -169,12 +169,14 @@ class RealValCommander:
             activate_grasp(phy, f'B_{i}', loc)
 
         phy.d.ctrl[:] = 0
-        mujoco.mj_step(phy.m, phy.d, nstep=n_sub_time)
+        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 2))
 
         # now deactivate all the eqs, so they don't stop the robot from moving
         for i in range(cdcpd_n_points):
             eq = phy.m.eq(f'B_{i}')
             eq.active = 0
+
+        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 2))
 
     def set_cdcpd_from_mj_rope(self, phy: Physics):
         set_cdcpd_req = SetCDCPDStateRequest()

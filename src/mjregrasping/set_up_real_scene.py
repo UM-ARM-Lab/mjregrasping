@@ -32,11 +32,10 @@ def set_up_real_scene(val_cmd: RealValCommander, phy: Physics, viz: Viz, loc: fl
 
     # Move the tip of the rope around to more or less match the start state in the real world
     waypoints = np.array([
-        [0.6, 0.2, 0.9],
         [0.6, 0.6, 0.9],
         [0.6, 0.6, 0.5],
-        [0.6, 0.3, 0.5],
-        [0.4, 0.3, 0.1],
+        [0.6, 0.2, 0.5],
+        [0.4, 0.2, 0.2],
     ])
     tip_eq = phy.m.eq("B_24")
     tip_eq.active = 1

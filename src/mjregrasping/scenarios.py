@@ -40,7 +40,7 @@ real_untangle = Scenario(
     obstacle_name="obstacles",
     robot_data=val,
     rope_name="rope",
-    noise_sigma=np.deg2rad(2),
+    noise_sigma=np.deg2rad(1),
 )
 
 val_untangle = Scenario(
@@ -96,6 +96,21 @@ def dy(y):
 
 def dz(z):
     return np.array([0, 0, z])
+
+
+def x_axis(d, geom_name: str):
+    mat = d.geom(geom_name).xmat.reshape(3, 3)
+    return mat[:, 0]
+
+
+def y_axis(d, geom_name: str):
+    mat = d.geom(geom_name).xmat.reshape(3, 3)
+    return mat[:, 1]
+
+
+def z_axis(d, geom_name: str):
+    mat = d.geom(geom_name).xmat.reshape(3, 3)
+    return mat[:, 2]
 
 
 def get_threading_skeletons(phy: Physics):
@@ -187,18 +202,4 @@ def get_untangle_skeletons(phy: Physics):
             dx(m.geom("rack2_bottom").size[1] * 2),
             dz(-m.geom("rack2_post3").size[2] * 2),
         ], axis=0),
-    }
-
-
-def get_real_untangle_skeletons(phy: Physics):
-    d = phy.d
-    m = phy.m
-    return {
-        "loop1": np.array([
-            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
-            d.geom("leg1").xpos + dz(m.geom("leg1").size[2]),
-            d.geom("leg4").xpos + dz(m.geom("leg4").size[2]),
-            d.geom("leg4").xpos - dz(m.geom("leg4").size[2]),
-            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
-        ]),
     }
