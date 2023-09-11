@@ -15,13 +15,13 @@
                     </body>
                 </body>
                 <geom name="right_wall" type="box" pos="0.85 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
-                <geom name="left_wall" type="box" pos="-0.50 0 1" euler="0 0 0.1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="left_wall" type="box" pos="-0.50 -.5 1" euler="0 0 0.2" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
                 <geom name="back_wall" type="box" pos="0.0 -0.35 1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
             </body>
             <body name="table" pos="-0.31 0.715 0">
                 <body name="top" pos="0 0 0.69">
-                    <body name="goal" pos="0.47 0.02 0.0">
-                        <geom name="strip" type="box" size="0.03 0.14 0.015" pos="0 0 0.05" rgba="1 1 1 1"/>
+                    <body name="goal" pos="-0.15 0.02 0.0">
+                        <geom name="strip" type="box" size="0.03 0.14 0.015" pos="0 0 0.06" rgba="1 1 1 1"/>
                         <geom name="goal" class="visual" type="sphere" size="0.05" pos="0 0 0.08" rgba="1 0 1 0.3"/>
                     </body>
                     <body name="loop1" pos="0.17 0 0.275" euler="0 0 3.14159">

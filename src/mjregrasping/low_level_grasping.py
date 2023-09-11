@@ -2,6 +2,7 @@ from time import perf_counter
 from typing import Optional
 
 import cv2
+import mujoco
 import numpy as np
 import open3d as o3d
 import pymanopt
@@ -14,10 +15,13 @@ import ros_numpy
 import rospy
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.jacobian_ctrl import get_jacobian_ctrl
+from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.my_transforms import mj_transform_points
 from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
+from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rviz import plot_points_rviz
+from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import Viz
 from ros_numpy.point_cloud2 import merge_rgb_fields
 from sensor_msgs.msg import PointCloud2, Image
@@ -80,6 +84,8 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
 
         # Set mujoco state to match the real robot so that we can query mujoco for FK and the jacobian and stuck
         val_cmd.update_mujoco_qpos(phy)
+        # q = val_cmd.get_latest_qpos_in_mj_order()
+        # pid_to_joint_config(phy, viz, val_dedup(q), DEFAULT_SUB_TIME_S, reached_tol=2, stopped_tol=999)
 
         dcam_site = phy.d.site(camera_site_name)
 
@@ -92,8 +98,6 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         rope_found = len(rope_points_in_cam) > 0
 
         if rope_found:
-            rope_points_in_cam = filter_by_volume(rope_points_in_cam)
-
             rope_points_in_tool = mj_transform_points(dcam_site, tool_site, rope_points_in_cam)
 
             plot_points_rviz(viz.markers_pub, rope_points_in_cam, idx=0, frame_id=camera_frame, label='rope_in_cam',
@@ -138,7 +142,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         full_ctrl[act_indices] = ctrl
 
         # send commands to the robot
-        val_cmd.send_vel_command(phy.m, full_ctrl)
+        # val_cmd.send_vel_command(phy.m, full_ctrl)
 
         if is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed) and rope_found:
             val_cmd.send_pos_command(val_cmd.get_latest_qpos_in_mj_order())
@@ -161,12 +165,14 @@ def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: st
                      pc_pub: Optional[rospy.Publisher] = None,
                      rgb_pub: Optional[rospy.Publisher] = None,
                      mask_pub: Optional[rospy.Publisher] = None):
+    t0 = perf_counter()
     frames = pipe.wait_for_frames()
     align = rs.align(rs.stream.color)
     aligned_frames = align.process(frames)
     rgb_frame = aligned_frames.first(rs.stream.color)
     rgb = np.asanyarray(rgb_frame.get_data())
     depth_frame = aligned_frames.get_depth_frame()
+    print(f"read_and_segment took {perf_counter() - t0:.3f}s")
 
     # Save for training
     # from time import time
@@ -174,6 +180,7 @@ def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: st
     # now = int(time())
     # PImage.fromarray(rgb).save(f"imgs/rgb_{now}.png")
 
+    t0 = perf_counter()
     if rgb_pub:
         rgb_msg = ros_numpy.msgify(Image, rgb, encoding='rgb8')
         rgb_pub.publish(rgb_msg)
@@ -208,6 +215,7 @@ def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: st
         rgb[~seg_mask] = 0
         mask_msg = ros_numpy.msgify(Image, rgb, encoding='rgb8')
         mask_pub.publish(mask_msg)
+    print(f"segmentation and such {perf_counter() - t0:.3f}s")
 
     return points_xyz_masked
 

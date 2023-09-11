@@ -28,15 +28,12 @@ class RobotData:
 val = RobotData(
     base_link="val_base",
     allowed_robot_collision_geoms_names=[
-        'left_finger_pad', 'left_finger_pad2', 'right_finger_pad', 'right_finger_pad2'
     ],
     ignored_robot_self_collision_geoms_names=[
-        'left_finger_pad', 'left_finger_pad2',
-        'right_finger_pad', 'right_finger_pad2',
     ],
     gripper_geom_names=[
-        ['left_finger_pad', 'left_finger_pad2', 'leftgripper', 'leftgripper2'],
-        ['right_finger_pad', 'right_finger_pad2', 'rightgripper', 'rightgripper2'],
+        ['leftgripper', 'leftgripper2'],
+        ['rightgripper', 'rightgripper2'],
     ],
     gripper_joint_names=[
         'leftgripper', 'leftgripper2',

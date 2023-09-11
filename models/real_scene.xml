@@ -10,7 +10,7 @@
     <include file="materials.xml"/>
     <include file="val.xml"/>
     <!-- override the high viscosity used in sim experiments because it's unrealistic -->
-    <option viscosity="0.01" timestep="0.003"/>
+    <option viscosity="1" timestep="0.003"/>
     <include file="real_obs.xml"/>
     <include file="floor.xml"/>
     <include file="cc_sphere.xml"/>
@@ -22,18 +22,18 @@
         <light name="overhead1" pos="0 0 10" mode="trackcom"/>
         <body pos="0.39 0.844 0.74" euler="0 0 3.4" name="rope">
             <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
-            <composite type="cable" curve="s" count="25 1 1" size="1 0.22 1">
-                <joint kind="main" damping=".015" stiffness="0.15"/>
+            <composite type="cable" curve="s" count="25 1 1" size="1.24 0.22 1">
+                <joint kind="main" damping=".02" stiffness="0.05"/>
                 <geom type="capsule" size=".01" rgba="0.8 0.2 0.1 1" condim="1" group="1"/>
             </composite>
-            <joint type="free" damping="100"/>
+            <joint type="free" damping="1"/>
         </body>
     </worldbody>
     <equality>
-        <connect body1="drive50" body2="B_first" name="left" anchor="0 0 0.10" active="false" solref="0.03 1"/>
-        <connect body1="drive10" body2="B_first" name="right" anchor="0 0 0.10" active="false" solref="0.03 1"/>
+        <weld body1="drive50" body2="B_first" name="left" relpose="0 0 0.13 1 0 0 0" active="false" solref="0.04 1" torquescale="0.2"/>
+        <weld body1="drive10" body2="B_first" name="right" relpose="0 0 0.13 1 0 0 0" active="false" solref="0.04 1" torquescale="0.2"/>
 
-        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.06 1"/>
+        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.04 1"/>
 
         <!-- constraints to pull the mujoco rope towards where CDCPD says the rope is -->
         <connect body1="world" body2="B_first" name="B_0" anchor="0 0 0" active="false" solref="0.1 1"/>

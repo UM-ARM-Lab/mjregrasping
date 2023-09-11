@@ -113,10 +113,14 @@ class RealValCommander:
             self.first_valid_command = True
 
         self.latest_cmd.header.stamp = rospy.Time.now()
-        self.latest_cmd.position = pos
+        current_q = self.get_latest_qpos_in_mj_order()
+        # vmax = 0.20
+        # v = np.clip((pos - current_q) * 2, -vmax, vmax)
+        # self.latest_cmd.velocity = v
         self.latest_cmd.velocity = []
+        self.latest_cmd.position = pos
 
-    def stop(self):
+    def disconnect(self):
         self.should_disconnect = True
         self.command_thread.join()
 
@@ -129,13 +133,6 @@ class RealValCommander:
         js = self.get_latest_joint_state()
         pos_in_mj_order = np.array(js.position)[self.mj_order]
         return pos_in_mj_order
-
-    def pid_to_joint_configs(self, qs):
-        for q in qs[:-1]:
-            self.send_pos_command(q)
-            self.wait_until_reached(q, reached_tol=4, stopped_tol=10)
-        self.send_pos_command(qs[-1])
-        self.wait_until_reached(qs[-1], reached_tol=2, stopped_tol=1)
 
     def wait_until_reached(self, q_target, reached_tol=2, stopped_tol=1):
         stopped = False
@@ -175,8 +172,7 @@ class RealValCommander:
         for i in range(cdcpd_n_points):
             eq = phy.m.eq(f'B_{i}')
             eq.active = 0
-
-        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 2))
+        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 8))
 
     def set_cdcpd_from_mj_rope(self, phy: Physics):
         set_cdcpd_req = SetCDCPDStateRequest()

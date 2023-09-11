@@ -15,9 +15,9 @@ from arc_utilities import ros_init
 from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasp_and_settle import grasp_and_settle, deactivate_release_and_moving
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_grasp_locs
+from mjregrasping.grasping import get_grasp_locs, activate_grasp
 from mjregrasping.low_level_grasping import run_grasp_controller
-from mjregrasping.move_to_joint_config import pid_to_joint_configs
+from mjregrasping.move_to_joint_config import pid_to_joint_configs, pid_to_joint_config
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
@@ -25,11 +25,12 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
-from mjregrasping.rollout import control_step, get_speed_factor
+from mjregrasping.rollout import control_step, get_speed_factor, DEFAULT_SUB_TIME_S
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import real_goal_sig, dz
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
+from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import make_viz, Viz
 from moveit_msgs.msg import MoveItErrorCodes
 
@@ -91,7 +92,6 @@ class OnStuckOurs(BaseOnStuckMethod):
                             break
                         except RuntimeError:
                             print("Realsense issue? Try unplugging and replugging the camera.")
-                            input("press enter when ready to try again!")
             ##################################################
             grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov,
                              val_cmd=None)  # we don't need val to grasp, that's what the grasp controller is for
@@ -136,7 +136,8 @@ def main():
     val_cmd = RealValCommander(phy)
 
     mov = None
-    set_up_real_scene(val_cmd, phy, viz)
+    loc0 = 0.8
+    set_up_real_scene(val_cmd, phy, viz, loc0)
 
     skeletons = get_real_untangle_skeletons(phy)
     viz.skeletons(skeletons)
@@ -144,12 +145,12 @@ def main():
     val_cmd.set_cdcpd_grippers(phy)
     val_cmd.set_cdcpd_from_mj_rope(phy)
     # let CDCPD converge
-    sleep(10)
-    val_cmd.pull_rope_towards_cdcpd(phy, 1000)
+    sleep(5)
+    val_cmd.pull_rope_towards_cdcpd(phy, 800)
     viz.viz(phy)
 
     grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
-    goal = point_goal_from_geom(grasp_goal, phy, "goal", 1, viz)
+    goal = point_goal_from_geom(grasp_goal, phy, "goal", 0.95, viz)
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
@@ -159,12 +160,12 @@ def main():
     hp['finger_q_closed'] = 0
     hp['horizon'] = 5
     hp['n_samples'] = 32
-    hp['n_grasp_samples'] = 2
+    hp['n_grasp_samples'] = 1
     mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=scenario.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
     osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt, goal_skel_names=[], max_ik_attempts=1500,
-                      joint_noise=0.01, allowed_planning_time=30, pos_noise=0.04)
+                      joint_noise=0.01, allowed_planning_time=15, pos_noise=0.04)
 
     goal.viz_goal(phy)
 
@@ -172,18 +173,19 @@ def main():
     traps.reset_trap_detection()
 
     # DEBUGGING IK and Releasing
-    # phy_plan = phy.copy_all()
-    # from mjregrasping.grasp_strategies import Strategies
-    # # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
-    # strategy = [Strategies.STAY, Strategies.MOVE]
-    # locs = np.array([-1, 1])
-    # res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz, max_ik_attempts=1000, joint_noise=0.01, allowed_planning_time=30)
-    # print(res.error_code.val)
-    # grasp_rrt.display_result(viz, res, scene_msg)
-    # deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
-    # pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
-    # run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=hp['finger_q_open'], finger_q_closed=hp['finger_q_closed'])
-    # grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    phy_plan = phy.copy_all()
+    from mjregrasping.grasp_strategies import Strategies
+    # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
+    strategy = [Strategies.NEW_GRASP, Strategies.STAY]
+    locs = np.array([1, loc0])
+    res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz, max_ik_attempts=1000, joint_noise=0.01, allowed_planning_time=30)
+    print(res.error_code.val)
+    grasp_rrt.display_result(viz, res, scene_msg)
+    deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
+    pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=hp['finger_q_open'], finger_q_closed=hp['finger_q_closed'])
+    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    return
 
     val_cmd.start_record()
 
