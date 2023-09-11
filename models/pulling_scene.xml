@@ -24,8 +24,8 @@
                     <geom name="attach" class="visual" type="box" size="0.01 0.03 0.03" rgba="1 0 0 1"/>
                     <body pos="0.03 0 0" euler="0 0 0" name="rope">
                         <inertial pos="0 0 0" quat="1 0 0 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
-                        <composite type="cable" curve="s" count="25 1 1" size="3 0.22 1">
-                            <joint kind="main" damping=".02" stiffness="0.1"/>
+                        <composite type="cable" curve="s" count="35 1 1" size="3 0.22 1">
+                            <joint kind="main" damping=".02" stiffness="0.2"/>
                             <geom type="capsule" size=".018" rgba=".8 .2 .1 1" condim="1" group="1"/>
                         </composite>
                         <joint type="ball" damping=".02"/>

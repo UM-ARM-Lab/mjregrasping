@@ -1,8 +1,8 @@
 import json
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from pathlib import Path
 
 
 def list_mean(x):
@@ -14,31 +14,32 @@ def count_grasps(x):
 
 
 def main():
-    untangle_trials_dirs = [
+    print_results_table(load_data([
         Path("results/Untangle/untangle_ours_v3"),
         Path("results/Untangle/untangle_no_signature_v1"),
         Path("results/Untangle/untangle_tamp5_v2"),
         Path("results/Untangle/untangle_tamp50_v2"),  # waiting on new results from  Freya
         Path("results/Untangle/untangle_always_blacklist_v1"),  # waiting on new results from Nova
-    ]
+    ]))
 
-    df = load_data(untangle_trials_dirs)
-    print_results_table(df)
-
-    threading_trials_dirs = [
+    print_results_table(load_data([
         Path("results/Threading/threading_ours_v2"),
         Path("results/Threading/threading_wang1"),
         Path("results/Threading/threading_tamp5_v1"),
-    ]
+    ]))
 
-    df = load_data(threading_trials_dirs)
-    print_results_table(df)
+    print_results_table(load_data([
+        Path("results/Pulling/pulling_ours_v1"),
+    ]))
 
 
 def load_data(trials_dirs):
     # First find the full list of headers
     headers = []
     for trials_dir in trials_dirs:
+        if not trials_dir.exists():
+            print(f"WARNING: {trials_dir} does not exist")
+            continue
         for trial_dir in trials_dir.iterdir():
             # load each json file and make a row with the data
             json_path = list(trial_dir.glob("*.json"))[0]
@@ -53,6 +54,9 @@ def load_data(trials_dirs):
                         headers.append(key)
     rows = []
     for trials_dir in trials_dirs:
+        if not trials_dir.exists():
+            print(f"WARNING: {trials_dir} does not exist")
+            continue
         for trial_dir in trials_dir.iterdir():
             # load each json file and make a row with the data
             json_path = list(trial_dir.glob("*.json"))[0]
@@ -69,6 +73,10 @@ def load_data(trials_dirs):
 
 
 def print_results_table(df):
+    if len(df) == 0:
+        print("No data.")
+        return
+
     agg = {
         'success':        ['sum', 'count'],
         'overall_time':   ['mean', 'std'],
