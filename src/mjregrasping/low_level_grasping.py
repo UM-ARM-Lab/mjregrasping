@@ -78,8 +78,8 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         dt = t - last_t
         print(f"{dt=:.3f}")
 
-        # Set mujoco state to match the real robot
-        # val_cmd.update_mujoco_qpos(phy)
+        # Set mujoco state to match the real robot so that we can query mujoco for FK and the jacobian and stuck
+        val_cmd.update_mujoco_qpos(phy)
 
         dcam_site = phy.d.site(camera_site_name)
 
@@ -101,7 +101,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
             plot_points_rviz(viz.markers_pub, rope_points_in_tool, idx=0, frame_id=tool_site_name,
                              label='rope points in tool', s=0.1)
 
-            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool, grasp_pos_inset=0.03)
+            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool, grasp_pos_inset=0.025)
             # q_wxyz = np.zeros(4)
             # mujoco.mju_mat2Quat(q_wxyz, grasp_mat_in_tool.flatten())
             # tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
@@ -141,6 +141,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         val_cmd.send_vel_command(phy.m, full_ctrl)
 
         if is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed) and rope_found:
+            val_cmd.send_pos_command(val_cmd.get_latest_qpos_in_mj_order())
             print("Grasp successful!")
             success = True
             break

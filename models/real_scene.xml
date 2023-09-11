@@ -1,7 +1,7 @@
 <mujoco model="untangle">
     <default>
         <joint stiffness="0.5"/>
-        <geom friction="0.001"/>
+        <geom friction="0.1"/>
         <default class="visual">
             <!-- any geom with the class "visual" will not collide with anything -->
             <geom contype="0" conaffinity="0" group="2"/>
@@ -10,7 +10,7 @@
     <include file="materials.xml"/>
     <include file="val.xml"/>
     <!-- override the high viscosity used in sim experiments because it's unrealistic -->
-    <option viscosity="0.002" timestep="0.003"/>
+    <option viscosity="0.01" timestep="0.003"/>
     <include file="real_obs.xml"/>
     <include file="floor.xml"/>
     <include file="cc_sphere.xml"/>
@@ -23,7 +23,7 @@
         <body pos="0.39 0.844 0.74" euler="0 0 3.4" name="rope">
             <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
             <composite type="cable" curve="s" count="25 1 1" size="1 0.22 1">
-                <joint kind="main" damping=".015"/>
+                <joint kind="main" damping=".015" stiffness="0.15"/>
                 <geom type="capsule" size=".01" rgba="0.8 0.2 0.1 1" condim="1" group="1"/>
             </composite>
             <joint type="free" damping="100"/>

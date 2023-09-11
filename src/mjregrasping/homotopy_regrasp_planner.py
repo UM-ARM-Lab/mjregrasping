@@ -36,7 +36,7 @@ def get_robot_dq_cost(res):
 class HomotopyRegraspPlanner:
 
     def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict,
-                 goal_skel_names: Optional[List[str]] = None, seed=0):
+                 goal_skel_names: Optional[List[str]] = None, seed=0, **ik_kwargs):
         """
 
         Args:
@@ -52,6 +52,7 @@ class HomotopyRegraspPlanner:
         self.skeletons = skeletons
         self.true_h_blacklist = []
         self.goal_skel_names = goal_skel_names
+        self.ik_kwargs = ik_kwargs
 
         self.rrt_rng = np.random.RandomState(seed)
         self.grasp_rrt = grasp_rrt
@@ -220,7 +221,8 @@ class HomotopyRegraspPlanner:
         # check if we need to move the arms at all
         any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
         if any_moving:
-            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, max_ik_attempts=100, joint_noise=0.3)
+            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, **self.ik_kwargs)
+            print(res.error_code.val)
 
             if res.error_code.val != MoveItErrorCodes.SUCCESS:
                 return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)

@@ -116,7 +116,7 @@
                                                         <geom type="mesh" mesh="PINCER_HOUSING2"
                                                               name="drive47_housing_mesh"
                                                               rgba="0.2 0.2 0.2 1"/>
-                                                        <site name="left_tool" pos="0 0 0.13" size="0.001"/>
+                                                        <site name="left_tool" pos="0 0 0.16" size="0.001"/>
                                                         <body name="left_d405_mount" pos="-0.0215 0 0.031"
                                                               euler="1.5707 -1.5707 0">
                                                             <geom type="mesh" mesh="d405_mount" name="left_d405_mount"
@@ -237,7 +237,7 @@
                                                         <geom type="mesh" mesh="PINCER_HOUSING2"
                                                               name="drive7_housing_mesh"
                                                               rgba="0.2 0.2 0.2 1"/>
-                                                        <site name="right_tool" pos="0 0 0.13" size="0.001"/>
+                                                        <site name="right_tool" pos="0 0 0.16" size="0.001"/>
                                                         <body name="right_d405_mount" pos="-0.0215 0 0.031"
                                                               euler="1.5707 -1.5707 0">
                                                             <geom type="mesh" mesh="d405_mount" name="right_d405_mount"
