@@ -45,8 +45,6 @@ def get_angle_cost(skel, loc, rope_points):
     # weight by the geodesic distance from each rope point to the loc we're threading through
     w = np.exp(-hp['thread_geodesic_w'] * np.abs(np.linspace(0, 1, rope_points.shape[1]) - loc))
     angle_cost = angle_cost @ w * hp['angle_cost_weight']
-    # self.viz.arrow('bfield_dir', rope_points[0, -1], 0.5 * bfield_dirs[0, -1], cm.Reds(angle_cost[0] / np.pi))
-    # self.viz.arrow('delta', rope_points[0, -1], rope_deltas[0, -1], cm.Reds(angle_cost[0] / np.pi))
     angle_cost = sum(angle_cost)
     if np.any(~np.isfinite(angle_cost)):
         return 100

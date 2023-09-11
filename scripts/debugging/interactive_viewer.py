@@ -15,7 +15,7 @@ from mjregrasping.grasping import activate_grasp, let_rope_move_through_gripper_
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import limit_actuator_windup, slow_when_eqs_bad
-from mjregrasping.scenarios import real_untangle
+from mjregrasping.scenarios import real_goal_sig
 from mjregrasping.viz import make_viz
 
 
@@ -108,7 +108,7 @@ def main():
     rr.init("viewer")
     rr.connect()
 
-    scenario = real_untangle
+    scenario = real_goal_sig
 
     viz = make_viz(scenario)
 

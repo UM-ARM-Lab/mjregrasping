@@ -34,8 +34,8 @@ conq_hose = Scenario(
     noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
 )
 
-real_untangle = Scenario(
-    name="RealUntangle",
+real_goal_sig = Scenario(
+    name="Real",
     xml_path=Path("models/real_scene.xml"),
     obstacle_name="obstacles",
     robot_data=val,

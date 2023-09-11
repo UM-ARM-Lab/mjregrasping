@@ -1,15 +1,16 @@
-from typing import Dict, Optional
+from typing import Dict, Optional, List
 
 import matplotlib.pyplot as plt
 import numpy as np
 import rerun as rr
 from pymjregrasping_cpp import seedOmpl
 
-from mjregrasping.goal_funcs import get_rope_points, locs_eq, get_nongrasping_rope_contact_cost
+from mjregrasping.goal_funcs import get_rope_points, locs_eq
 from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_utils import NO_HOMOTOPY, h2array, make_h_desired
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
@@ -22,9 +23,20 @@ from moveit_msgs.msg import MoveItErrorCodes, MotionPlanResponse
 from trajectory_msgs.msg import JointTrajectoryPoint
 
 
+def get_robot_dq_cost(res):
+    prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
+    dq = 0
+    for point in res.trajectory.joint_trajectory.points[1:]:
+        plan_pos = point.positions
+        dq += np.sum(np.square(np.array(plan_pos) - np.array(prev_plan_pos)))
+    dq_cost = np.clip(dq * hp['robot_dq_weight1'], 0, BIG_PENALTY * hp['robot_dq_weight2'])
+    return dq_cost
+
+
 class HomotopyRegraspPlanner:
 
-    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict,
+                 goal_skel_names: Optional[List[str]] = None, seed=0):
         """
 
         Args:
@@ -39,6 +51,7 @@ class HomotopyRegraspPlanner:
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
         self.true_h_blacklist = []
+        self.goal_skel_names = goal_skel_names
 
         self.rrt_rng = np.random.RandomState(seed)
         self.grasp_rrt = grasp_rrt
@@ -150,37 +163,44 @@ class HomotopyRegraspPlanner:
         not_stay = strategy != Strategies.STAY
         if np.any(same_locs & not_stay):
             cost = 10 * BIG_PENALTY
-            return cost, 0, 0, 0, 0
+            return cost, 0, 0, 0, 0, 0
 
         if res.error_code.val != MoveItErrorCodes.SUCCESS:
             cost = 10 * BIG_PENALTY
-            return cost, 0, 0, 0, 0
+            return cost, 0, 0, 0, 0, 0
 
         homotopy_cost = 0
-        h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
-        rope_points_plan = get_rope_points(phy_plan)
-        for blacklisted_h in self.true_h_blacklist:
-            if h_plan == blacklisted_h:
-                homotopy_cost = BIG_PENALTY
-                break
+        if hp['use_signature_cost']:
+            h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
+            for blacklisted_h in self.true_h_blacklist:
+                if h_plan == blacklisted_h:
+                    homotopy_cost = BIG_PENALTY
+                    break
 
         geodesics_cost = get_geodesic_dist(candidate_locs, self.key_loc) * hp['geodesic_weight']
 
-        prev_plan_pos = res.trajectory.joint_trajectory.points[0].positions
-        dq = 0
-        for point in res.trajectory.joint_trajectory.points[1:]:
-            plan_pos = point.positions
-            dq += np.linalg.norm(np.array(plan_pos) - np.array(prev_plan_pos))
-        dq_cost = np.clip(dq, 0, BIG_PENALTY / 2) * hp['robot_dq_weight']
+        dq_cost = get_robot_dq_cost(res)
 
         rope_points0 = get_rope_points(phy0)
+        rope_points_plan = get_rope_points(phy_plan)
         drope = np.linalg.norm(rope_points_plan - rope_points0, axis=-1).mean()
         drope_cost = np.clip(drope, 0, BIG_PENALTY / 2) * hp['rope_dq_weight']
 
-        return 0, dq_cost, drope_cost, homotopy_cost, geodesics_cost
+        if self.goal_skel_names is None:
+            goal_sig_cost = 0
+        else:
+            h, _ = get_full_h_signature_from_phy(self.skeletons, phy_plan)
+            if h == NO_HOMOTOPY:
+                goal_sig_cost = BIG_PENALTY
+            else:
+                h_desired = h2array(make_h_desired(self.skeletons, self.goal_skel_names))
+                h = h2array(h)
+                goal_sig_cost = sum(np.abs(np.array(h) - h_desired)) * BIG_PENALTY
+
+        return 0, dq_cost, drope_cost, homotopy_cost, goal_sig_cost, geodesics_cost
 
     def get_cost_names(self):
-        return ["penalty", "dq", "drope", "homotopy", "geodesic"]
+        return ["penalty", "dq", "drope", "homotopy", "goal_sig_cost", "geodesic"]
 
     def cost(self, sim_grasp: SimGraspCandidate):
         costs = self.costs(sim_grasp)
@@ -194,37 +214,34 @@ class HomotopyRegraspPlanner:
         viz = viz if viz_execution else None
         phy_plan = phy.copy_all()
 
-        res = MotionPlanResponse()
-        res.error_code.val = MoveItErrorCodes.SUCCESS
-        point = JointTrajectoryPoint()
-        point.positions = get_q(phy_plan)
-        res.trajectory.joint_trajectory.points.append(point)
-
         # release and settle for any moving grippers
         deactivate_release_and_moving(phy_plan, strategy, viz=viz, is_planning=True)
 
-        # if the rope is still touching the grippers that should be moving or releasing, penalize this, because
-        # this means the fingers will likely tangle!
-        if get_nongrasping_rope_contact_cost(phy_plan, candidate_locs) > 0:
-            res.error_code.val = MoveItErrorCodes.START_STATE_IN_COLLISION
+        # check if we need to move the arms at all
+        any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
+        if any_moving:
+            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, max_ik_attempts=100, joint_noise=0.3)
+
+            if res.error_code.val != MoveItErrorCodes.SUCCESS:
+                return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+
+            if viz_execution and viz is not None:
+                self.grasp_rrt.display_result(viz, res, scene_msg)
+                # print(f'dq: {get_robot_dq_cost(res):.1f}')
+
+            # Teleport to the final planned joint configuration
+            teleport_to_end_of_plan(phy_plan, res)
+            if viz_execution:
+                viz.viz(phy_plan, is_planning=True)
         else:
-            # check if we need to move the arms at all
-            any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
-            if any_moving:
-                res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz)
+            res = MotionPlanResponse()
+            res.error_code.val = MoveItErrorCodes.SUCCESS
+            point = JointTrajectoryPoint()
+            point.positions = get_q(phy_plan)
+            res.trajectory.joint_trajectory.points.append(point)
 
-                if res.error_code.val != MoveItErrorCodes.SUCCESS:
-                    return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
-
-                if viz_execution and viz is not None:
-                    self.grasp_rrt.display_result(viz, res, scene_msg)
-
-                # Teleport to the final planned joint configuration
-                teleport_to_end_of_plan(phy_plan, res)
-                if viz_execution:
-                    viz.viz(phy_plan, is_planning=True)
-            # Activate grasps
-            grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
+        # Activate grasps
+        grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
 
         return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
 

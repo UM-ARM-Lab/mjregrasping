@@ -19,7 +19,7 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-from mjregrasping.scenarios import real_untangle, get_real_untangle_skeletons
+from mjregrasping.scenarios import real_goal_sig, get_real_untangle_skeletons
 from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import make_viz, Viz
 from srv import SetCDCPDState, SetCDCPDStateRequest
@@ -33,7 +33,7 @@ def main():
     rr.init('untangle')
     rr.connect()
 
-    scenario = real_untangle
+    scenario = real_goal_sig
 
     viz = make_viz(scenario)
     cdcpd_sub = Listener("/cdcpd_pred", MarkerArray)

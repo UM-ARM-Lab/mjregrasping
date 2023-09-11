@@ -31,7 +31,8 @@ hp = {
     "nongrasping_rope_contact_weight": 0.5,
     "nongrasping_rope_dist_weight":    0.15,
     "gripper_to_goal_weight":          1.0,
-    "robot_dq_weight":                 0.3,
+    "robot_dq_weight1":                0.01,
+    "robot_dq_weight2":                0.5,
     "rope_dq_weight":                  6.0,
     "max_contact_cost":                1,
     "max_expected_contacts":           6,
@@ -52,5 +53,7 @@ hp = {
     "wang_scootch_fraction":           0.03,
     "ours_scootch_fraction":           0.005,
     # Use 5 for a 'fast' baseline (still slower than our method), and 50 for strong baseline
-    "tamp_horizon":                    5, # 50,
+    "tamp_horizon":                    5,  # 50,
+    "untangle_max_iters":              300,
+    "use_signature_cost":              True,
 }

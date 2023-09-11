@@ -33,7 +33,7 @@ def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning
 
 def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool,
                           mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None,
-                          n_open_steps: int = 20):
+                          n_open_steps: int = 5):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -95,7 +95,7 @@ def settle_with_checks(phy: Physics, viz: Optional[Viz], is_planning: bool, mov:
         rope_displacements = np.linalg.norm(rope_points - last_rope_points, axis=-1)
         robot_displacements = np.abs(q - last_q)
         is_unstable = phy.d.warning.number.sum() > 0
-        rope_settled = np.max(rope_displacements) < 0.005
+        rope_settled = np.max(rope_displacements) < 0.01
         robot_settled = np.max(robot_displacements) < np.deg2rad(1)
         if robot_settled and rope_settled or is_unstable:
             return

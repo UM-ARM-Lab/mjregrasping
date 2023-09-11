@@ -2,7 +2,7 @@
 import multiprocessing
 from concurrent.futures.thread import ThreadPoolExecutor
 from time import perf_counter
-from typing import Optional
+from typing import Optional, List
 
 import mujoco
 import numpy as np
@@ -27,7 +27,7 @@ from mjregrasping.regrasp_planner_utils import get_geodesic_dist
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step, get_speed_factor
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import val_untangle, real_untangle, dz, dx, z_axis
+from mjregrasping.scenarios import val_untangle, real_goal_sig, dz, dx, z_axis
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.viz import make_viz, Viz
@@ -49,10 +49,10 @@ class BaseOnStuckMethod:
 
 class OnStuckOurs(BaseOnStuckMethod):
 
-    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT, goal_skel_names: Optional[List[str]]=None):
         super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
-        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
+        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons, goal_skel_names)
 
     def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander]):
         initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
@@ -110,27 +110,13 @@ def get_real_untangle_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
     return {
-        "loop1":            np.array([
-            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
-            d.geom("leg1").xpos + dz(m.geom("leg1").size[2]),
-            d.geom("leg4").xpos + dz(m.geom("leg4").size[2]),
-            d.geom("leg4").xpos - dz(m.geom("leg4").size[2]),
-            d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),
+        "loop1": np.array([
+            d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]),
+            d.geom("loop1_front").xpos + dz(m.geom("loop1_front").size[2]),
+            d.geom("loop1_back").xpos + dz(m.geom("loop1_back").size[2]),
+            d.geom("loop1_back").xpos - dz(m.geom("loop1_back").size[2]),
+            d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]),
         ]),
-        "ladder1":          np.array([
-            d.geom("back_step2").xpos - dx(m.geom("back_step2").size[0]) * 0.75,
-            d.geom("back_step2").xpos + dx(m.geom("back_step2").size[0]) * 0.75,
-            d.geom("back_step1").xpos + dx(m.geom("back_step1").size[0]) * 0.95,
-            d.geom("back_step1").xpos - dx(m.geom("back_step1").size[0]) * 0.95,
-            d.geom("back_step2").xpos - dx(m.geom("back_step2").size[0]) * 0.75,
-        ]),
-        "ladder_left_side": np.array([
-            d.geom("back_left_rail").xpos - z_axis(d, "back_left_rail") * m.geom("back_left_rail").size[2],
-            d.geom("back_left_rail").xpos + z_axis(d, "back_left_rail") * m.geom("back_left_rail").size[2] * 0.9,
-            d.geom("front_left_rail").xpos + z_axis(d, "front_left_rail") * m.geom("front_left_rail").size[2] * 0.9,
-            d.geom("front_left_rail").xpos - z_axis(d, "front_left_rail") * m.geom("front_left_rail").size[2],
-            d.geom("back_left_rail").xpos - z_axis(d, "back_left_rail") * m.geom("back_left_rail").size[2],
-        ])
     }
 
 
@@ -141,7 +127,7 @@ def main():
     rr.init('untangle')
     rr.connect()
 
-    scenario = real_untangle
+    scenario = real_goal_sig
 
     gl_ctx = mujoco.GLContext(1280, 720)
     gl_ctx.make_current()
@@ -171,40 +157,32 @@ def main():
     hp['finger_q_pregrasp'] = 0.5
     hp['finger_q_open'] = 0.5
     hp['finger_q_closed'] = -0.15
-    hp['horizon'] = 10
-    hp['n_samples'] = 36
-    hp['n_grasp_samples'] = 20
-    hp['robot_dq_weight'] = 0.2
-    hp['grasp_loc_diff_thresh'] = 0.04
-    # I think the rope is super noisy because of CDCPD so I'm turning this down?
-    hp['trap_q_rope_weight'] = 0.05
-    hp['frac_dq_threshold'] = 0.3
+    hp['horizon'] = 5
+    hp['n_samples'] = 32
+    hp['n_grasp_samples'] = 5
     mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=scenario.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
-    osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+    osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt, goal_skel_names=[])
 
     goal.viz_goal(phy)
 
     mppi.reset()
     traps.reset_trap_detection()
 
-    # for testing in sim
-    # val_cmd = None
-
     # DEBUGGING IK and Releasing
-    # phy_plan = phy.copy_all()
-    # from mjregrasping.grasp_strategies import Strategies
-    # # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
-    # strategy = [Strategies.STAY, Strategies.MOVE]
-    # locs = np.array([-1, 0.41])
-    # res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz)
-    # print(res.error_code.val)
-    # grasp_rrt.display_result(viz, res, scene_msg)
-    # deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
-    # pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
-    # run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.05)
-    # grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    phy_plan = phy.copy_all()
+    from mjregrasping.grasp_strategies import Strategies
+    # grasp_rrt.fix_start_state_in_place(phy_plan, viz)
+    strategy = [Strategies.STAY, Strategies.MOVE]
+    locs = np.array([-1, 1])
+    res, scene_msg = grasp_rrt.plan(phy_plan, strategy, locs, viz)
+    print(res.error_code.val)
+    grasp_rrt.display_result(viz, res, scene_msg)
+    deactivate_release_and_moving(phy, strategy, viz=viz, is_planning=False, val_cmd=val_cmd)
+    pid_to_joint_configs(phy, res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+    run_grasp_controller(val_cmd, phy, tool_idx=1, viz=viz, finger_q_open=0.5, finger_q_closed=0.05)
+    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
 
     val_cmd.start_record()
 

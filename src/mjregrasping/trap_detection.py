@@ -2,7 +2,9 @@ import numpy as np
 import rerun as rr
 
 from mjregrasping.buffer import Buffer
+from mjregrasping.goals import GraspLocsGoal
 from mjregrasping.params import hp
+from mjregrasping.physics import Physics
 
 
 def get_q_for_trap_detection(phy):
@@ -22,7 +24,12 @@ class TrapDetection:
         self.state_history.reset()
         self.max_dq = 0
 
-    def check_is_stuck(self, phy):
+    def check_is_stuck(self, phy: Physics, grasp_goal: GraspLocsGoal):
+        not_moving = self.check_is_not_moving(phy)
+        no_grasp_goals = np.all(grasp_goal.get_grasp_locs() == -1)
+        return not_moving or no_grasp_goals
+
+    def check_is_not_moving(self, phy: Physics):
         latest_q = get_q_for_trap_detection(phy)
         self.state_history.insert(latest_q)
         qs = np.array(self.state_history.data)

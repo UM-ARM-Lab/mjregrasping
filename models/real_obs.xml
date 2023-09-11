@@ -1,24 +1,11 @@
 <mujoco model="real_obs">
     <worldbody>
         <body name="obstacles" pos="-0.06 -0.02 -0.43" euler="0.03 0 0.025">
-            <body name="ladder" pos="0.75 0.20 -0.02">
-                <geom name="front_left_rail" type="box" pos="-0.18 -0.20 0.64" euler="-0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
-                <geom name="back_left_rail" type="box" pos="-0.18 0.20 0.64" euler="0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
-                <geom name="front_right_rail" type="box" pos="0.18 -0.20 0.64" euler="-0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
-                <geom name="back_right_rail" type="box" pos="0.18 0.20 0.64" euler="0.3 0 0" size="0.02 0.055 0.7" material="metal"/>
-                <geom name="front_step1" type="box" pos="0.0 -0.05 1.13" size="0.19 0.03 0.03" material="metal"/>
-                <geom name="back_step1" type="box" pos="0.0 0.04 1.13" size="0.19 0.03 0.03" material="metal"/>
-                <geom name="front_step2" type="box" pos="0.0 -0.14 0.84" size="0.235 0.03 0.03" material="metal"/>
-                <geom name="back_step2" type="box" pos="0.0 0.14 0.84" size="0.235 0.03 0.03" material="metal"/>
-            </body>
             <body name="walls">
                 <body name="front_wall" pos="-0.05 0.97 1">
                     <geom name="front_wall" type="box" size="1 0.02 1.1" material="cream-plaster"/>
                     <body name="outlet_bar" pos="0 -0.025 0.106">
                         <geom name="outlet_bar" type="box" pos="0 0 0" size="1 0.025 0.11" material="metal"/>
-                        <body name="goal" pos="0.05 -0.03 0">
-                            <geom name="goal" pos="0 -0.04 0.02" class="visual" type="sphere" size="0.1" rgba="0.8 0.5 0.8 0.5"/>
-                        </body>
                     </body>
                     <body name="tv" pos="0 -0.05 0.64">
                         <geom name="tv" type="box" pos="0 0 0" size="0.6 0.05 0.3" rgba="0 0 0 1"/>
@@ -28,11 +15,23 @@
                     </body>
                 </body>
                 <geom name="right_wall" type="box" pos="0.85 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
-                <geom name="left_wall" type="box" pos="-0.48 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="left_wall" type="box" pos="-0.48 0 1" euler="0 0 0.1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
                 <geom name="back_wall" type="box" pos="0.0 -0.35 1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
             </body>
             <body name="table" pos="-0.31 0.715 0">
                 <body name="top" pos="0 0 0.70">
+                    <body name="goal" pos="0.14 0.4 0.05">
+                        <geom name="goal" class="visual" type="sphere" size="0.07" pos="0.045 0 0" rgba="1 0 1 0.3"/>
+                    </body>
+                    <body name="loop1" pos="0.21 0 0.27">
+                        <geom type="box" name="loop1_top" pos="0 0 0.225" size="0.025 0.25 0.025" rgba="0.5 0.5 1.0 1"/>
+                        <geom type="box" name="loop1_bottom" pos="0 0 -0.225" size="0.025 0.25 0.025" rgba="0.5 0.5 1.0 1"/>
+                        <geom type="box" name="loop1_front" pos="0 0.225 0.0" size="0.025 0.025 0.25" rgba="0.5 0.5 1.0 1"/>
+                        <geom type="box" name="loop1_back" pos="0 -0.225 0.0" size="0.025 0.025 0.25" rgba="0.5 0.5 1.0 1"/>
+                        <geom type="box" pos="-0.14 0 -0.225" size="0.025 0.25 0.025" rgba="0.5 0.5 1.0 1"/>
+                        <geom type="box" pos="-0.07 0.225 -0.225" size="0.07 0.025 0.025" rgba="0.5 0.5 1.0 1"/>
+                        <geom type="box" pos="-0.07 -0.225 -0.225" size="0.07 0.025 0.025" rgba="0.5 0.5 1.0 1"/>
+                    </body>
                     <geom name="top" type="box" size="0.79 0.255 0.038" rgba="0.35 0.45 0.5 1.0"/>
                     <geom name="left_rim" type="cylinder" pos="0.79 0 0" zaxis="0 1 0" size="0.038 0.255" rgba="0.35 0.45 0.5 1.0"/>
                     <geom name="front_rim" type="cylinder" pos="0 -0.255 0" zaxis="1 0 0" size="0.038 0.79" rgba="0.35 0.45 0.5 1.0"/>
