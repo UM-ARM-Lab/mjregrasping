@@ -172,7 +172,17 @@ class RealValCommander:
         for i in range(cdcpd_n_points):
             eq = phy.m.eq(f'B_{i}')
             eq.active = 0
-        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 8))
+
+        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 2))
+
+    def get_cdcpd_np(self):
+        cdcpd_marker_array = self.cdcpd_sub.get()
+        cdcpd_np = np.zeros((len(cdcpd_marker_array.markers) - 1, 3))
+        for i, marker in enumerate(cdcpd_marker_array.markers[:-1]):
+            cdcpd_np[i, 0] = marker.pose.position.x
+            cdcpd_np[i, 1] = marker.pose.position.y
+            cdcpd_np[i, 2] = marker.pose.position.z
+        return cdcpd_np
 
     def set_cdcpd_from_mj_rope(self, phy: Physics):
         set_cdcpd_req = SetCDCPDStateRequest()

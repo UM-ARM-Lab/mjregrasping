@@ -6,10 +6,11 @@ import rerun as rr
 from pymjregrasping_cpp import seedOmpl
 
 from mjregrasping.goal_funcs import get_rope_points, locs_eq
-from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle
+from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle, deactivate_moving, \
+    deactivate_release
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_h_signature_from_phy, through_skels
 from mjregrasping.homotopy_utils import NO_HOMOTOPY, h2array, make_h_desired
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
@@ -258,3 +259,113 @@ class HomotopyRegraspPlanner:
         if sum([s_i in [Strategies.MOVE, Strategies.NEW_GRASP] for s_i in s]) > 1:
             return False
         return True
+
+
+class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
+
+    def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, goal_skel_names: List[str], seed=0):
+        super().__init__(key_loc, grasp_rrt, skeletons, seed)
+        self.goal_skel_names = goal_skel_names
+
+    def sample_grasp_inputs(self, phy):
+        grasps_inputs = []
+        is_grasping = get_is_grasping(phy)
+        new_is_grasping = 1 - is_grasping
+        strategy = [Strategies.NEW_GRASP if is_grasping_i else Strategies.RELEASE for is_grasping_i in new_is_grasping]
+
+        for i in range(hp['threading_n_samples']):
+            if i == 0:  # ensure we always try the tip
+                sample_loc = 1.0
+            else:
+                sample_loc = self.sample_loc_with_reflection()
+            candidate_locs = []
+            for tool_name, s_i in zip(phy.o.rd.tool_sites, strategy):
+                if s_i == Strategies.NEW_GRASP:
+                    candidate_locs.append(sample_loc)
+                elif s_i == Strategies.RELEASE:
+                    candidate_locs.append(-1)
+
+            candidate_locs = np.array(candidate_locs)
+
+            grasps_inputs.append(SimGraspInput(strategy, candidate_locs))
+        return grasps_inputs
+
+    def sample_loc_with_reflection(self):
+        """ Reflection means if we sample a loc like 1.1 which is greater that 1, we reflect that and return 0.9 """
+        sample_loc = self.rng.normal(self.key_loc, 0.04)
+        if sample_loc > 1.0:
+            sample_loc = 2 - sample_loc
+        elif sample_loc < 0.0:
+            sample_loc = -sample_loc
+        return sample_loc
+
+    def is_valid_strategy(self, s, is_grasping):
+        is_valid = super().is_valid_strategy(s, is_grasping)
+        will_be_grasping = [get_will_be_grasping(s_i, g_i) for s_i, g_i in zip(s, is_grasping)]
+        if np.all(will_be_grasping):
+            is_valid = False
+        if s[0] == Strategies.NEW_GRASP and s[1] == Strategies.MOVE:
+            is_valid = False
+        if s[1] == Strategies.NEW_GRASP and s[0] == Strategies.MOVE:
+            is_valid = False
+        return is_valid
+
+    def simulate_grasp(self, phy: Physics, viz: Optional[Viz], grasp_input: SimGraspInput, viz_execution=False):
+        strategy = grasp_input.strategy
+        candidate_locs = grasp_input.candidate_locs
+        initial_locs = get_grasp_locs(phy)
+
+        viz = viz if viz_execution else None
+        phy_plan = phy.copy_all()
+
+        deactivate_moving(phy_plan, strategy, viz=viz, is_planning=True)
+
+        # check if we need to move the arms at all
+        any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
+        if any_moving:
+            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, joint_noise=0.1)
+
+            if res.error_code.val != MoveItErrorCodes.SUCCESS:
+                return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+
+            if viz_execution and viz is not None:
+                self.grasp_rrt.display_result(viz, res, scene_msg)
+
+            # Teleport to the final planned joint configuration
+            teleport_to_end_of_plan(phy_plan, res)
+            if viz_execution:
+                viz.viz(phy_plan, is_planning=True)
+        else:
+            res = MotionPlanResponse()
+            res.error_code.val = MoveItErrorCodes.SUCCESS
+            point = JointTrajectoryPoint()
+            point.positions = get_q(phy_plan)
+            res.trajectory.joint_trajectory.points.append(point)
+
+        grasp_and_settle(phy_plan, candidate_locs, viz, is_planning=True)
+
+        deactivate_release(phy_plan, strategy, viz=viz, is_planning=True)
+
+        return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)
+
+    def costs(self, sim_grasp: SimGraspCandidate):
+        costs = super().costs(sim_grasp)
+
+        phy = sim_grasp.phy
+        h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
+        if h == NO_HOMOTOPY:
+            threading_homotopy_cost = BIG_PENALTY
+        else:
+            h_desired = h2array(make_h_desired(self.skeletons, self.goal_skel_names))
+            h = h2array(h)
+            threading_homotopy_cost = sum(np.abs(np.array(h) - h_desired)) * BIG_PENALTY
+
+        return costs + (threading_homotopy_cost,)
+
+    def through_skels(self, phy: Physics):
+        return through_skels(self.skeletons, self.goal_skel_names, phy)
+
+    def get_cost_names(self):
+        cost_names = super().get_cost_names()
+        cost_names.append('threading_homotopy')
+        return cost_names

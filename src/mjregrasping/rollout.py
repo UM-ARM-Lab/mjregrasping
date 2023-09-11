@@ -41,14 +41,8 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
 
     if val_cmd:
         mj_q = get_full_q(phy)
-        if abs(qvel_target[9]) < 1e-3 and abs(qvel_target[17]) < 1e-3:
-            real_q = val_cmd.get_latest_qpos_in_mj_order()
-            mj_q[9] = real_q[9]
-            mj_q[10] = real_q[10]
-            mj_q[18] = real_q[18]
-            mj_q[19] = real_q[19]
         val_cmd.send_pos_command(mj_q)
-        val_cmd.pull_rope_towards_cdcpd(phy, n_sub_time)
+        # val_cmd.pull_rope_towards_cdcpd(phy, n_sub_time)
 
 
 def slow_when_eqs_bad(phy):

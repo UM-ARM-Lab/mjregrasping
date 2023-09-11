@@ -322,14 +322,15 @@ class ThreadingGoal(ObjectPointGoalBase):
 
         angle_cost = get_angle_cost(self.skel, self.loc, rope_points)
 
-        torso_cost = sum(np.abs(joint_positions[:, 1] - 0.2) * hp['torso_weight'])
+        # penalize dist in Y
+        reachablility = np.sum(keypoint[:, 1]) * hp['reachablility_weight']
 
         return (
             contact_cost,
             unstable_cost,
             angle_cost,
             keypoint_cost,
-            torso_cost,
+            reachablility,
             grasp_finger_cost,
             grasp_pos_cost,
             nongrasping_rope_contact_cost,
@@ -346,7 +347,7 @@ class ThreadingGoal(ObjectPointGoalBase):
             "unstable",
             "threading_angle",
             "threading_keypoint",
-            "torso_cost",
+            "reachability",
             "grasp_finger",
             "grasp_pos",
             "nongrasping_rope_contact",
@@ -356,14 +357,15 @@ class ThreadingGoal(ObjectPointGoalBase):
             "smoothness",
         ]
 
-    def satisfied(self, phy: Physics, disc_center, disc_normal, disc_rad):
+    def satisfied(self, phy: Physics, disc_center, disc_normal, disc_rad, end_loc):
         # NOTE: always using 1 here means regardless of which loc we're trying to push through the loop,
         #  check whether the tip is penetrating the disc
-        satisfied = penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy, 1.0, self.viz)
+        satisfied = penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy, end_loc, self.viz)
         return satisfied
 
 
-def penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy: Physics, loc: float, viz: Optional[Viz]):
+def penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy: Physics, loc: float, viz: Optional[Viz],
+                                   other_side_thresh=0.03):
     disc_normal = disc_normal / norm(disc_normal)
     xpos = grasp_locations_to_xpos(phy, [loc])[0]
     # project xpos into the place of the disc, defined by the disc center and normal
@@ -371,8 +373,8 @@ def penetrating_disc_approximation(disc_center, disc_normal, disc_rad, phy: Phys
     projected_xpos = xpos - np.dot(xpos - disc_center, disc_normal) * disc_normal
     # check if the projected xpos is within the disc
     dist = norm(projected_xpos - disc_center)
-    # also check if the origin xpos is on the positive half of the disc plane
-    satisfied = dist < disc_rad and np.dot(xpos - disc_center, disc_normal) > 0
+    # also check if the origin xpos is on the positive half of the disc plane (Z > other_side_thresh)
+    satisfied = dist < disc_rad and np.dot(xpos - disc_center, disc_normal) > other_side_thresh
     if viz:
         viz.sphere('projected_xpos', projected_xpos, 0.001, 'g' if satisfied else 'r')
         disc_marker_msg = Marker()
@@ -412,3 +414,9 @@ def point_goal_from_geom(grasp_goal: GraspLocsGoal, phy: Physics, geom: str, loc
     goal_point = phy.d.geom(geom).xpos
     goal_radius = phy.m.geom(geom).size[0] - 0.01
     return ObjectPointGoal(grasp_goal, goal_point, goal_radius, loc, viz)
+
+
+def get_disc_params(goal):
+    disc_center = np.mean(goal.skel[:4], axis=0)
+    disc_normal = skeleton_field_dir(goal.skel, disc_center[None])[0] * 0.01
+    return disc_center, disc_normal

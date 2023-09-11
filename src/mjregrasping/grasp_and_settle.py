@@ -65,7 +65,7 @@ def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov
             continue
         ctrl[ctrl_i] = -0.4
         activate_grasp(phy, eq_name, grasp_loc_i)
-        let_rope_move_through_gripper_geoms(phy, 200)
+        # let_rope_move_through_gripper_geoms(phy, 200)
     if val_cmd:
         val_cmd.set_cdcpd_grippers(phy)
     for _ in range(n_close_steps):

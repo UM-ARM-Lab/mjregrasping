@@ -2,7 +2,6 @@ from time import perf_counter
 from typing import Optional
 
 import cv2
-import mujoco
 import numpy as np
 import open3d as o3d
 import pymanopt
@@ -13,18 +12,20 @@ from pymanopt.manifolds import SpecialOrthogonalGroup
 
 import ros_numpy
 import rospy
+from arc_utilities.tf2wrapper import TF2Wrapper
 from mjregrasping.homotopy_utils import make_ring_skeleton, skeleton_field_dir
 from mjregrasping.jacobian_ctrl import get_jacobian_ctrl
-from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.my_transforms import mj_transform_points
 from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
-from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rviz import plot_points_rviz
-from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import Viz
 from ros_numpy.point_cloud2 import merge_rgb_fields
 from sensor_msgs.msg import PointCloud2, Image
+
+
+class GraspFailed(Exception):
+    pass
 
 
 def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int, viz: Viz, finger_q_closed: float,
@@ -36,6 +37,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
     rgb_pub = rospy.Publisher("grasp_rgb", Image, queue_size=10)
     mask_pub = rospy.Publisher("grasp_mask", Image, queue_size=10)
     pc_pub = rospy.Publisher("grasp_pc", PointCloud2, queue_size=10)
+    tfw = TF2Wrapper()
 
     tool_site_name = phy.o.rd.tool_sites[tool_idx]
     tool_site = phy.d.site(tool_site_name)
@@ -62,9 +64,9 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
 
     v_scale = 0.05
     w_scale = 0.05
-    jnt_lim_avoidance = 0.01
+    jnt_lim_avoidance = 0.04
     max_v_norm = 0.01
-    gripper_kp = 0.8
+    gripper_kp = 1.3
 
     gripper_q_indices = [phy.m.actuator(a).trnid[0] for a in phy.o.rd.gripper_actuator_names]
     tool_frame_name = phy.o.rd.tool_sites[tool_idx]
@@ -77,15 +79,13 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
 
     last_t = perf_counter()
     success = False
-    for idx in range(50):
+    for idx in range(125):
         t = perf_counter()
         dt = t - last_t
-        print(f"{dt=:.3f}")
+        # print(f"{dt=:.3f}")
 
         # Set mujoco state to match the real robot so that we can query mujoco for FK and the jacobian and stuck
         val_cmd.update_mujoco_qpos(phy)
-        # q = val_cmd.get_latest_qpos_in_mj_order()
-        # pid_to_joint_config(phy, viz, val_dedup(q), DEFAULT_SUB_TIME_S, reached_tol=2, stopped_tol=999)
 
         dcam_site = phy.d.site(camera_site_name)
 
@@ -105,21 +105,23 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
             plot_points_rviz(viz.markers_pub, rope_points_in_tool, idx=0, frame_id=tool_site_name,
                              label='rope points in tool', s=0.1)
 
-            grasp_mat_in_tool, grasp_pos_in_tool = get_best_grasp(rope_points_in_tool, grasp_pos_inset=0.025)
-            # q_wxyz = np.zeros(4)
-            # mujoco.mju_mat2Quat(q_wxyz, grasp_mat_in_tool.flatten())
-            # tfw.send_transform(grasp_pos_in_tool, np_wxyz_to_xyzw(q_wxyz), tool_frame_name, 'grasp_pose_in_tool')
-
-            radius = 0.01
-            grasp_z_in_tool = grasp_mat_in_tool[:, 2]
-            skeleton = make_ring_skeleton(grasp_pos_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
-            viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
-
-            v_in_tool = get_v_in_tool(skeleton, v_scale, max_v_norm)
+            print("Using rope mask")
+            grasp_mat_in_tool, grasp_pos_in_tool = get_grasp_for_closest_point(rope_points_in_tool,
+                                                                               grasp_pos_inset=0.02)
         else:
-            print("No points found! Backing up ")
-            grasp_mat_in_tool = np.eye(3)
-            v_in_tool = np.array([0, 0, -max_v_norm])
+            print("Using CDCPD")
+            zivid2tool = tfw.get_transform(tool_frame_name, "zivid_optical_frame")
+            cdcpd_in_tool = val_cmd.get_cdcpd_np() @ zivid2tool[:3, :3].T + zivid2tool[:3, 3]
+            plot_points_rviz(viz.markers_pub, cdcpd_in_tool, idx=0, frame_id=tool_frame_name, label='cdcpd_in_tool',
+                             color='b')
+            grasp_mat_in_tool, grasp_pos_in_tool = get_grasp_cdcpd(cdcpd_in_tool, grasp_pos_inset=0.02)
+
+        radius = 0.01
+        grasp_z_in_tool = grasp_mat_in_tool[:, 2]
+        skeleton = make_ring_skeleton(grasp_pos_in_tool, -grasp_z_in_tool, radius, delta_angle=0.5)
+        viz.lines(skeleton, "ring", 0, 0.007, 'g', frame_id=tool_frame_name)
+
+        v_in_tool = get_v_in_tool(skeleton, v_scale, max_v_norm)
 
         v_in_world = tool2world_mat @ v_in_tool
         viz.arrow("v", tool_site_pos, v_in_world, 'w')
@@ -142,7 +144,7 @@ def run_grasp_controller(val_cmd: RealValCommander, phy: Physics, tool_idx: int,
         full_ctrl[act_indices] = ctrl
 
         # send commands to the robot
-        # val_cmd.send_vel_command(phy.m, full_ctrl)
+        val_cmd.send_vel_command(phy.m, full_ctrl)
 
         if is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed) and rope_found:
             val_cmd.send_pos_command(val_cmd.get_latest_qpos_in_mj_order())
@@ -165,22 +167,19 @@ def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: st
                      pc_pub: Optional[rospy.Publisher] = None,
                      rgb_pub: Optional[rospy.Publisher] = None,
                      mask_pub: Optional[rospy.Publisher] = None):
-    t0 = perf_counter()
     frames = pipe.wait_for_frames()
     align = rs.align(rs.stream.color)
     aligned_frames = align.process(frames)
     rgb_frame = aligned_frames.first(rs.stream.color)
     rgb = np.asanyarray(rgb_frame.get_data())
     depth_frame = aligned_frames.get_depth_frame()
-    print(f"read_and_segment took {perf_counter() - t0:.3f}s")
 
     # Save for training
-    # from time import time
-    # from PIL import Image as PImage
-    # now = int(time())
-    # PImage.fromarray(rgb).save(f"imgs/rgb_{now}.png")
+    from time import time
+    from PIL import Image as PImage
+    now = int(time())
+    PImage.fromarray(rgb).save(f"imgs/rgb_{now}.png")
 
-    t0 = perf_counter()
     if rgb_pub:
         rgb_msg = ros_numpy.msgify(Image, rgb, encoding='rgb8')
         rgb_pub.publish(rgb_msg)
@@ -215,12 +214,32 @@ def read_and_segment(far_threshold, pipe, predictor: Predictor, camera_frame: st
         rgb[~seg_mask] = 0
         mask_msg = ros_numpy.msgify(Image, rgb, encoding='rgb8')
         mask_pub.publish(mask_msg)
-    print(f"segmentation and such {perf_counter() - t0:.3f}s")
 
     return points_xyz_masked
 
 
-def get_best_grasp(rope_points_in_tool, grasp_pos_inset: float):
+def get_grasp_cdcpd(cdcpd_in_tool, grasp_pos_inset: float):
+    cdcpd_pred_torch = torch.from_numpy(cdcpd_in_tool)
+
+    # Take the closest point to the tool tip, which is where the grippers will close
+    distances = np.linalg.norm(cdcpd_in_tool, axis=-1)
+    distances_sorted_idx = np.argsort(distances)
+    closest_idx = distances_sorted_idx[0]
+    grasp_pos_in_tool = cdcpd_in_tool[closest_idx]
+
+    # use PCA of the closest 4 points to the tool tip to extract the long (x) direction of the rope
+    cdcpd_near_torch = cdcpd_pred_torch[distances_sorted_idx[:4]]
+    _, _, V = torch.pca_lowrank(cdcpd_near_torch)
+    rope_x_in_tool = V[:, 0]
+    grasp_mat_in_tool = np.eye(3)
+
+    grasp_mat_in_tool, grasp_pos_in_tool = opt_grasp(grasp_mat_in_tool, grasp_pos_in_tool, rope_x_in_tool,
+                                                     grasp_pos_inset)
+
+    return grasp_mat_in_tool, grasp_pos_in_tool
+
+
+def get_grasp_for_closest_point(rope_points_in_tool, grasp_pos_inset: float):
     """
 
     Args:
@@ -239,6 +258,13 @@ def get_best_grasp(rope_points_in_tool, grasp_pos_inset: float):
     rope_x_in_tool = V[:, 0]
     grasp_mat_in_tool = np.eye(3)
 
+    grasp_mat_in_tool, grasp_pos_in_tool = opt_grasp(grasp_mat_in_tool, grasp_pos_in_tool, rope_x_in_tool,
+                                                     grasp_pos_inset)
+
+    return grasp_mat_in_tool, grasp_pos_in_tool
+
+
+def opt_grasp(grasp_mat_in_tool, grasp_pos_in_tool, rope_x_in_tool, grasp_pos_inset):
     SO3 = SpecialOrthogonalGroup(3)
     manifold = SO3
 
@@ -256,25 +282,7 @@ def get_best_grasp(rope_points_in_tool, grasp_pos_inset: float):
     optimizer = pymanopt.optimizers.SteepestDescent(max_iterations=15, min_step_size=5e-4, verbosity=0)
     result = optimizer.run(problem, initial_point=grasp_mat_in_tool)
     grasp_mat_in_tool = result.point
-
     grasp_pos_in_tool += grasp_mat_in_tool[:, 2] * grasp_pos_inset  # helps grasp deeper in the gripper
-
-    # TODO: use open3d plane segmentation to avoid smashing the fingers into the table or walls
-    # plane_model, inliers = pcd.segment_plane(distance_threshold=0.01,
-    #                                          ransac_n=3,
-    #                                          num_iterations=1000)
-    # [a, b, c, d] = plane_model
-    # print(f"Plane equation: {a:.2f}x + {b:.2f}y + {c:.2f}z + {d:.2f} = 0")
-    #
-    # inlier_cloud = pcd.select_by_index(inliers)
-    # inlier_cloud.paint_uniform_color([1.0, 0, 0])
-    # outlier_cloud = pcd.select_by_index(inliers, invert=True)
-    # o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud],
-    #                                   zoom=0.8,
-    #                                   front=[-0.4999, -0.1659, -0.8499],
-    #                                   lookat=[2.1813, 2.0619, 2.0999],
-    #                                   up=[0.1204, -0.9852, 0.1215])
-
     return grasp_mat_in_tool, grasp_pos_in_tool
 
 
@@ -347,7 +355,7 @@ def publish_pointcloud(camera_frame, pc_pub, points_rgb, points_xyz):
 
 
 def is_grasp_complete(gripper_q, desired_gripper_q, finger_q_closed):
-    return gripper_q < finger_q_closed + 0.15 and desired_gripper_q < finger_q_closed + 0.15
+    return gripper_q < finger_q_closed + 0.05 and desired_gripper_q < finger_q_closed + 0.05
 
 
 def rescale_ctrl(phy, ctrl, act_indices=None):
