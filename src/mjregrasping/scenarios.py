@@ -25,22 +25,22 @@ class Scenario:
     noise_sigma: Union[np.ndarray, float]
 
 
-conq_hose = Scenario(
-    name="ConqHose",
-    xml_path=Path("models/conq_hose_scene.xml"),
-    obstacle_name="hose_obstacles",
-    robot_data=conq,
-    rope_name="rope",
-    noise_sigma=np.array([0.02, 0.02, 0.01, np.deg2rad(1)]),
-)
-
 real_untangle = Scenario(
     name="RealUntangle",
     xml_path=Path("models/real_scene.xml"),
     obstacle_name="obstacles",
     robot_data=val,
     rope_name="rope",
-    noise_sigma=np.deg2rad(2),
+    noise_sigma=np.deg2rad(1),
+)
+
+simple_goal_sig = Scenario(
+    name="SimpleGoalSig",
+    xml_path=Path("models/simple_goal_sig_scene.xml"),
+    obstacle_name="obstacles",
+    robot_data=val,
+    rope_name="rope",
+    noise_sigma=np.deg2rad(1),
 )
 
 val_untangle = Scenario(

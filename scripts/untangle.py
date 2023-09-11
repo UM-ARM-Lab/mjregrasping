@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import multiprocessing
 from concurrent.futures.thread import ThreadPoolExecutor
 from time import perf_counter
@@ -15,7 +16,7 @@ from mjregrasping.params import hp
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import val_untangle
+from mjregrasping.scenarios import val_untangle, simple_goal_sig
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
 from mjregrasping.point_reaching_methods import OnStuckOurs, OnStuckTamp, OnStuckAlwaysBlacklist, OursNoSignature
@@ -24,12 +25,24 @@ from mjregrasping.viz import make_viz
 
 @ros_init.with_ros("untangle")
 def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("scenario")
+    parser.add_argument("method")
+
+    args = parser.parse_args()
+
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     rr.init('untangle')
     rr.connect()
 
-    scenario = val_untangle
+    if args.scenario == "val_untangle":
+        scenario = val_untangle
+    elif args.scenario == "simple_goal_sig":
+        scenario = simple_goal_sig
+    else:
+        raise NotImplementedError(f"Unknown scenario: {args.scenario}")
 
     gl_ctx = mujoco.GLContext(1280, 720)
     gl_ctx.make_current()
@@ -51,11 +64,16 @@ def main():
                            noise_sigma=val_untangle.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
-        # osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        # osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        # osm = OnStuckAlwaysBlacklist(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        osm = OursNoSignature(scenario, skeletons, goal, grasp_goal, grasp_rrt)
-        print(Fore.BLUE + f"Running method {osm.method_name()}" + Fore.RESET)
+
+        if args.method == "ours":
+            osm = OnStuckOurs(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        elif args.method == "tamp":
+            osm = OnStuckTamp(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        elif args.method == "blacklist":
+            osm = OnStuckAlwaysBlacklist(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        elif args.method == "no_signature":
+            osm = OursNoSignature(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        print(Fore.BLUE + f"Running method {osm.method_name()} with {scenario.name}" + Fore.RESET)
         mpc_times = []
 
         goal.viz_goal(phy)

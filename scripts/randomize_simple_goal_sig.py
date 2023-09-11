@@ -23,7 +23,7 @@ from mjregrasping.viz import make_viz, Viz
 def randomize_loop_positions(original_path: Path, rng: np.random.RandomState):
     mxml = MujocoXmlExpander(original_path)
 
-    dy = 0.1
+    dy = 0.15
     loop1 = mxml.get_e("body", "loop1")
     loop1_pos = mxml.get_vec(loop1, 'pos')
     loop1_pos[1] += rng.uniform(-dy, dy)
@@ -49,7 +49,7 @@ def main():
     root.mkdir(exist_ok=True, parents=True)
 
     rng = np.random.RandomState(0)
-    for i in range(25, 30):
+    for i in range(0, 25):
         # Configure the model before we construct the data and physics object
         m = randomize_loop_positions(scenario.xml_path, rng)
 
