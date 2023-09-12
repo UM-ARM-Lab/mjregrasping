@@ -118,7 +118,7 @@
                                                         <body name="leftgripper" pos="0 0.0135 0.068553"
                                                               euler="1.15 -1.5707 0">
                                                             <joint name="leftgripper" type="hinge" axis="0 0 1" limited="true"
-                                                                   range="-0.01 1"
+                                                                   range="-0.11 1"
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper" friction="0.00001"
                                                                   rgba="0.8 0.8 0.8 1"/>
@@ -130,7 +130,7 @@
                                                         <body name="leftgripper2" pos="0 -0.0135 0.068553"
                                                               euler="1.99 1.5707 0">
                                                             <joint name="leftgripper2" type="hinge" axis="0 0 1" limited="true"
-                                                                   range="-0.01 1"
+                                                                   range="-0.11 1"
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="leftgripper2"
                                                                   friction="0.00001"
@@ -217,7 +217,7 @@
                                                         <body name="rightgripper" pos="0 0.0135 0.068553"
                                                               euler="1.15 -1.5707 0">
                                                             <joint name="rightgripper" type="hinge" axis="0 0 1" limited="true"
-                                                                   range="-0.01 1"
+                                                                   range="-0.11 1"
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper"
                                                                   friction="0.00001"
@@ -230,7 +230,7 @@
                                                         <body name="rightgripper2" pos="0 -0.0135 0.068553"
                                                               euler="1.99 1.5707 0">
                                                             <joint name="rightgripper2" type="hinge" axis="0 0 1" limited="true"
-                                                                   range="-0.01 1"
+                                                                   range="-0.11 1"
                                                                    damping="0.01" frictionloss="0.01"/>
                                                             <geom type="mesh" mesh="soft_gripper_thin" name="rightgripper2"
                                                                   friction="0.00001"
@@ -276,7 +276,7 @@
                      forcelimited="true" forcerange="-4 4"/>
         <intvelocity name="joint47_vel" joint="joint47" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
                      forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.01 1" kp="35"
+        <intvelocity name="leftgripper_vel" joint="leftgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.11 1" kp="35"
                      forcelimited="true" forcerange="-1 1"/>
 
         <!--  10 -->
@@ -295,7 +295,7 @@
                      forcelimited="true" forcerange="-4 4"/>
         <intvelocity name="joint7_vel" joint="joint7" ctrllimited="true" ctrlrange="-3.1 3.1" actrange="-6.2 6.2" kp="50"
                      forcelimited="true" forcerange="-3 3"/>
-        <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.01 1" kp="35"
+        <intvelocity name="rightgripper_vel" joint="rightgripper" ctrllimited="true" ctrlrange="-0.5 0.5" actrange="-0.11 1" kp="35"
                      forcelimited="true" forcerange="-1 1"/>
     </actuator>
     <equality>

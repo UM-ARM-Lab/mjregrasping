@@ -1,4 +1,5 @@
 import json
+import logging
 import pickle
 import time
 from pathlib import Path
@@ -56,5 +57,9 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     mov_path = results_root / f'{scenario.name}_{now}_{i}.mp4'
     print(f"Saving output to {mov_path}")
     mov.start(mov_path)
+
+    log_filename = results_root / f'{scenario.name}_{now}_{i}.log'
+    logging.basicConfig(filename=log_filename, level=logging.DEBUG)
+    logging.getLogger().addHandler(logging.StreamHandler())
 
     return phy, sdf, skeletons, mov
