@@ -220,7 +220,7 @@ class HomotopyRegraspPlanner:
         # check if we need to move the arms at all
         any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
         if any_moving:
-            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, max_ik_attempts=100, joint_noise=0.3)
+            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, max_ik_attempts=500, joint_noise=0.2)
 
             if res.error_code.val != MoveItErrorCodes.SUCCESS:
                 return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)

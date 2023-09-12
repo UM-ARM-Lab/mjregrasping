@@ -14,7 +14,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rviz import MujocoXmlExpander
-from mjregrasping.scenarios import threading_cable, get_threading_skeletons, dz, dy
+from mjregrasping.scenarios import threading_cable, get_threading_skeletons, dz, dy, simple_goal_sig
 from mjregrasping.settle import settle
 from mjregrasping.trials import save_trial
 from mjregrasping.viz import make_viz, Viz
@@ -34,14 +34,14 @@ def randomize_loop_positions(original_path: Path, rng: np.random.RandomState):
     return m
 
 
-@ros_init.with_ros("randomize_threading")
+@ros_init.with_ros("randomize_simple_goal_sig")
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    rr.init('randomize_threading')
+    rr.init('randomize_simple_goal_sig')
     rr.connect()
 
-    scenario = threading_cable
+    scenario = simple_goal_sig
 
     viz = make_viz(scenario)
 
@@ -49,7 +49,7 @@ def main():
     root.mkdir(exist_ok=True, parents=True)
 
     rng = np.random.RandomState(0)
-    for i in range(0, 25):
+    for i in range(0, 5):
         # Configure the model before we construct the data and physics object
         m = randomize_loop_positions(scenario.xml_path, rng)
 
@@ -78,7 +78,7 @@ def main():
             0,  # right gripper
         ])
         pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
-        q[0] = rng.uniform(-0.3, 0.3)
+        q[0] = rng.uniform(-0.4, 0.0)
         q[1] = rng.uniform(-0.4, -0.1)
         pid_to_joint_config(phy, viz, q, sub_time_s=DEFAULT_SUB_TIME_S)
 

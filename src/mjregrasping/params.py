@@ -3,7 +3,7 @@ from mjregrasping.cfg import ParamsConfig
 
 # These values are considered const by convention
 hp = {
-    "n_grasp_samples":                 20,
+    "n_grasp_samples":                 1,  # FIXME: should be 20
     "horizon":                         15,
     "n_samples":                       50,
     "temp":                            0.15,
