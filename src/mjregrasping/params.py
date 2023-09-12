@@ -50,8 +50,7 @@ hp = {
     "joint_kp":                        6.0,
     "act_windup_limit":                0.02,
     "start_state_jiggle_deg":          2,
-    "wang_scootch_fraction":           0.03,
-    "ours_scootch_fraction":           0.005,
+    "goal_scootch":                    0.005,
     # Use 5 for a 'fast' baseline (still slower than our method), and 50 for strong baseline
     "tamp_horizon":                    5,  # 50,
     "untangle_max_iters":              300,

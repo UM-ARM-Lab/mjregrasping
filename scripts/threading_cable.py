@@ -12,6 +12,8 @@ from colorama import Fore
 
 import rospy
 from arc_utilities import ros_init
+from mjregrasping.geometry import pairwise_squared_distances
+from mjregrasping.goal_funcs import get_tool_points
 from mjregrasping.goals import GraspLocsGoal, ObjectPointGoal, point_goal_from_geom, ThreadingGoal
 from mjregrasping.grasp_and_settle import deactivate_moving, grasp_and_settle, deactivate_release
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
@@ -28,7 +30,7 @@ from mjregrasping.regrasp_planner_utils import SimGraspInput, SimGraspCandidate,
 from mjregrasping.regrasping_mppi import RegraspMPPI, mppi_viz, do_grasp_dynamics
 from mjregrasping.rollout import control_step
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.scenarios import threading, Scenario
+from mjregrasping.scenarios import threading_cable, Scenario
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
@@ -141,9 +143,6 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
 
         return costs + (threading_signature_cost,)
 
-    def through_skels(self, phy: Physics):
-        return through_skels(self.skeletons, self.goal_skel_names, phy)
-
     def get_cost_names(self):
         cost_names = super().get_cost_names()
         cost_names.append('threading_homotopy')
@@ -209,7 +208,7 @@ def main():
     rr.init('threading')
     rr.connect()
 
-    scenario = threading
+    scenario = threading_cable
     hp["threading_n_samples"] = 10
     hp["geodesic_weight"] = 100
     hp['robot_dq_weight'] = 0.02
@@ -221,15 +220,14 @@ def main():
 
     grasp_rrt = GraspRRT()
 
-    for i in range(0, 10):
+    for i in range(0, 25):
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
-        print("recording disabled!")
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
         pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
         mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=i, horizon=hp['horizon'],
-                           noise_sigma=threading.noise_sigma,
+                           noise_sigma=scenario.noise_sigma,
                            temp=hp['temp'])
         num_samples = hp['n_samples']
         goal_idx = 0
@@ -251,8 +249,8 @@ def main():
         traps = TrapDetection()
 
         # method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
-        # method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
-        method = ThreadingMethodTAMP(scenario, grasp_rrt, skeletons, traps, end_loc)
+        method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
+        # method = ThreadingMethodTAMP(scenario, grasp_rrt, skeletons, traps, end_loc)
         print(f"Running method {method.__class__.__name__}")
 
         itr = 0
@@ -285,7 +283,7 @@ def main():
                 if disc_penetrated:
                     print("Disc penetrated!")
                     mppi.reset()
-                    method.on_disc(phy, goal, goals[goal_idx+1], viz, mov)
+                    method.on_disc(phy, goal, goals[goal_idx + 1], viz, mov)
                 elif is_stuck:
                     print("Stuck!")
                     mppi.reset()
@@ -345,6 +343,13 @@ class ThreadingMethod:
     def goal_satisfied(self, goal, phy):
         raise NotImplementedError()
 
+    def get_scootched_loc(self, goal):
+        loc = max(goal.grasp_goal.get_grasp_locs()) - hp['grasp_loc_diff_thresh'] * 2
+        return loc
+
+    def scootch_goal(self, phy: Physics, goal: ThreadingGoal):
+        goal.loc = max(goal.loc - hp['goal_scootch'], max(get_grasp_locs(phy)))
+
 
 class ThreadingMethodWang(ThreadingMethod):
     """
@@ -352,7 +357,7 @@ class ThreadingMethodWang(ThreadingMethod):
     by Wang, Berenson, and Balkcom. 2015
     """
 
-    def __init__(self, grasp_rrt: GraspRRT, skeletons: Dict, traps: TrapDetection, end_loc: int):
+    def __init__(self, grasp_rrt: GraspRRT, skeletons: Dict, traps: TrapDetection, end_loc: float):
         super().__init__(grasp_rrt, skeletons, traps, end_loc)
         self.plan_to_end_found = False
 
@@ -362,94 +367,77 @@ class ThreadingMethodWang(ThreadingMethod):
     def on_disc(self, phy, goal, next_goal, viz, mov):
         self.plan_to_end_found = False
 
+        # The original paper uses floating grippers that can teleport, so adapt that by alterating grippers
+        locs, strategy = self.get_strategy_and_locs(phy, self.end_loc)
+        planning_t0 = perf_counter()
         self.grasp_rrt.fix_start_state_in_place(phy)
+        res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz)
+        if res.error_code.val == MoveItErrorCodes.SUCCESS:
+            self.planning_times.append(perf_counter() - planning_t0)
+            grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
+            execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
+            self.traps.reset_trap_detection()
+            self.plan_to_end_found = True
+            return
 
-        # Try to find a grasp to end loc with one arm.
-        # The original paper uses floating grippers that can teleport, so we could adapt that in two ways:
-        # 1) teleport the gripper to the final q of the plan
-        method_1 = False
-        if method_1:
-            strategy = [Strategies.STAY, Strategies.MOVE]
-            locs = np.array([-1, self.end_loc])
-            planning_t0 = perf_counter()
-            res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz,
-                                                 pos_noise=1e-3)  # This method cant handle noise
-            if res.error_code.val == MoveItErrorCodes.SUCCESS:
-                self.planning_times.append(perf_counter() - planning_t0)
-                teleport_to_end_of_plan(phy, res)
-                grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
-                deactivate_release(phy, strategy, viz=viz, is_planning=False, mov=mov)
-                goal.grasp_goal.set_grasp_locs(locs)
-                self.traps.reset_trap_detection()
-                self.plan_to_end_found = True
-                return
+        # If we fail, try to scootch down the rope
+        self.scootch_goal(phy, goal)
+        loc = self.get_scootched_loc(goal)
+        locs, strategy = self.get_strategy_and_locs(phy, loc)
 
-            # If we fail, try to scootch down the rope
-            locs = goal.grasp_goal.get_grasp_locs()
-            locs[1] -= hp['wang_scootch_fraction']
-            for _ in range(5):
-                res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz,
-                                                     pos_noise=1e-3)  # This method cant handle noise
-                if res.error_code.val == MoveItErrorCodes.SUCCESS:
-                    self.planning_times.append(perf_counter() - planning_t0)
-                    teleport_to_end_of_plan(phy, res)
-                    grasp_and_settle(phy, locs, viz, is_planning=False, mov=mov)
-                    deactivate_release(phy, strategy, viz=viz, is_planning=False, mov=mov)
-                    goal.grasp_goal.set_grasp_locs(locs)
-                    goal.loc -= hp['wang_scootch_fraction']
-                    return
-        else:
-            # 2) alternate grippers and actually move the arms
-            strategy = []
-            locs = []
-            for g_i in get_is_grasping(phy):
-                if g_i:
-                    strategy.append(Strategies.RELEASE)
-                    locs.append(-1)
-                else:
-                    strategy.append(Strategies.NEW_GRASP)
-                    locs.append(self.end_loc)
-            locs = np.array(locs)
-            planning_t0 = perf_counter()
-            res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz)
-            if res.error_code.val == MoveItErrorCodes.SUCCESS:
-                self.planning_times.append(perf_counter() - planning_t0)
-                grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
-                execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
-                self.traps.reset_trap_detection()
-                self.plan_to_end_found = True
-                return
-
-            # If we fail, try to scootch down the rope
-            goal.loc = max(goal.loc - hp['wang_scootch_fraction'], max(get_grasp_locs(phy)))
-            strategy = []
-            locs = []
-            loc_i = np.min(np.abs(goal.grasp_goal.get_grasp_locs())) - hp['wang_scootch_fraction']
-            for g_i in get_is_grasping(phy):
-                if g_i:
-                    strategy.append(Strategies.RELEASE)
-                    locs.append(-1)
-                else:
-                    strategy.append(Strategies.NEW_GRASP)
-                    locs.append(loc_i)
-            res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz)
-            if res.error_code.val == MoveItErrorCodes.SUCCESS:
-                self.planning_times.append(perf_counter() - planning_t0)
-                grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
-                execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
-                self.traps.reset_trap_detection()
-                return
+        res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz)
+        if res.error_code.val == MoveItErrorCodes.SUCCESS:
+            self.planning_times.append(perf_counter() - planning_t0)
+            grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
+            execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
+            self.traps.reset_trap_detection()
+            return
 
         self.planning_times.append(perf_counter() - planning_t0)
         print("No plans found!")
 
     def on_stuck(self, phy, goal, viz, mov):
-        pass
+        # In Wang et. al, they only check whether the gripper is too close to the obstacle, not the more general
+        # case of the controller being stuck, so we do that here.
+        tool_points = get_tool_points(phy)
+        gripper_to_goal_dist = np.min(np.sqrt(pairwise_squared_distances(tool_points, goal.goal_point[None])))
+        if gripper_to_goal_dist > 0.05:
+            return
+
+        self.scootch_goal(phy, goal)
+
+        # Try to scootch down
+        loc = self.get_scootched_loc(goal)
+        locs, strategy = self.get_strategy_and_locs(phy, loc)
+        planning_t0 = perf_counter()
+        self.grasp_rrt.fix_start_state_in_place(phy)
+        res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz)
+        self.planning_times.append(perf_counter() - planning_t0)
+        if res.error_code.val == MoveItErrorCodes.SUCCESS:
+            print("Scootched down!")
+            grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
+            execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
+            self.traps.reset_trap_detection()
+            return
+        print("No plans found!")
 
     def goal_satisfied(self, goal, phy):
         ret = self.plan_to_end_found
         self.plan_to_end_found = False
         return ret
+
+    def get_strategy_and_locs(self, phy, loc):
+        strategy = []
+        locs = []
+        for g_i in get_is_grasping(phy):
+            if g_i:
+                strategy.append(Strategies.RELEASE)
+                locs.append(-1)
+            else:
+                strategy.append(Strategies.NEW_GRASP)
+                locs.append(loc)
+        locs = np.array(locs)
+        return locs, strategy
 
 
 class ThreadingMethodTAMP(ThreadingMethod):
@@ -476,12 +464,12 @@ class ThreadingMethodTAMP(ThreadingMethod):
         else:
             # if we've reached the goal but can't grasp the end, scootch down the rope
             # but don't scootch past where we are currently grasping it.
-            goal.loc = max(goal.loc - hp['ours_scootch_fraction'], max(get_grasp_locs(phy)))
+            self.scootch_goal(phy, goal)
             print("No plans found!")
             self.plan_to_end_found = False
 
     def on_stuck(self, phy, goal, viz, mov):
-        loc = max(goal.grasp_goal.get_grasp_locs()) - hp['grasp_loc_diff_thresh'] * 2
+        loc = self.get_scootched_loc(goal)
         planner = TAMPThreadingPlanner(self.scenario, loc, self.grasp_rrt, self.skeletons, goal)
 
         planning_t0 = perf_counter()
@@ -515,7 +503,7 @@ class ThreadingMethodOurs(ThreadingMethod):
         self.planning_times.append(perf_counter() - planning_t0)
         viz.viz(best_grasp.phy, is_planning=True)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            if planner.through_skels(best_grasp.phy):
+            if through_skels(self.skeletons, goal.goal_skel_names, best_grasp.phy):
                 print("Executing grasp change plan")
                 execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
                 self.traps.reset_trap_detection()
@@ -524,11 +512,11 @@ class ThreadingMethodOurs(ThreadingMethod):
         else:
             # if we've reached the goal but can't grasp the end, scootch down the rope
             # but don't scootch past where we are currently grasping it.
-            goal.loc = max(goal.loc - hp['ours_scootch_fraction'], max(get_grasp_locs(phy)))
+            self.scootch_goal(phy, goal)
             print("No plans found!")
 
     def on_stuck(self, phy, goal, viz, mov):
-        loc = max(goal.grasp_goal.get_grasp_locs()) - hp['grasp_loc_diff_thresh'] * 2
+        loc = self.get_scootched_loc(goal)
         planner = HomotopyThreadingPlanner(loc, self.grasp_rrt, self.skeletons, goal.skeleton_names)
 
         planning_t0 = perf_counter()
