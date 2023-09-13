@@ -58,6 +58,7 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     print(f"Saving output to {mov_path}")
     mov.start(mov_path)
 
+    # FIXME: doesn't create a new file for each trial
     log_filename = results_root / f'{scenario.name}_{now}_{i}.log'
     logging.basicConfig(filename=log_filename, level=logging.DEBUG)
     logging.getLogger().addHandler(logging.StreamHandler())

@@ -28,7 +28,7 @@
                 <geom type="box" name="loop2_front" pos="0.14 0 0.04" size="0.01 0.01 0.08" rgba="0.5 0.5 1.0 1"/>
                 <geom type="box" name="loop2_top" pos="0.05 0 0.12" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
             </body>
-            <body name="loop3" pos="0.07 -0.30 1.0" euler="0 0 -0.5">
+            <body name="loop3" pos="0.07 -0.26 1.0" euler="0 0 -0.5">
                 <geom type="box" name="loop3_bottom" pos="0.05 0 -0.04" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
                 <geom type="box" name="loop3_front" pos="0.14 0 0.04" size="0.01 0.01 0.08" rgba="0.5 0.5 1.0 1"/>
                 <geom type="box" name="loop3_top" pos="0.05 0 0.12" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
