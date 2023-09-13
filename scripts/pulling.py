@@ -20,6 +20,7 @@ from mjregrasping.scenarios import val_untangle, val_pulling
 from mjregrasping.trap_detection import TrapDetection
 from mjregrasping.trials import load_trial
 from mjregrasping.viz import make_viz
+import git
 
 
 @ros_init.with_ros("pulling")
@@ -28,6 +29,9 @@ def main():
 
     rr.init('pulling')
     rr.connect()
+
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.head.object.hexsha
 
     scenario = val_pulling
 
@@ -119,6 +123,7 @@ def main():
             'grasp_history':  np.array(grasp_goal.history).tolist(),
             'method':         osm.method_name(),
             'hp':             hp,
+            'git_sha':        sha,
         }
         print(metrics)
         if mov:
