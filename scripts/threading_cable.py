@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 from importlib import reload
 from time import perf_counter
 from typing import Dict, Optional, List
+import git
 
 import mujoco
 import numpy as np
@@ -207,6 +208,9 @@ class TAMPThreadingPlanner(HomotopyThreadingPlanner):
 def main():
     reload(logging)
 
+    repo = git.Repo(search_parent_directories=True)
+    sha = repo.head.object.hexsha
+
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     rr.init('threading')
@@ -325,6 +329,7 @@ def main():
             'grasp_history':  np.array(grasp_goal.history).tolist(),
             'method':         method.method_name(),
             'hp':             hp,
+            'git_sha':        sha,
         }
         mov.close(metrics)
 
