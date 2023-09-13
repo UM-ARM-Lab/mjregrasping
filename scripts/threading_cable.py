@@ -44,7 +44,7 @@ from trajectory_msgs.msg import JointTrajectoryPoint
 class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
 
     def __init__(self, key_loc: float, grasp_rrt: GraspRRT, skeletons: Dict, goal_skel_names: Optional[List[str]],
-                 seed=0.):
+                 seed=0):
         super().__init__(key_loc, grasp_rrt, skeletons, goal_skel_names, seed)
 
     def sample_grasp_inputs(self, phy):
@@ -224,6 +224,11 @@ def main():
 
     for i in range(0, 25):
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
+        # disable collision only between rope and gripper geoms
+        from itertools import chain
+        for geom_name in list(chain(*phy.o.rd.gripper_geom_names)) + phy.o.rope.geom_names:
+            phy.m.geom(geom_name).contype = 1
+            phy.m.geom(geom_name).conaffinity = 2
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 
@@ -264,7 +269,7 @@ def main():
                 mov.close()
                 break
 
-            if itr > 275:
+            if itr > 325:
                 print(Fore.RED + "Max iterations reached!" + Fore.RESET)
                 break
 
@@ -278,18 +283,20 @@ def main():
             else:
                 disc_center = np.mean(goal.skel[:4], axis=0)
                 disc_normal = skeleton_field_dir(goal.skel, disc_center[None])[0] * 0.01
-                disc_rad = 0.05  # TODO: compute the radius of the disc
+                disc_rad = np.linalg.norm(goal.skel - disc_center, axis=-1).max()
 
                 disc_penetrated = goal.satisfied(phy, disc_center, disc_normal, disc_rad)
                 is_stuck = traps.check_is_stuck(phy, grasp_goal)
                 if disc_penetrated:
                     logging.info("Disc penetrated!")
-                    mppi.reset()
-                    method.on_disc(phy, goal, goals[goal_idx + 1], viz, mov)
+                    needs_reset = method.on_disc(phy, goal, goals[goal_idx + 1], viz, mov)
+                    if needs_reset:
+                        mppi.reset()
                 elif is_stuck:
                     logging.info("Stuck!")
-                    mppi.reset()
-                    method.on_stuck(phy, goal, viz, mov)
+                    needs_reset = method.on_stuck(phy, goal, viz, mov)
+                    if needs_reset:
+                        mppi.reset()
 
                 if method.goal_satisfied(goal, phy):
                     goal_idx += 1
@@ -384,12 +391,12 @@ class ThreadingMethodWang(ThreadingMethod):
             execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
             self.plan_to_end_found = True
-            return
+            return True
 
         # If we fail, try to scootch down the rope
         logging.info("scootched goal")
         self.scootch_goal(phy, goal)
-        loc = self.get_scootched_loc(goal)
+        loc = self.get_scootched_loc(goal.grasp_goal)
         locs, strategy = self.get_strategy_and_locs(phy, loc)
 
         res, scene_msg = self.grasp_rrt.plan(phy, strategy, locs, viz)
@@ -399,9 +406,10 @@ class ThreadingMethodWang(ThreadingMethod):
             grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
             execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
-            return
+            return True
 
         logging.info("No plans found!")
+        return False
 
     def on_stuck(self, phy, goal, viz, mov):
         # In Wang et. al, they only check whether the gripper is too close to the obstacle, not the more general
@@ -410,7 +418,7 @@ class ThreadingMethodWang(ThreadingMethod):
         gripper_to_goal_dist = np.min(np.sqrt(pairwise_squared_distances(tool_points, goal.goal_point[None])))
         if gripper_to_goal_dist > 0.08:
             logging.info("Gripper too far from goal, not stuck!")
-            return
+            return False
 
         # Try to scootch down
         loc = self.get_scootched_loc(goal.grasp_goal)
@@ -424,11 +432,12 @@ class ThreadingMethodWang(ThreadingMethod):
             grasp = SimGraspCandidate(None, None, strategy, res, locs, None)
             execute_grasp_change_plan(grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
-            return
+            return True
         else:
             logging.info("scootched goal")
             self.scootch_goal(phy, goal)
         logging.info("No plans found!")
+        return False
 
     def goal_satisfied(self, goal, phy):
         ret = self.plan_to_end_found
@@ -469,12 +478,14 @@ class ThreadingMethodTAMP(ThreadingMethod):
             self.plan_to_end_found = True
             execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
+            return True
         else:
             # if we've reached the goal but can't grasp the end, scootch down the rope
             # but don't scootch past where we are currently grasping it.
             self.scootch_goal(phy, goal)
             logging.info("No plans found!")
             self.plan_to_end_found = False
+            return False
 
     def on_stuck(self, phy, goal, viz, mov):
         loc = self.get_scootched_loc(goal.grasp_goal)
@@ -488,9 +499,11 @@ class ThreadingMethodTAMP(ThreadingMethod):
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
+            return True
         else:
             self.scootch_goal(phy, goal)
             logging.info("No plans found!")
+            return False
 
     def goal_satisfied(self, goal: ThreadingGoal, phy: Physics):
         ret = self.plan_to_end_found
@@ -512,16 +525,19 @@ class ThreadingMethodOurs(ThreadingMethod):
         self.planning_times.append(perf_counter() - planning_t0)
         viz.viz(best_grasp.phy, is_planning=True)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-            if through_skels(self.skeletons, goal.goal_skel_names, best_grasp.phy):
+            if through_skels(self.skeletons, goal.skeleton_names, best_grasp.phy):
                 execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
                 self.traps.reset_trap_detection()
+                return True
             else:
                 logging.info("Not through the goal skeleton!")
+                return False
         else:
             # if we've reached the goal but can't grasp the end, scootch down the rope
             # but don't scootch past where we are currently grasping it.
             self.scootch_goal(phy, goal)
             logging.info("No plans found!")
+            return False
 
     def on_stuck(self, phy, goal, viz, mov):
         loc = self.get_scootched_loc(goal.grasp_goal)
@@ -535,13 +551,15 @@ class ThreadingMethodOurs(ThreadingMethod):
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
             execute_grasp_change_plan(best_grasp, goal.grasp_goal, phy, viz, mov)
             self.traps.reset_trap_detection()
+            return True
         else:
             self.scootch_goal(phy, goal)
             logging.info("No plans found!")
+            return False
 
     def goal_satisfied(self, goal: ThreadingGoal, phy: Physics):
         if through_skels(self.skeletons, goal.skeleton_names, phy):
-            logging.info("Through {goal.skeleton_names}!")
+            logging.info(f"Through {goal.skeleton_names}!")
             return True
         return False
 
@@ -555,7 +573,7 @@ def execute_grasp_change_plan(best_grasp, grasp_goal: GraspLocsGoal, phy: Physic
     grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov)
     deactivate_release(phy, best_grasp.strategy, viz=viz, is_planning=False, mov=mov)
     grasp_goal.set_grasp_locs(best_grasp.locs)
-    print(f"Changed grasp to {best_grasp.locs}")
+    logging.info(f"Changed grasp to {best_grasp.locs}")
 
 
 if __name__ == "__main__":

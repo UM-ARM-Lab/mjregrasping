@@ -12,26 +12,26 @@
                     <geom name="cover" class="visual" type="box" size="0.05 0.05 0.05" rgba="1 0 0 1"/>
                 </body>
             </body>
-            <body name="attach2" pos="0.05 -0.55 1">
+            <body name="attach2" pos="0.05 -0.55 1.0">
                 <geom name="attach2" type="sphere" size="0.02" rgba="1.0 0 0 1"/>
                 <body name="goal">
                     <geom name="goal" class="visual" type="sphere" size="0.06" pos="0.045 0 0" rgba="1 0 1 0.3"/>
                 </body>
             </body>
-            <body name="loop1" pos="0.07 0.33 0.9">
-                <geom type="box" name="loop1_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop1_front" pos="0.09 0 0.03" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop1_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
+            <body name="loop1" pos="0.07 0.27 0.9" euler="0 0 -0.5">
+                <geom type="box" name="loop1_bottom" pos="0.05 0 -0.04" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop1_front" pos="0.14 0 0.04" size="0.01 0.01 0.08" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop1_top" pos="0.05 0 0.12" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
             </body>
-            <body name="loop2" pos="0.07 0 1.1">
-                <geom type="box" name="loop2_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop2_front" pos="0.09 0 0.03" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop2_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
+            <body name="loop2" pos="0.07 0 1.1" euler="0 0 -0.5">
+                <geom type="box" name="loop2_bottom" pos="0.05 0 -0.04" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop2_front" pos="0.14 0 0.04" size="0.01 0.01 0.08" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop2_top" pos="0.05 0 0.12" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
             </body>
-            <body name="loop3" pos="0.07 -0.33 1">
-                <geom type="box" name="loop3_bottom" pos="0.04 0 0" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop3_front" pos="0.09 0 0.04" size="0.01 0.01 0.04" rgba="0.5 0.5 1.0 1"/>
-                <geom type="box" name="loop3_top" pos="0.04 0 0.08" size="0.06 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
+            <body name="loop3" pos="0.07 -0.30 1.0" euler="0 0 -0.5">
+                <geom type="box" name="loop3_bottom" pos="0.05 0 -0.04" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop3_front" pos="0.14 0 0.04" size="0.01 0.01 0.08" rgba="0.5 0.5 1.0 1"/>
+                <geom type="box" name="loop3_top" pos="0.05 0 0.12" size="0.10 0.01 0.01" rgba="0.5 0.5 1.0 1"/>
             </body>
         </body>
     </worldbody>

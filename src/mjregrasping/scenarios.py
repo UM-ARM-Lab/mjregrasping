@@ -107,36 +107,35 @@ def dz(z):
     return np.array([0, 0, z])
 
 
+def x_axis(d, name):
+    return d.geom(name).xmat.reshape(3, 3)[:, 0]
+
+
+def y_axis(d, name):
+    return d.geom(name).xmat.reshape(3, 3)[:, 1]
+
+
+def z_axis(d, name):
+    return d.geom(name).xmat.reshape(3, 3)[:, 2]
+
+
 def get_threading_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
     return {
-        "loop1": d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop1_top").size[0]) * 2,
-            dz(m.geom("loop1_front").size[2] * 2),
-            -dy(m.geom("loop1_top").size[0] * 2),
-            dz(-m.geom("loop1_front").size[2] * 2),
-        ], axis=0),
-        "loop2": d.geom("loop2_front").xpos - dz(m.geom("loop2_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop2_top").size[0]) * 2,
-            dz(m.geom("loop2_front").size[2] * 2),
-            -dy(m.geom("loop2_top").size[0] * 2),
-            dz(-m.geom("loop2_front").size[2] * 2),
-        ], axis=0),
-        "loop3": d.geom("loop3_front").xpos - dz(m.geom("loop3_front").size[2]) + np.cumsum([
-            np.zeros(3),
-            dy(m.geom("loop3_top").size[0]) * 2,
-            dz(m.geom("loop3_front").size[2] * 2),
-            -dy(m.geom("loop3_top").size[0] * 2),
-            dz(-m.geom("loop3_front").size[2] * 2),
-        ], axis=0),
+        f"loop{k}": np.array([
+            d.geom(f"loop{k}_front").xpos + dz(m.geom(f"loop{k}_front").size[2]),
+            d.geom(f"loop{k}_front").xpos - dz(m.geom(f"loop{k}_front").size[2]),
+            d.geom(f"loop{k}_bottom").xpos - x_axis(d, f"loop{k}_bottom") * m.geom(f"loop{k}_bottom").size[0],
+            d.geom(f"loop{k}_top").xpos - x_axis(d, f"loop{k}_top") * m.geom(f"loop{k}_top").size[0],
+            d.geom(f"loop{k}_front").xpos + dz(m.geom(f"loop{k}_front").size[2]),
+        ]) for k in range(1, 4)
     }
 
 
 def get_pulling_skeletons(phy: Physics):
     return {}
+
 
 def get_untangle_skeletons(phy: Physics):
     d = phy.d
