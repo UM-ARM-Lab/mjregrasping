@@ -49,6 +49,10 @@ class MjVedo:
             geom_bodyid = m_geom.bodyid
             d_body = d.body(geom_bodyid)
 
+            # hack for figures
+            if 'attach' in m_geom.name:
+                continue
+
             geom_xmat = d_geom.xmat.reshape(3, 3)
             geom_transform = np.eye(4)
             geom_transform[0:3, 0:3] = geom_xmat

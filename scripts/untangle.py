@@ -73,6 +73,8 @@ def main():
             osm = OnStuckAlwaysBlacklist(scenario, skeletons, goal, grasp_goal, grasp_rrt)
         elif args.method == "no_signature":
             osm = OursNoSignature(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        else:
+            raise NotImplementedError(f"Unknown method: {args.method}")
         print(Fore.BLUE + f"Running method {osm.method_name()} with {scenario.name}" + Fore.RESET)
         mpc_times = []
 

@@ -39,13 +39,15 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     with phy_path.open("rb") as f:
         phy = pickle.load(f)
     mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
+    if viz:
+        viz.viz(phy)
     if sdf_path:
         sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(sdf_path))
         # viz_slices(sdf)
     else:
         sdf = None
-    viz.skeletons(skeletons)
+    if viz:
+        viz.skeletons(skeletons)
 
     mov = MjMovieMaker(gl_ctx, phy.m)
 

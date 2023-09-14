@@ -255,8 +255,8 @@ def main():
 
         traps = TrapDetection()
 
-        # method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
-        method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
+        method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
+        # method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
         # method = ThreadingMethodTAMP(scenario, grasp_rrt, skeletons, traps, end_loc)
         print(f"Running method {method.__class__.__name__}")
 
