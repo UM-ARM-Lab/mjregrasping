@@ -53,6 +53,8 @@ def main():
     viz = make_viz(scenario)
     for trial_idx in range(0, 25):
         phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
+        # TODO: save rrd files for each trial?
+        # rr.save()
 
         overall_t0 = perf_counter()
 

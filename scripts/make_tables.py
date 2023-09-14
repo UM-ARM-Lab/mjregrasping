@@ -9,8 +9,11 @@ def list_mean(x):
     return np.mean([np.mean(l) for l in x])
 
 
-def count_grasps(x):
+def avg_grasps(x):
     return np.mean([len(x_i) for x_i in x])
+
+def std_grasps(x):
+    return np.std([len(x_i) for x_i in x])
 
 
 def main():
@@ -29,7 +32,7 @@ def main():
     ]))
 
     print_results_table(load_data([
-        Path("results/Pulling/pulling_ours_v1"),
+        Path("results/Pulling/pulling_ours_v2"),
     ]))
 
 
@@ -41,6 +44,8 @@ def load_data(trials_dirs):
             print(f"WARNING: {trials_dir} does not exist")
             continue
         for trial_dir in trials_dir.iterdir():
+            if not trial_dir.is_dir():
+                continue
             # load each json file and make a row with the data
             json_path = list(trial_dir.glob("*.json"))[0]
             with json_path.open("r") as f:
@@ -58,6 +63,8 @@ def load_data(trials_dirs):
             print(f"WARNING: {trials_dir} does not exist")
             continue
         for trial_dir in trials_dir.iterdir():
+            if not trial_dir.is_dir():
+                continue
             # load each json file and make a row with the data
             json_path = list(trial_dir.glob("*.json"))[0]
             with json_path.open("r") as f:
@@ -83,7 +90,7 @@ def print_results_table(df):
         'sim_time':       ['mean', 'std'],
         'planning_times': list_mean,
         'mpc_times':      list_mean,
-        'grasp_history':  count_grasps,
+        'grasp_history':  [avg_grasps, std_grasps],
     }
     table_data = df.groupby(['dirname']).agg(agg)
 
@@ -96,7 +103,7 @@ def print_results_table(df):
             f"{row['success']['sum']:.0f}/{row['success']['count']:.0f}",
             f"{row['overall_time']['mean'] / 60:.0f} ({row['overall_time']['std'] / 60:.0f})",
             f"{row['sim_time']['mean'] / 60:.1f} ({row['sim_time']['std'] / 60:.1f})",
-            f"{row['grasp_history']['count_grasps']:.1f}",
+            f"{row['grasp_history']['avg_grasps']:.1f} ({row['grasp_history']['std_grasps']:.1f})",
         ]
         print(' & '.join(x) + " \\\\")
 
