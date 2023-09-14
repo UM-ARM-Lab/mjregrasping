@@ -12,12 +12,9 @@ from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.mjvedo import MjVedo, COLORS
 from mjregrasping.scenarios import threading_cable
 from mjregrasping.trials import load_trial
-from mjregrasping.viz import make_viz
 
 
 def main():
-    rospy.init_node("constructing_signature_fig")
-
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
     scenario = threading_cable

@@ -9,7 +9,7 @@ import rospy
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.mjvedo import MjVedo, COLORS
 from mjregrasping.scenarios import val_untangle
-from mjregrasping.trials import load_trial
+from mjregrasping.trials import load_trial, load_phy_and_skeletons
 from mjregrasping.viz import make_viz
 
 
@@ -21,30 +21,28 @@ def main():
     scenario = val_untangle
 
     viz = make_viz(scenario)
-    gl_ctx = mujoco.GLContext(1280, 720)
-    gl_ctx.make_current()
 
-    trial_idx = 5
-    phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
+    for trial_idx in range(25):
+        phy, _, skeletons = load_phy_and_skeletons(trial_idx, scenario)
 
-    t0 = perf_counter()
-    h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
-    print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
+        t0 = perf_counter()
+        h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
+        print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
 
-    mjvedo = MjVedo(scenario.xml_path)
-    set_cam(mjvedo)
-    mjvedo.viz(phy)
-    mjvedo.plotter.render().screenshot(f"title_fig_scene_{trial_idx}.png", scale=3)
+        mjvedo = MjVedo(scenario.xml_path)
+        set_cam(mjvedo)
+        mjvedo.viz(phy)
+        mjvedo.plotter.render().screenshot(f"title_fig_scene_{trial_idx}.png", scale=3)
 
-    mjvedo = MjVedo(scenario.xml_path)
-    set_cam(mjvedo)
-    lw = 25
-    mjvedo.viz(phy, is_planning=True)
-    for skel in skeletons.values():
-        mjvedo.plotter += Line(skel, lw=lw, c='k')
-    for i, loop in enumerate(loops):
-        mjvedo.plotter += Line(loop, lw=lw, c=COLORS[i % len(COLORS)])
-    mjvedo.plotter.render().screenshot(f"title_fig_skel_{trial_idx}.png", scale=3)
+        mjvedo = MjVedo(scenario.xml_path)
+        set_cam(mjvedo)
+        lw = 25
+        mjvedo.viz(phy, is_planning=True)
+        for skel in skeletons.values():
+            mjvedo.plotter += Line(skel, lw=lw, c='k')
+        for i, loop in enumerate(loops):
+            mjvedo.plotter += Line(loop, lw=lw, c=COLORS[i % len(COLORS)])
+        mjvedo.plotter.render().screenshot(f"title_fig_skel_{trial_idx}.png", scale=3)
 
 
 def set_cam(mjvedo):

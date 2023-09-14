@@ -29,16 +29,7 @@ def save_trial(i, phy, scenario, sdf_path, skeletons):
 
 
 def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
-    trials_root = Path("trial_data") / scenario.name
-    trial_path = trials_root / f"{scenario.name}_{i}.pkl"
-    with trial_path.open("rb") as f:
-        trial_info = pickle.load(f)
-    phy_path = trial_info['phy_path']
-    sdf_path = trial_info['sdf_path']
-    skeletons = trial_info['skeletons']
-    with phy_path.open("rb") as f:
-        phy = pickle.load(f)
-    mujoco.mj_forward(phy.m, phy.d)
+    phy, sdf_path, skeletons = load_phy_and_skeletons(i, scenario)
     if viz:
         viz.viz(phy)
     if sdf_path:
@@ -66,3 +57,17 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     logging.getLogger().addHandler(logging.StreamHandler())
 
     return phy, sdf, skeletons, mov
+
+
+def load_phy_and_skeletons(i, scenario):
+    trials_root = Path("trial_data") / scenario.name
+    trial_path = trials_root / f"{scenario.name}_{i}.pkl"
+    with trial_path.open("rb") as f:
+        trial_info = pickle.load(f)
+    phy_path = trial_info['phy_path']
+    sdf_path = trial_info['sdf_path']
+    skeletons = trial_info['skeletons']
+    with phy_path.open("rb") as f:
+        phy = pickle.load(f)
+    mujoco.mj_forward(phy.m, phy.d)
+    return phy, sdf_path, skeletons
