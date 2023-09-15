@@ -28,7 +28,7 @@ def main():
     print_results_table(load_data([
         Path("results/Threading/threading_ours_v4"),
         Path("results/Threading/threading_wang_v2"),
-        Path("results/Threading/threading_tamp5_v1"),
+        Path("results/Threading/threading_tamp5_v2"),
     ]))
 
     print_results_table(load_data([

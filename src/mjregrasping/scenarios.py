@@ -4,15 +4,9 @@ from typing import Union
 
 import mujoco
 import numpy as np
-from transformations import quaternion_from_euler
 
-from mjregrasping.goals import ObjectPointGoal
-from mjregrasping.grasping import activate_grasp
-from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.physics import Physics
-from mjregrasping.robot_data import RobotData, conq, val
-from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-from mjregrasping.settle import settle
+from mjregrasping.robot_data import RobotData, val
 
 
 @dataclass
@@ -71,30 +65,6 @@ val_pulling = Scenario(
 )
 
 
-def setup_pull(phy, viz):
-    # set the rope pose
-    phy.d.qpos[20:23] = np.array([1.0, 0.2, 0])
-    phy.d.qpos[23:27] = quaternion_from_euler(0, 0, 0)
-    robot_q2 = np.array([
-        0.0, 0.9,  # torso
-        1.0, 0.0, 0.0, -1.0, 0, 0, 0,  # left arm
-        0.3,  # left gripper
-        1.0, 0.0, 0, 0.0, 0, 0.0, 0,  # right arm
-        0.1,  # right gripper
-    ])
-    pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-    activate_grasp(phy, 'left', 0.0)
-    robot_q2[9] = 0.1
-    pid_to_joint_config(phy, viz, robot_q2, sub_time_s=DEFAULT_SUB_TIME_S)
-
-
-def make_pull_goal(viz):
-    goal_rope_loc = 1
-    goal_point = np.array([0.8, 0.21, 0.2])
-    goal = ObjectPointGoal(goal_point, 0.03, goal_rope_loc, viz)
-    return goal
-
-
 def dx(x):
     return np.array([x, 0, 0])
 
@@ -122,6 +92,7 @@ def z_axis(d, name):
 def get_threading_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
+    mujoco.mj_forward(m, d)
     return {
         f"loop{k}": np.array([
             d.geom(f"loop{k}_front").xpos + dz(m.geom(f"loop{k}_front").size[2]),
@@ -140,6 +111,7 @@ def get_pulling_skeletons(phy: Physics):
 def get_untangle_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
+    mujoco.mj_forward(m, d)
     return {
         "loop1": d.geom("rack1_post1").xpos - dz(m.geom("rack1_post1").size[2]) + np.cumsum([
             np.zeros(3),
@@ -204,6 +176,7 @@ def get_untangle_skeletons(phy: Physics):
 def get_real_untangle_skeletons(phy: Physics):
     d = phy.d
     m = phy.m
+    mujoco.mj_forward(m, d)
     return {
         "loop1": np.array([
             d.geom("leg1").xpos - dz(m.geom("leg1").size[2]),

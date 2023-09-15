@@ -72,6 +72,9 @@ def main():
         objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)
 
+        skeletons = get_threading_skeletons(phy)
+        viz.skeletons(skeletons)
+
         rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
         rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
         phy.d.qpos[rope_xyz_q_indices] = np.array([1.5, 0.6, 0.0])
@@ -101,12 +104,6 @@ def main():
         loc = rng.uniform(0.93, 0.96)
         activate_grasp(phy, 'right', loc)
         settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
-
-        if viz:
-            viz.viz(phy)
-
-        skeletons = get_threading_skeletons(phy)
-        viz.skeletons(skeletons)
 
         save_trial(i, phy, scenario, None, skeletons)
         print(f"Saved trial {i}")

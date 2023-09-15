@@ -22,11 +22,11 @@ def main():
     gl_ctx = mujoco.GLContext(1280, 720)
     gl_ctx.make_current()
 
-    qpos_filename = Path('results/Threading/1694678882_0/Threading_1694678882_0_\signature{}_qpos.npy')
+    qpos_filename = Path('results/constructing_signature_threading_0_qpos.npy')
     outdir = qpos_filename.parent
     qpos = np.load(qpos_filename)
 
-    trial_idx = int(qpos_filename.stem.split('_')[2])
+    trial_idx = int(qpos_filename.stem.split('_')[-2])
     phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz=None)
 
     # Load the given frame and render it with mjvedo

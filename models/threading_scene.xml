@@ -20,8 +20,8 @@
     <include file="threading_obstacles.xml"/>
     <include file="cable.xml"/>
     <equality>
-        <weld body1="drive50" body2="B_first" name="left" relpose="0 0 0.181 1 0 0 0" active="false" solref="0.04 1" torquescale="0.2"/>
-        <weld body1="drive10" body2="B_first" name="right" relpose="0 0 0.181 1 0 0 0" active="false" solref="0.04 1" torquescale="0.2"/>
+        <weld body1="drive50" body2="B_first" name="left" relpose="0 0 0.181 1 0 0 0" active="false" solref="0.04 1" torquescale="0.1"/>
+        <weld body1="drive10" body2="B_first" name="right" relpose="0 0 0.181 1 0 0 0" active="false" solref="0.04 1" torquescale="0.1"/>
 
         <connect body1="attach1" body2="B_first" name="attach1" anchor="0 -0.03 0" active="false" solref="0.03 1"/>
         <connect body1="attach2" body2="B_first" name="attach2" anchor="0 0.03 0" active="false" solref="0.03 1"/>
