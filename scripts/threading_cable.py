@@ -226,7 +226,8 @@ def main():
 
     grasp_rrt = GraspRRT()
 
-    for i in range(0, 25):
+    for i in range(11, 25):
+        logging.info(f"Loading trial {i}")
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
         # disable collision only between rope and gripper geoms
         from itertools import chain
@@ -259,9 +260,9 @@ def main():
 
         traps = TrapDetection()
 
-        method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
+        # method = ThreadingMethodOurs(grasp_rrt, skeletons, traps, end_loc)
         # method = ThreadingMethodWang(grasp_rrt, skeletons, traps, end_loc)
-        # method = ThreadingMethodTAMP(scenario, grasp_rrt, skeletons, traps, end_loc)
+        method = ThreadingMethodTAMP(scenario, grasp_rrt, skeletons, traps, end_loc)
         print(f"Running method {method.__class__.__name__}")
 
         itr = 0
@@ -293,13 +294,14 @@ def main():
                 is_stuck = traps.check_is_stuck(phy, grasp_goal)
                 if disc_penetrated:
                     logging.info("Disc penetrated!")
-                    needs_reset = method.on_disc(phy, goal, goals[goal_idx + 1], viz, mov)
-                    if needs_reset:
+                    plan_found = method.on_disc(phy, goal, goals[goal_idx + 1], viz, mov)
+                    if plan_found:
+                        is_stuck = False  # if we found a plan, clearly we're not stuck!
                         mppi.reset()
-                elif is_stuck:
+                if is_stuck:
                     logging.info("Stuck!")
-                    needs_reset = method.on_stuck(phy, goal, viz, mov)
-                    if needs_reset:
+                    plan_found = method.on_stuck(phy, goal, viz, mov)
+                    if plan_found:
                         mppi.reset()
 
                 if method.goal_satisfied(goal, phy):
@@ -475,7 +477,7 @@ class ThreadingMethodTAMP(ThreadingMethod):
         planner = TAMPThreadingPlanner(self.scenario, self.end_loc, self.grasp_rrt, self.skeletons, next_goal)
         print(f"Planning with {planner.key_loc=}...")
         planning_t0 = perf_counter()
-        sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
+        sim_grasps = planner.simulate_sampled_grasps(phy, None, viz_execution=False)
         best_grasp = planner.get_best(sim_grasps, viz=viz)
         self.planning_times.append(perf_counter() - planning_t0)
         viz.viz(best_grasp.phy1, is_planning=True)

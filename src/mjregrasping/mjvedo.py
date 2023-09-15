@@ -18,7 +18,7 @@ class MjVedo:
         self.mj_xml_parser = MujocoXmlExpander(xml_path)
         self.fps = fps
 
-        self.plotter = Plotter(title="drone_example", axes=1)
+        self.plotter = Plotter(title="drone_example", axes=1, interactive=False)
 
         self.mesh_cache = {}
         # maps from mujoco geom IDs to Vedo actors
@@ -108,6 +108,8 @@ class MjVedo:
 
                 mesh = self.mesh_cache[mesh_name].clone()
                 mesh.apply_transform(body_transform)
+                if is_planning:
+                    mesh.alpha(0.5)
                 self.plotter += mesh
                 self.actor_map[geom_id] = mesh
         for light_id in range(m.nlight):

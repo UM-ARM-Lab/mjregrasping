@@ -4,9 +4,8 @@ from time import perf_counter
 
 import mujoco
 import numpy as np
-from vedo import Line
+from vedo import Line, DashedLine
 
-import rospy
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.mjvedo import MjVedo, COLORS
@@ -21,15 +20,16 @@ def main():
     gl_ctx = mujoco.GLContext(1280, 720)
     gl_ctx.make_current()
 
-    qpos_filename = Path('results/constructing_signature_threading_0_qpos.npy')
+    qpos_filename = Path(
+        '/home/peter/mjregrasping_ws/src/mjregrasping/results/Threading/threading_ours_v5_in_progress/1694811075_2/Threading_1694811075_2_\signature{}_qpos.npy')
     outdir = qpos_filename.parent
     qpos = np.load(qpos_filename)
 
-    trial_idx = int(qpos_filename.stem.split('_')[-2])
+    trial_idx = int(qpos_filename.stem.split('_')[-3])
     # phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz=None)
 
     # Load the given frame and render it with mjvedo
-    frame_idx = 8000
+    frame_idx = 4600
     phy.d.qpos = qpos[frame_idx]
     mujoco.mj_forward(phy.m, phy.d)
 
@@ -53,13 +53,13 @@ def main():
         mjvedo.plotter += Line(skel, lw=lw, c='k', alpha=0.8)
     for i, loop in enumerate(loops):
         loop_viz = loop + i * 0.002  # add noise to avoid z-fighting and overlapping lines
-        mjvedo.plotter += Line(loop_viz, lw=lw, c=COLORS[i % len(COLORS)])
+        mjvedo.plotter += DashedLine(loop_viz, lw=lw, c=COLORS[i % len(COLORS)])
     mjvedo.plotter.render().screenshot(outdir / f"skel_{trial_idx}_{frame_idx}.png", scale=3)
 
 
 def set_cam(mjvedo):
     mjvedo.plotter.camera.SetFocalPoint(0, 0.7, -0.1)
-    mjvedo.plotter.camera.SetPosition(2.0, -0.7, 2.4)
+    mjvedo.plotter.camera.SetPosition(1.0, -1.0, 2.4)
     mjvedo.plotter.camera.SetViewUp(0, 0, 1)
 
 

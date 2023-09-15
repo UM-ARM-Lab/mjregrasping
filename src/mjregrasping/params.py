@@ -9,7 +9,7 @@ hp = {
     "temp":                            0.15,
     "keypoint_weight":                 1.0,
     "next_xpos_sdf_weight":            0.1,
-    "torso_weight":                    0.5,
+    "torso_weight":                    0.75,
     "reachability_weight":             0.1,
     "grasp_pos_weight":                1.0,
     "trap_weight":                     50.0,
