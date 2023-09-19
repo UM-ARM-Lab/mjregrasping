@@ -1,6 +1,6 @@
 <mujoco model="real_obs">
     <worldbody>
-        <body name="obstacles" pos="-0.06 -0.02 -0.442" euler="0.03 0.02 0.025">
+        <body name="obstacles" pos="-0.06 -0.02 -0.43" euler="-0.01 0.0 0.025">
             <body name="walls">
                 <body name="front_wall" pos="-0.05 0.97 1">
                     <geom name="front_wall" type="box" size="1 0.02 1.1" material="cream-plaster"/>
@@ -16,15 +16,16 @@
                 </body>
                 <geom name="right_wall" type="box" pos="0.85 0 1" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
                 <geom name="left_wall" type="box" pos="-0.50 -.5 1" euler="0 0 0.2" size="0.03 1 1.1" rgba="0.5 0.1 0.1 0.1"/>
-                <geom name="back_wall" type="box" pos="0.0 -0.37 1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
+                <geom name="back_wall" type="box" pos="0.0 -0.39 1" euler="0 0 -0.1" size="1 0.03 1.1" rgba="0.5 0.1 0.1 0.1"/>
             </body>
-            <body name="table" pos="-0.31 0.715 0">
+            <body name="table" pos="-0.24 0.715 0">
                 <body name="top" pos="0 0 0.69">
-                    <body name="goal" pos="-0.15 0.02 0.0">
+                    <body name="goal" pos="-0.21 0.02 0.0">
                         <geom name="strip" type="box" size="0.04 0.15 0.020" pos="0 0 0.06" rgba="1 1 1 1"/>
-                        <geom name="goal" class="visual" type="sphere" size="0.06" pos="0 0 0.15" rgba="1 0 1 0.3"/>
+                        <geom name="goal" class="visual" type="sphere" size="0.05" pos="0 0 0.18" rgba="1 0 1 0.3"/>
                     </body>
-                    <body name="loop1" pos="0.22 0 0.275" euler="0 0 3.14159">
+                    <geom name="phone" type="box" pos="0.15 -0.13 0.05" size="0.06 0.08 0.01"/>
+                    <body name="loop1" pos="0.21 -0.03 0.275" euler="0 0 3.14159">
                         <geom type="box" name="loop1_top" pos="0 0 0.23" size="0.035 0.265 0.035" rgba="0.5 0.5 1.0 1"/>
                         <geom type="box" name="loop1_bottom" pos="0 0 -0.23" size="0.035 0.265 0.035" rgba="0.5 0.5 1.0 1"/>
                         <geom type="box" name="loop1_front" pos="0 0.23 0.0" size="0.035 0.035 0.265" rgba="0.5 0.5 1.0 1"/>
@@ -33,10 +34,8 @@
                         <geom type="box" pos="-0.07 0.225 -0.225" size="0.07 0.025 0.025" rgba="0.5 0.5 1.0 1"/>
                         <geom type="box" pos="-0.07 -0.225 -0.225" size="0.07 0.025 0.025" rgba="0.5 0.5 1.0 1"/>
                     </body>
-                    <geom name="top" type="box" size="0.79 0.255 0.038" rgba="0.35 0.45 0.5 1.0"/>
-                    <geom name="left_rim" type="cylinder" pos="0.79 0 0" zaxis="0 1 0" size="0.038 0.255" rgba="0.35 0.45 0.5 1.0"/>
-                    <geom name="front_rim" type="cylinder" pos="0 -0.255 0" zaxis="1 0 0" size="0.038 0.79" rgba="0.35 0.45 0.5 1.0"/>
-                    <geom name="front_left_sphere" type="sphere" pos="0.79 -0.255 0" size="0.038" rgba="0.35 0.45 0.5 1.0"/>
+                    <geom name="top" type="box" size="0.81 0.275 0.024" rgba="0.35 0.45 0.5 1.0"/>
+                    <geom name="hack" type="box" pos="0.9 0 -0.21" size="0.1 0.1 0.05" rgba="0.5 0.5 1.0 0.1"/>
                 </body>
                 <geom name="leg1" type="box" pos="0.73 0.16 0.36" euler="0 0 0.785" size="0.06 0.0275 0.35"
                       material="metal"/>

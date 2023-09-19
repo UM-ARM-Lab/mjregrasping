@@ -17,6 +17,7 @@ from mjregrasping.goal_funcs import get_rope_points
 from mjregrasping.grasping import activate_grasp, get_grasp_locs
 from mjregrasping.physics import Physics
 from arm_robots_msgs.msg import GripperConstraint
+from mjregrasping.val_dup import val_dedup
 from sensor_msgs.msg import JointState
 from arm_robots_msgs.srv import SetCDCPDState, SetCDCPDStateRequest, SetGripperConstraints, SetGripperConstraintsRequest
 from visualization_msgs.msg import MarkerArray
@@ -24,12 +25,14 @@ from visualization_msgs.msg import MarkerArray
 
 class RealValCommander:
 
-    def __init__(self, phy: Physics):
+    def __init__(self, phy: Physics, pos_vmax):
         """
         All commands are ordered based on mujoco!
         """
+        self.slow = False
         self.robot = phy.o.robot
         self.command_rate = rospy.Rate(100)
+        self.pos_vmax = pos_vmax
         self.should_disconnect = False
         self.first_valid_command = False
         self.command_pub = rospy.Publisher("/hdt_adroit_coms/joint_cmd", JointState, queue_size=10)
@@ -50,13 +53,15 @@ class RealValCommander:
         self.record_srv = rospy.ServiceProxy("video_recorder", TriggerVideoRecording)
         self.tfw = TF2Wrapper()
 
-    def start_record(self):
+    def start_record(self, mov):
         req = TriggerVideoRecordingRequest()
         now = int(time.time())
         req.filename = f'/home/peter/recordings/peter/real_untangle_{now}.avi'
         req.record = True
         req.timeout_in_sec = 10 * 60
         self.record_srv(req)
+        if mov:
+            mov.start(f'/home/peter/recordings/peter/mj_real_untangle_{now}.mp4')
 
     def stop_record(self):
         req = TriggerVideoRecordingRequest()
@@ -82,12 +87,18 @@ class RealValCommander:
                 if time_since_last_command < rospy.Duration(secs=1):
                     command_to_send = deepcopy(self.latest_cmd)
                     command_to_send.header.stamp = now
+
+                    if self.slow:
+                        current_q = self.get_latest_qpos_in_mj_order()
+                        v = np.clip((self.latest_cmd.position - current_q) * 1, -self.pos_vmax, self.pos_vmax)
+                        self.latest_cmd.velocity = v
                     self.command_pub.publish(command_to_send)
                 self.command_rate.sleep()
         except ReferenceError:
             pass
 
     def send_vel_command(self, m: mujoco.MjModel, vel):
+        self.slow = False
         if not self.first_valid_command:
             self.first_valid_command = True
 
@@ -108,15 +119,12 @@ class RealValCommander:
         self.latest_cmd.position = positions_dup.tolist()
         self.latest_cmd.velocity = command_dup.tolist()
 
-    def send_pos_command(self, pos: np.ndarray):
+    def send_pos_command(self, pos: np.ndarray, slow=False):
+        self.slow = slow
         if not self.first_valid_command:
             self.first_valid_command = True
 
         self.latest_cmd.header.stamp = rospy.Time.now()
-        current_q = self.get_latest_qpos_in_mj_order()
-        # vmax = 0.20
-        # v = np.clip((pos - current_q) * 2, -vmax, vmax)
-        # self.latest_cmd.velocity = v
         self.latest_cmd.velocity = []
         self.latest_cmd.position = pos
 
@@ -134,20 +142,7 @@ class RealValCommander:
         pos_in_mj_order = np.array(js.position)[self.mj_order]
         return pos_in_mj_order
 
-    def wait_until_reached(self, q_target, reached_tol=2, stopped_tol=1):
-        stopped = False
-        reached = False
-        for i in range(75):
-            current_q = self.get_latest_qpos_in_mj_order()
-            error = np.abs(current_q - q_target)
-            max_joint_error = np.rad2deg(np.max(error))
-            reached = max_joint_error < reached_tol
-            stopped = np.rad2deg(np.max(np.abs(self.latest_cmd.velocity))) < stopped_tol
-            if reached and stopped:
-                return
-        print(f"WARNING: reached timeout! {reached} {stopped}")
-
-    def pull_rope_towards_cdcpd(self, phy: Physics, n_sub_time: int):
+    def pull_rope_towards_cdcpd(self, phy: Physics, n_sub_time: int, settle_after=True):
         cdcpd_pred = self.cdcpd_sub.get()
         # Now we have the cdcpd prediction, we need to tell mujoco to obey it
         # we do this by using eq constraints in mujoco. There is one eq constraint per rope body, but
@@ -173,7 +168,8 @@ class RealValCommander:
             eq = phy.m.eq(f'B_{i}')
             eq.active = 0
 
-        mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 2))
+        if settle_after:
+            mujoco.mj_step(phy.m, phy.d, nstep=int(n_sub_time / 2))
 
     def get_cdcpd_np(self):
         cdcpd_marker_array = self.cdcpd_sub.get()

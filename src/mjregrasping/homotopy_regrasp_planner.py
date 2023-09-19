@@ -269,25 +269,30 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
 
     def sample_grasp_inputs(self, phy):
         grasps_inputs = []
+        current_locs = get_grasp_locs(phy)
         is_grasping = get_is_grasping(phy)
-        new_is_grasping = 1 - is_grasping
-        strategy = [Strategies.NEW_GRASP if is_grasping_i else Strategies.RELEASE for is_grasping_i in new_is_grasping]
+        for strategy in get_all_strategies_from_phy(phy):
+            if not self.is_valid_strategy(strategy, is_grasping):
+                continue
+            for i in range(hp['threading_n_samples']):
+                if i == 0:
+                    sample_loc = self.key_loc
+                else:
+                    sample_loc = self.sample_loc_with_reflection()
+                candidate_locs = []
+                for tool_name, s_i, loc_i in zip(phy.o.rd.tool_sites, strategy, current_locs):
+                    if s_i == Strategies.NEW_GRASP:
+                        candidate_locs.append(sample_loc)
+                    elif s_i == Strategies.RELEASE:
+                        candidate_locs.append(-1)
+                    elif s_i == Strategies.STAY:
+                        candidate_locs.append(loc_i)
+                    else:
+                        raise NotImplementedError(s_i)
 
-        for i in range(hp['threading_n_samples']):
-            if i == 0:  # ensure we always try the tip
-                sample_loc = 1.0
-            else:
-                sample_loc = self.sample_loc_with_reflection()
-            candidate_locs = []
-            for tool_name, s_i in zip(phy.o.rd.tool_sites, strategy):
-                if s_i == Strategies.NEW_GRASP:
-                    candidate_locs.append(sample_loc)
-                elif s_i == Strategies.RELEASE:
-                    candidate_locs.append(-1)
+                candidate_locs = np.array(candidate_locs)
 
-            candidate_locs = np.array(candidate_locs)
-
-            grasps_inputs.append(SimGraspInput(strategy, candidate_locs))
+                grasps_inputs.append(SimGraspInput(strategy, candidate_locs))
         return grasps_inputs
 
     def sample_loc_with_reflection(self):
@@ -304,9 +309,7 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
         will_be_grasping = [get_will_be_grasping(s_i, g_i) for s_i, g_i in zip(s, is_grasping)]
         if np.all(will_be_grasping):
             is_valid = False
-        if s[0] == Strategies.NEW_GRASP and s[1] == Strategies.MOVE:
-            is_valid = False
-        if s[1] == Strategies.NEW_GRASP and s[0] == Strategies.MOVE:
+        if s[0] == Strategies.MOVE or s[1] == Strategies.MOVE:
             is_valid = False
         return is_valid
 
@@ -323,7 +326,7 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
         # check if we need to move the arms at all
         any_moving = np.any([s in [Strategies.NEW_GRASP, Strategies.MOVE] for s in strategy])
         if any_moving:
-            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, joint_noise=0.1)
+            res, scene_msg = self.grasp_rrt.plan(phy_plan, strategy, candidate_locs, viz, joint_noise=0.01, max_ik_attempts=250)
 
             if res.error_code.val != MoveItErrorCodes.SUCCESS:
                 return SimGraspCandidate(phy, phy_plan, strategy, res, candidate_locs, initial_locs)

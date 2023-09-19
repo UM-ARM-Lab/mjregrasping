@@ -7,6 +7,7 @@ from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step, DEFAULT_SUB_TIME_S
+from mjregrasping.val_dup import val_dedup
 from mjregrasping.viz import Viz
 from moveit_msgs.msg import MotionPlanResponse
 
@@ -23,6 +24,18 @@ def pid_to_joint_configs(phy: Physics, res: MotionPlanResponse, viz: Viz, is_pla
             continue
         pid_to_joint_config(phy, viz, q, DEFAULT_SUB_TIME_S, is_planning, mov, val_cmd, reached_tol=reached_tol, stopped_tol=10)
     pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov, val_cmd)
+    if val_cmd:
+        while True:
+            pid_to_joint_config(phy, viz, qs[-1], DEFAULT_SUB_TIME_S, is_planning, mov, val_cmd)
+            current_q = val_dedup(val_cmd.get_latest_qpos_in_mj_order())
+            error = np.abs(current_q - qs[-1])
+            # ignore grippers
+            error[9] = 0
+            error[17] = 0
+            max_joint_error = np.rad2deg(np.max(error))
+            reached = max_joint_error < reached_tol
+            if reached:
+                break
 
 
 def warn_about_limits(q_target, phy):

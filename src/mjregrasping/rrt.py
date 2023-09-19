@@ -29,7 +29,7 @@ class GraspRRT:
         client.update_configuration({"maximum_waypoint_distance": 0.15})
         self.fix_start_rng = np.random.RandomState(0)
 
-    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], pos_noise=0.03, **kwargs):
+    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], pos_noise=0.01, **kwargs):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 

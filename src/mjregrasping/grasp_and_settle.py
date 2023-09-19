@@ -33,7 +33,7 @@ def deactivate_release_and_moving(phy, strategy, viz: Optional[Viz], is_planning
 
 def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: bool,
                           mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None,
-                          n_open_steps: int = 5):
+                          n_open_steps: int = 20):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)
@@ -56,7 +56,7 @@ def deactivate_and_settle(phy, needs_release, viz: Optional[Viz], is_planning: b
 
 
 def grasp_and_settle(phy, grasp_locs, viz: Optional[Viz], is_planning: bool, mov: Optional[MjMovieMaker] = None,
-                     val_cmd: Optional[RealValCommander] = None, n_close_steps: int = 5):
+                     val_cmd: Optional[RealValCommander] = None, n_close_steps: int = 20):
     rope_grasp_eqs = phy.o.rd.rope_grasp_eqs
     ctrl = np.zeros(phy.m.nu)
     gripper_ctrl_indices = get_gripper_ctrl_indices(phy)

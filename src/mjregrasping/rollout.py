@@ -17,7 +17,7 @@ def no_results(*args, **kwargs):
     return (None,)
 
 
-def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None):
+def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None, val_cmd: Optional[RealValCommander] = None, slow=False):
     m = phy.m
     d = phy.d
 
@@ -41,8 +41,8 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
 
     if val_cmd:
         mj_q = get_full_q(phy)
-        val_cmd.send_pos_command(mj_q)
-        # val_cmd.pull_rope_towards_cdcpd(phy, n_sub_time)
+        val_cmd.send_pos_command(mj_q, slow=slow)
+        # val_cmd.pull_rope_towards_cdcpd(phy, n_sub_time / 4)
 
 
 def slow_when_eqs_bad(phy):

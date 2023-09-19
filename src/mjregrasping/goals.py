@@ -322,17 +322,18 @@ class ThreadingGoal(ObjectPointGoalBase):
 
         angle_cost = get_angle_cost(self.skel, self.loc, rope_points)
 
-        # penalize dist in Y
-        reachablility = np.sum(keypoint[:, 1]) * hp['reachablility_weight']
+        # learn forward and stay centered left/right
+        torso_cost = 2 * np.sum(np.abs(joint_positions[:, 0])) * hp['torso_weight'] + np.sum(
+            np.abs(joint_positions[:, 1] - 0.2)) * hp['torso_weight']
 
         return (
             contact_cost,
             unstable_cost,
             angle_cost,
             keypoint_cost,
-            reachablility,
             grasp_finger_cost,
             grasp_pos_cost,
+            torso_cost,
             nongrasping_rope_contact_cost,
             nongrasping_rope_dist_cost,
             gripper_to_goal_cost,
@@ -347,9 +348,9 @@ class ThreadingGoal(ObjectPointGoalBase):
             "unstable",
             "threading_angle",
             "threading_keypoint",
-            "reachability",
             "grasp_finger",
             "grasp_pos",
+            "torso",
             "nongrasping_rope_contact",
             "nongrasping_rope_dist",
             "gripper_to_goal",

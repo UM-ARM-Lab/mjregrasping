@@ -34,13 +34,14 @@ def get_jacobian_ctrl(phy: Physics, tool_site, desired_mat_in_tool, v_in_tool, j
     tool2world_mat = phy.d.site_xmat[tool_site.id].reshape(3, 3)
     J_gripper = block_diag(tool2world_mat.T, tool2world_mat.T) @ J_base
     J_pinv = np.linalg.pinv(J_gripper)
-    # use null-space projection to avoid joint limits
     current_q = get_q(phy)
     current_full_q = get_full_q(phy)[joint_indices]
+    # use null-space projection to avoid joint limits
     zero_vels = -current_full_q * jnt_lim_avoidance
     warn_near_joint_limits(current_q, phy)
-    # NOTE: not sure if pinv include the singularity avoidance, could write that term out myself
+    # NOTE: not sure if pinv includes the singularity avoidance, could write that term out myself
     ctrl = J_pinv @ twist_in_tool + (np.eye(len(joint_indices)) - J_pinv @ J_gripper) @ zero_vels
+    # confirm that the ctrl results in the same twist
     return ctrl, w_in_tool
 
 
