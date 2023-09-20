@@ -3,7 +3,7 @@ from typing import Optional
 import mujoco
 import numpy as np
 
-from mjregrasping.eq_errors import compute_eq_errors
+from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q, get_qpos_for_actuators
@@ -45,9 +45,8 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
 
 
 def slow_when_eqs_bad(phy):
-    eq_errors = compute_eq_errors(phy)
-    max_eq_err = np.clip(np.max(eq_errors), 0, 1)
-    speed_factor = min(max(0.001 * -np.exp(150 * max_eq_err) + 1, 0), 1)
+    total_eq_error = compute_total_eq_error(phy)
+    speed_factor = np.clip(np.exp(-700 * total_eq_error), 0, 1)
     phy.d.ctrl *= speed_factor
 
 

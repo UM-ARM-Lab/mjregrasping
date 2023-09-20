@@ -47,9 +47,9 @@
                 </body>
             </body>
         </body>
-        <body name="drones" pos="0 0 11.7">
+        <body name="drones" pos="0 0 15.0">
             <geom name="drone_base" type="sphere" size="0.3" pos="0 0 0" rgba="1 0 0 0.5"/>
-            <body name="drone1" pos="0 -4 -0.5">
+            <body name="drone1" pos="0 -4 -2.0">
                 <geom name="drone1_body" type="mesh" mesh="drone_frame"/>
                 <body name="drone1_rope" pos="0 0 -0.1" quat="0.707141 0 0.707073 0">
                     <body name="drone1_B_first">
@@ -98,7 +98,7 @@
                     </body>
                 </body>
             </body>
-            <body name="drone2" pos="0 4 -0.5">
+            <body name="drone2" pos="0 4 -2.0">
                 <geom name="drone2_body" type="mesh" mesh="drone_frame"/>
                 <body name="drone2_rope" pos="0 0 -0.1" quat="0.707141 0 0.707073 0">
                     <body name="drone2_B_first">
@@ -147,7 +147,7 @@
                     </body>
                 </body>
             </body>
-            <body name="drone3" pos="0 12 -0.5">
+            <body name="drone3" pos="0 12 -2.0">
                 <geom name="drone3_body" type="mesh" mesh="drone_frame"/>
                 <body name="drone3_rope" pos="0 0 -0.1" quat="0.707141 0 0.707073 0">
                     <body name="drone3_B_first">

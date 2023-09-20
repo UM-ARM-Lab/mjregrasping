@@ -23,7 +23,6 @@ hp = {
     "ever_not_grasping_weight":        5.0,
     "finger_q_open":                   0.3,
     "finger_q_closed":                 0.06,
-    "finger_q_pregrasp":               0.12,
     "state_history_size":              8,
     "warmstart":                       8,
     "settle_steps":                    10,

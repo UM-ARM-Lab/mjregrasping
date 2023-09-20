@@ -50,8 +50,15 @@ def main():
     grasp_rrt = GraspRRT()
 
     viz = make_viz(scenario)
-    for trial_idx in range(0, 25):
+    for trial_idx in [15, 18, 2, 11, 12, 17]:
+    # for trial_idx in range(0, 25):
         phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
+    
+        # disable collision only between rope and gripper geoms
+        from itertools import chain
+        for geom_name in list(chain(*phy.o.rd.gripper_geom_names)) + phy.o.rope.geom_names:
+            phy.m.geom(geom_name).contype = 1
+            phy.m.geom(geom_name).conaffinity = 2
 
         overall_t0 = perf_counter()
 

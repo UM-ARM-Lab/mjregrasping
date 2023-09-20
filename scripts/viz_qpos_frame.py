@@ -9,57 +9,61 @@ from vedo import Line, DashedLine
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
 from mjregrasping.mjvedo import MjVedo, COLORS
-from mjregrasping.scenarios import threading_cable
+from mjregrasping.scenarios import threading_cable, val_untangle
+from mjregrasping.trials import load_phy_and_skeletons
 
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
 
-    scenario = threading_cable
+    scenario = val_untangle
 
     gl_ctx = mujoco.GLContext(1280, 720)
     gl_ctx.make_current()
 
-    qpos_filename = Path(
-        '/home/peter/mjregrasping_ws/src/mjregrasping/results/Threading/threading_ours_v5_in_progress/1694811075_2/Threading_1694811075_2_\signature{}_qpos.npy')
-    outdir = qpos_filename.parent
-    qpos = np.load(qpos_filename)
+    # qpos_filename = Path(
+    #     '/home/peter/mjregrasping_ws/src/mjregrasping/results/Untangle/untangle_ours_v3/1694038938_0/Untangle_1694038938_0_\signature{}_qpos.npy')
+    # outdir = qpos_filename.parent
+    # qpos = np.load(qpos_filename)
+    # trial_idx = int(qpos_filename.stem.split('_')[-3])
 
-    trial_idx = int(qpos_filename.stem.split('_')[-3])
-    # phy, sdf, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz=None)
+    outdir = Path('/home/peter/mjregrasping_ws/src/mjregrasping/results/Untangle/')
+    frame_idx = 0
+    for trial_idx in range(4,25):
+        phy, sdf_path, skeletons = load_phy_and_skeletons(trial_idx, scenario)
 
-    # Load the given frame and render it with mjvedo
-    frame_idx = 4600
-    phy.d.qpos = qpos[frame_idx]
-    mujoco.mj_forward(phy.m, phy.d)
+        # Load the given frame and render it with mjvedo
+        # frame_idx = 4600
+        # phy.d.qpos = qpos[frame_idx]
+        mujoco.mj_forward(phy.m, phy.d)
 
-    activate_grasp(phy, 'left', 1)
-    activate_grasp(phy, 'right', 0.94)
+        # activate_grasp(phy, 'left', 1)
+        # activate_grasp(phy, 'right', 0.94)
 
-    t0 = perf_counter()
-    h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
-    print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
+        t0 = perf_counter()
+        h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
+        print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
 
-    mjvedo = MjVedo(scenario.xml_path)
-    set_cam(mjvedo)
-    mjvedo.viz(phy)
-    mjvedo.plotter.render().screenshot(outdir / f"scene_{trial_idx}_{frame_idx}.png", scale=3)
+        mjvedo = MjVedo(scenario.xml_path)
+        set_cam(mjvedo)
+        mjvedo.viz(phy)
+        mjvedo.plotter.render().screenshot(outdir / f"scene_{trial_idx}_{frame_idx}.png", scale=3)
 
-    mjvedo = MjVedo(scenario.xml_path)
-    set_cam(mjvedo)
-    lw = 25
-    mjvedo.viz(phy, is_planning=True)
-    for skel in skeletons.values():
-        mjvedo.plotter += Line(skel, lw=lw, c='k', alpha=0.8)
-    for i, loop in enumerate(loops):
-        loop_viz = loop + i * 0.002  # add noise to avoid z-fighting and overlapping lines
-        mjvedo.plotter += DashedLine(loop_viz, lw=lw, c=COLORS[i % len(COLORS)])
-    mjvedo.plotter.render().screenshot(outdir / f"skel_{trial_idx}_{frame_idx}.png", scale=3)
+        mjvedo = MjVedo(scenario.xml_path)
+        set_cam(mjvedo)
+        lw = 25
+        mjvedo.viz(phy, is_planning=True)
+        for skel in skeletons.values():
+            mjvedo.plotter += Line(skel, lw=lw, c='k', alpha=0.8)
+        for i, loop in enumerate(loops):
+            loop_viz = loop + i * 0.002  # add noise to avoid z-fighting and overlapping lines
+            mjvedo.plotter += DashedLine(loop_viz, lw=lw, c=COLORS[i % len(COLORS)])
+        mjvedo.plotter.render().screenshot(outdir / f"skel_{trial_idx}_{frame_idx}.png", scale=3)
 
 
 def set_cam(mjvedo):
     mjvedo.plotter.camera.SetFocalPoint(0, 0.7, -0.1)
-    mjvedo.plotter.camera.SetPosition(1.0, -1.0, 2.4)
+    mjvedo.plotter.camera.SetPosition(-0.2, -1.0, 2.4)
     mjvedo.plotter.camera.SetViewUp(0, 0, 1)
 
 

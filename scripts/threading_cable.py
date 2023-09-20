@@ -226,7 +226,7 @@ def main():
 
     grasp_rrt = GraspRRT()
 
-    for i in range(11, 25):
+    for i in range(15, 25):
         logging.info(f"Loading trial {i}")
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
         # disable collision only between rope and gripper geoms
