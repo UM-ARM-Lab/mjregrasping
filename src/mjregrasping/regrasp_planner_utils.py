@@ -12,7 +12,7 @@ from moveit_msgs.msg import MotionPlanResponse
 
 
 def get_geodesic_dist(locs, key_loc: float):
-    return np.min(np.abs(locs - key_loc))
+    return np.abs(locs - key_loc) @ (locs != -1)
 
 
 def get_will_be_grasping(s: Strategies, is_grasping: bool):

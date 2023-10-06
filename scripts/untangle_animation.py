@@ -16,28 +16,27 @@ def ease_out(t):
 
 
 def ease_out_in(t, c=1.0):
-    """ input and output are from 0 to 1 """
-    return np.clip(1 + (np.cos(2 * t * np.pi) - 1), 0, 1)
+    """ input and output are from 0 to 1. c>1 will create a longer period of 0 in the middle """
+    return np.clip(1 + c * (np.cos(2 * t * np.pi) - 1) / 2, 0, 1)
 
 
 def main():
     np.set_printoptions(precision=3, suppress=True, linewidth=220)
     qpos_path = Path(
-        "/home/peter/mjregrasping_ws/src/mjregrasping/results/Untangle/untangle_for_animiation/1695162530_11/Untangle_1695162530_11_\signature{}_qpos.npy")
+        "/home/peter/mjregrasping_ws/src/mjregrasping/results/Untangle/untangle_for_animiation/1695236183_18/Untangle_1695236183_18_\signature{}_qpos.npy")
     outdir, phy, qpos, skeletons, trial_idx = load_from_npy(qpos_path, val_untangle)
 
     mjvedo = MjVedo(val_untangle.xml_path)
-    mjvedo.plotter += Text2D(f"Untangling A Cable", 'bottom-center')
+    mjvedo.plotter += Text2D(f"Untangling A Cable", 'bottom-center', s=3)
 
     cx = 0
     cy = 0.5
     cz = 0.1
     distance = 2.5
     start_azimuth = 0
-    num_frames = 3000
-    rot_per_frame = np.deg2rad(-0.25)
-    z = 1.5
-    dz_per_frame = 0.0005
+    total_rotation = -1.4  # rad
+    num_frames = 4000
+    z = 1.65
     sim_steps_per_frame = 3
 
     mjvedo.viz(phy)
@@ -61,8 +60,8 @@ def main():
         set_phy_to_frame(phy, qpos, int(qpos_t))
         mjvedo.viz(phy)
 
-        start_spin = sec2frame(3)
-        stop_spin = sec2frame(7)
+        start_spin = sec2frame(4)
+        stop_spin = sec2frame(9)
         if t == start_spin:
             _, loops = get_loops_from_phy(phy)
             for loop, c in zip(loops, cycle(COLORS)):
@@ -79,6 +78,7 @@ def main():
             for a in fade_out_actors:
                 a.alpha(alpha)
 
+            rot_per_frame = total_rotation / (stop_spin - start_spin)
             azimuth += rot_per_frame
         elif t == stop_spin:
             # remove the lines
@@ -93,13 +93,12 @@ def main():
 
         x = distance * np.cos(azimuth) + cx
         y = distance * np.sin(azimuth) + cy
-        z += dz_per_frame
         mjvedo.plotter.camera.SetFocalPoint(cx, cy, cz)
         plotter.camera.SetPosition(x, y, z)
 
         return False
 
-    mjvedo.record(f"results/untangle_example_anim_{trial_idx}.mp4", num_frames=num_frames, anim_func=anim)
+    mjvedo.record(f"results/untangle_example_anim_{trial_idx}.mov", num_frames=num_frames, anim_func=anim)
 
 
 if __name__ == "__main__":

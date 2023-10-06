@@ -45,9 +45,15 @@ def control_step(phy: Physics, qvel_target, sub_time_s: float, mov: Optional[MjM
 
 
 def slow_when_eqs_bad(phy):
+    speed_factor = get_speed_factor(phy)
+    phy.d.ctrl *= speed_factor
+
+
+def get_speed_factor(phy):
+    return 1
     total_eq_error = compute_total_eq_error(phy)
     speed_factor = np.clip(np.exp(-700 * total_eq_error), 0, 1)
-    phy.d.ctrl *= speed_factor
+    return speed_factor
 
 
 def limit_actuator_windup(phy):

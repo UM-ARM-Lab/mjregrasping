@@ -67,8 +67,11 @@ class MjVedo:
                 alpha *= 0.3
 
             if geom_type == mjtGeom.mjGEOM_BOX:
-                fulL_size = (2 * m_geom.size)
-                box = Box(geom_xpos, *fulL_size, c=c, alpha=alpha)
+                full_size = (2 * m_geom.size)
+                if 'post' in m_geom.name:
+                    # Hack to fix z-fighting
+                    full_size[2] -= 1e-3
+                box = Box(geom_xpos, *full_size, c=c, alpha=alpha)
                 if geom_id not in self.actor_map:
                     self.plotter += box
                     self.actor_map[geom_id] = box

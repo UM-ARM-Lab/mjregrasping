@@ -37,7 +37,7 @@ hp = {
     "max_expected_contacts":           6,
     "contact_cost":                    3.0,
     "rope_disp_weight":                25.0,
-    "eq_err_weight":                   400.0,
+    "eq_err_weight":                   100.0,
     "trap_q_rope_weight":              0.5,
     "frac_dq_threshold":               0.25,
     "max_max_dq":                      0.0075,

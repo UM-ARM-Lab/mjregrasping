@@ -24,6 +24,6 @@
         <light name="overhead1" pos="0 0 10" mode="trackcom"/>
     </worldbody>
     <equality>
-        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
+        <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.04 1"/>
     </equality>
 </mujoco>

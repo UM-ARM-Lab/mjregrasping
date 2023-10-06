@@ -50,7 +50,7 @@ class OnStuckReal(BaseOnStuckMethod):
         if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
             print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
             print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
-            self.planner.update_blacklists(phy)
+            self.planner.update_blocklists(phy)
             best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         self.planner.planning_times.append(perf_counter() - planning_t0)
         if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:

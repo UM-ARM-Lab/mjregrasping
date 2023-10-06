@@ -67,7 +67,7 @@ class OnStuckOurs(BaseOnStuckMethod):
         print(f"{new_geodesic_dist=:.3f} {initial_geodesic_dist=:.3f}: {new_dist_is_lower=}")
         if not new_dist_is_lower:
             print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
-            self.planner.update_blacklists(phy)
+            self.planner.update_blocklists(phy)
             best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         if viz:
             scene_msg = make_planning_scene(phy)
@@ -103,7 +103,7 @@ class OnStuckAlwaysBlacklist(OnStuckOurs):
         planning_t0 = perf_counter()
         sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
         print("Blacklisting")
-        self.planner.update_blacklists(phy)
+        self.planner.update_blocklists(phy)
         best_grasp = self.planner.get_best(sim_grasps, viz=viz)
         self.planner.planning_times.append(perf_counter() - planning_t0)
         self.execute_best_grasp(best_grasp, mov, phy, viz)

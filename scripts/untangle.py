@@ -14,7 +14,7 @@ from mjregrasping.goals import GraspLocsGoal, point_goal_from_geom
 from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.params import hp
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
-from mjregrasping.rollout import control_step
+from mjregrasping.rollout import control_step, get_speed_factor
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle, simple_goal_sig
 from mjregrasping.trap_detection import TrapDetection
@@ -50,7 +50,7 @@ def main():
     grasp_rrt = GraspRRT()
 
     viz = make_viz(scenario)
-    for trial_idx in [15, 18, 2, 11, 12, 17]:
+    for trial_idx in [18, 2, 11, 12, 15]:
     # for trial_idx in range(0, 25):
         phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
     
@@ -124,6 +124,8 @@ def main():
             viz.viz(phy)
 
             do_grasp_dynamics(phy)
+
+            rr.log_scalar("speed_factor", get_speed_factor(phy))
 
             mppi.roll()
 

@@ -4,6 +4,7 @@ from typing import Dict, Optional, List
 import numpy as np
 from numpy.linalg import norm
 
+from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, \
     get_nongrasping_rope_contact_cost, get_regrasp_costs
@@ -160,12 +161,14 @@ class ObjectPointGoal(ObjectPointGoalBase):
 
         grasp_xpos = grasp_locations_to_xpos(phy, grasp_locs)
 
+        eq_error = compute_total_eq_error(phy)
+
         return result(tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint,
-                      finger_qs, grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost)
+                      finger_qs, grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost, eq_error)
 
     def costs(self, results, u_sample):
         (tools_pos, contact_cost, is_grasping, current_locs, is_unstable, rope_points, keypoint, finger_qs,
-         grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost) = as_floats(results)
+         grasp_locs, grasp_xpos, joint_positions, nongrasping_rope_contact_cost, eq_error) = as_floats(results)
 
         unstable_cost = sum(is_unstable * hp['unstable_weight'])
 
@@ -188,11 +191,10 @@ class ObjectPointGoal(ObjectPointGoalBase):
         nongrasping_rope_contact_cost = sum(nongrasping_rope_contact_cost)
         gripper_to_goal_cost = sum(gripper_to_goal_cost)
 
-        no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
-        ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
-
         keypoint_dist = self.keypoint_dist_to_goal(keypoint)[1:]
         keypoint_cost = sum(keypoint_dist * hp['keypoint_weight'])
+
+        eq_error_cost = sum(eq_error) * hp['eq_err_weight']
 
         return (
             contact_cost,
@@ -203,7 +205,7 @@ class ObjectPointGoal(ObjectPointGoalBase):
             nongrasping_rope_contact_cost,
             nongrasping_rope_dist_cost,
             gripper_to_goal_cost,
-            ever_not_grasping_cost,
+            eq_error_cost,
             smoothness_cost,
         )
 
@@ -218,7 +220,7 @@ class ObjectPointGoal(ObjectPointGoalBase):
             "nongrasping_rope_contact",
             "nongrasping_rope_dist",
             "gripper_to_goal",
-            "ever_not_grasping",
+            "eq_error",
             "smoothness",
         ]
 
@@ -314,9 +316,6 @@ class ThreadingGoal(ObjectPointGoalBase):
         contact_cost = sum(contact_cost)
         unstable_cost = sum(unstable_cost)
 
-        no_gripper_grasping = np.any(np.all(np.logical_not(is_grasping), axis=-1), axis=-1)
-        ever_not_grasping_cost = no_gripper_grasping * hp['ever_not_grasping_weight']
-
         keypoint_dist = self.keypoint_dist_to_goal(keypoint)[1:]
         keypoint_cost = sum(keypoint_dist * hp['keypoint_weight'])
 
@@ -335,7 +334,6 @@ class ThreadingGoal(ObjectPointGoalBase):
             nongrasping_rope_contact_cost,
             nongrasping_rope_dist_cost,
             gripper_to_goal_cost,
-            ever_not_grasping_cost,
             smoothness_cost,
         )
 
@@ -352,7 +350,6 @@ class ThreadingGoal(ObjectPointGoalBase):
             "nongrasping_rope_contact",
             "nongrasping_rope_dist",
             "gripper_to_goal",
-            "ever_not_grasping",
             "smoothness",
         ]
 

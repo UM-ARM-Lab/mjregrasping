@@ -50,22 +50,22 @@ class HomotopyRegraspPlanner:
         self.key_loc = key_loc
         self.rng = np.random.RandomState(seed)
         self.skeletons = skeletons
-        self.true_h_blacklist = []
+        self.true_h_blocklist = []
         self.goal_skel_names = goal_skel_names
 
         self.rrt_rng = np.random.RandomState(seed)
         self.grasp_rrt = grasp_rrt
         seedOmpl(seed)
 
-    def update_blacklists(self, phy):
+    def update_blocklists(self, phy):
         current_true_h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
         new = True
-        for blacklisted_true_h in self.true_h_blacklist:
-            if current_true_h == blacklisted_true_h:
+        for blocklisted_true_h in self.true_h_blocklist:
+            if current_true_h == blocklisted_true_h:
                 new = False
                 break
         if new:
-            self.true_h_blacklist.append(current_true_h)
+            self.true_h_blocklist.append(current_true_h)
 
     def simulate_sampled_grasps(self, phy, viz, viz_execution=False):
         self.grasp_rrt.fix_start_state_in_place(phy, viz)
@@ -172,8 +172,8 @@ class HomotopyRegraspPlanner:
         homotopy_cost = 0
         if hp['use_signature_cost']:
             h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
-            for blacklisted_h in self.true_h_blacklist:
-                if h_plan == blacklisted_h:
+            for blocklisted_h in self.true_h_blocklist:
+                if h_plan == blocklisted_h:
                     homotopy_cost = BIG_PENALTY
                     break
 
