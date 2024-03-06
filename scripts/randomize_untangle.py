@@ -120,7 +120,7 @@ def main():
     grasp_rrt = GraspRRT()
 
     rng = np.random.RandomState(0)
-    for trial_idx in range(10):
+    for trial_idx in range(33, 50):
         good = False
         while not good:
             # Configure the model before we construct the data and physics object
@@ -151,10 +151,9 @@ def main():
             viz.viz(phy, is_planning=False)
 
             fixed = grasp_rrt.fix_start_state_in_place(phy, viz)
-            for j in range(5):
-                loc = np.clip(rng.uniform(0.5, 1.5), 0, 1)
+            for loc in [1.00]:
                 res, scene_msg = grasp_rrt.plan(phy, [Strategies.STAY, Strategies.NEW_GRASP], [-1, loc], viz,
-                                                pos_noise=0.2)
+                                                pos_noise=0.02)
                 if res.error_code.val == MoveItErrorCodes.SUCCESS:
                     teleport_to_end_of_plan(phy, res)
                     activate_grasp(phy, 'right', loc)

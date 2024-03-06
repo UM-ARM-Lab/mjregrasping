@@ -13,3 +13,4 @@ wandb
 *.swp
 *.blend1
 *.pth
+models/tmp.xml

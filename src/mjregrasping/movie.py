@@ -1,4 +1,5 @@
 import json
+import logging
 from copy import deepcopy
 from pathlib import Path
 
@@ -21,7 +22,7 @@ class MjMovieMaker:
 
     def render(self, d: mujoco.MjData):
         """ Render the current mujoco scene and store the resulting image and qpos """
-        self.qpos_list.append(d.qpos)
+        self.qpos_list.append(d.qpos.copy())
         self.writer.append_data(self.r.render(d))
 
     def start(self, filename: Path):

@@ -7,7 +7,7 @@ we simply run our MPPI planner for a fixed horizon and take the final/accumulate
 import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from copy import copy
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 from mjregrasping.goals import ObjectPointGoal
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
@@ -25,13 +25,15 @@ from moveit_msgs.msg import MoveItErrorCodes
 
 class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
-    def __init__(self, scenario: Scenario, goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict, seed=0):
+    def __init__(self, scenario: Scenario, goal: ObjectPointGoal, grasp_rrt: GraspRRT, skeletons: Dict,
+                 goal_skel_names: Optional[List[str]] = None, seed=0):
         self.goal = copy(goal)
-        super().__init__(goal.loc, grasp_rrt, skeletons, seed)
+        super().__init__(goal.loc, grasp_rrt, skeletons, goal_skel_names, seed)
         self.scenario = scenario
 
     def costs(self, sim_grasp: SimGraspCandidate):
         # these costs are computed using the phy after the grasp but before the post-grasp motion towards the goal
+        # NOTE: even though the homotopy cost is computed, because we never blacklist anything in this baseline, it's always 0
         costs = super().costs(sim_grasp)
 
         post_motion_phy = sim_grasp.phy1
@@ -69,5 +71,6 @@ class TAMPRegraspPlanner(HomotopyRegraspPlanner):
 
             mppi.roll()
 
+        # Hack to pass the final state to use when computing cost
         sim_grasp.phy1 = phy_plan
         return sim_grasp

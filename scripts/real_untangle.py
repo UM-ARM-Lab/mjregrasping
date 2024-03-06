@@ -22,8 +22,6 @@ from mjregrasping.homotopy_regrasp_planner import HomotopyThreadingPlanner
 from mjregrasping.low_level_grasping import run_grasp_controller, GraspFailed
 from mjregrasping.mjcf_scene_to_sdf import get_sdf, viz_slices
 from mjregrasping.move_to_joint_config import pid_to_joint_configs
-from mjregrasping.moveit_planning import make_planning_scene
-from mjregrasping.movie import MjMovieMaker
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_q
@@ -34,23 +32,43 @@ from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import real_goal_sig, dz
 from mjregrasping.set_up_real_scene import set_up_real_scene
 from mjregrasping.trap_detection import TrapDetection
+from mjregrasping.point_reaching_methods import BaseOnStuckMethod
 from mjregrasping.viz import make_viz
 from moveit_msgs.msg import MoveItErrorCodes
 from trimesh.sample import sample_surface
 
 
-def get_real_untangle_skeletons(phy: Physics):
-    d = phy.d
-    m = phy.m
-    return {
-        "loop1": np.array([
-            d.geom("loop1_front").xpos + dz(m.geom("loop1_front").size[2]),
-            d.geom("loop1_front").xpos - dz(m.geom("loop1_front").size[2]),
-            d.geom("loop1_back").xpos - dz(m.geom("loop1_back").size[2]),
-            d.geom("loop1_back").xpos + dz(m.geom("loop1_back").size[2]),
-            d.geom("loop1_front").xpos + dz(m.geom("loop1_front").size[2]),
-        ]) - np.array([0.02, 0, 0]),  # hack to move the rope a bit further through the loop before the hand-off
-    }
+class OnStuckReal(BaseOnStuckMethod):
+
+    def __init__(self, scenario, skeletons, goal, grasp_goal, grasp_rrt: GraspRRT):
+        super().__init__(scenario, skeletons, goal, grasp_goal, grasp_rrt)
+        from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
+        self.planner = HomotopyRegraspPlanner(goal.loc, self.grasp_rrt, skeletons)
+
+    def on_stuck(self, phy, viz, mov, val_cmd: Optional[RealValCommander] = None):
+        initial_geodesic_dist = get_geodesic_dist(self.grasp_goal.get_grasp_locs(), self.goal.loc)
+        planning_t0 = perf_counter()
+        # print("DEBUGGING VIZ_EXECUTION=TRUE")
+        sim_grasps = self.planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
+        best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        new_geodesic_dist = get_geodesic_dist(best_grasp.locs, self.goal.loc)
+        # if we are unable to improve by grasping closer to the keypoint, update the blacklist and replan
+        if initial_geodesic_dist - new_geodesic_dist < 0.01:  # less than 1% closer to the keypoint
+            print(Fore.YELLOW + "Unable to improve by grasping closer to the keypoint." + Fore.RESET)
+            print(Fore.YELLOW + "Updating blacklist and replanning..." + Fore.RESET)
+            self.planner.update_blocklists(phy)
+            best_grasp = self.planner.get_best(sim_grasps, viz=viz)
+        self.planner.planning_times.append(perf_counter() - planning_t0)
+        if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
+            viz.viz(best_grasp.phy, is_planning=True)
+            print(f"Regrasping from {best_grasp.initial_locs} to {best_grasp.locs}")
+            # now execute the plan
+            deactivate_release_and_moving(phy, best_grasp.strategy, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+            pid_to_joint_configs(phy, best_grasp.res, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+            grasp_and_settle(phy, best_grasp.locs, viz, is_planning=False, mov=mov, val_cmd=val_cmd)
+            self.grasp_goal.set_grasp_locs(best_grasp.locs)
+        else:
+            print(Fore.RED + "Failed to find a plan." + Fore.RESET)
 
 
 @ros_init.with_ros("untangle")
@@ -146,9 +164,12 @@ def main():
 
     pool = ThreadPoolExecutor(multiprocessing.cpu_count() - 1)
     traps = TrapDetection()
-    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=scenario.noise_sigma,
+    hp['horizon'] = 8;
+    hp['n_samples'] = 36
+    mppi = RegraspMPPI(pool=pool, nu=phy.m.nu, seed=1, horizon=hp['horizon'], noise_sigma=val_untangle.noise_sigma,
                        temp=hp['temp'])
     num_samples = hp['n_samples']
+    osm = OnStuckReal(scenario, skeletons, goal, grasp_goal, grasp_rrt)
 
     goal.viz_goal(phy)
 
@@ -207,81 +228,13 @@ def main():
 
         goal.viz_goal(phy)
 
-        if isinstance(goal, ObjectPointGoal):
-            if goal.satisfied(phy):
-                print(Fore.GREEN + "Task complete!" + Fore.RESET)
-                break
-        else:
-            disc_center, disc_normal = get_disc_params(goal)
-            disc_rad = 0.30
-
-            disc_penetrated = goal.satisfied(phy, disc_center, disc_normal, disc_rad, end_loc)
-            is_stuck = traps.check_is_stuck(phy, grasp_goal)
-            if disc_penetrated:
-                print("Disc penetrated!")
-                mppi.reset()
-
-                # open the left gripper
-                qvel_open = np.zeros(phy.m.nu)
-                qvel_open[9] = 0.5
-                control_step(phy, qvel_open, sub_time_s=2, mov=None, val_cmd=val_cmd)
-
-                planner = HomotopyThreadingPlanner(end_loc, grasp_rrt, skeletons, goal.skeleton_names)
-                print(f"Planning with {planner.key_loc=}...")
-                sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=True)
-                best_grasp = planner.get_best(sim_grasps, viz=viz)
-                viz.viz(best_grasp.phy, is_planning=True)
-                # now execute the plan
-                if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-                    scene_msg = make_planning_scene(phy)
-                    grasp_rrt.display_result(viz, best_grasp.res, scene_msg)
-                    print(f"Regrasping from {best_grasp.initial_locs} to {best_grasp.locs}")
-                    if planner.through_skels(best_grasp.phy):
-                        print("Executing grasp change plan")
-                        execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov, val_cmd, grasp_pos_inset=0.02)
-                        needs_reset = True
-                        traps.reset_trap_detection()
-                    else:
-                        print("Not through the goal skeleton!")
-                else:
-                    # if we've reached the goal but can't grasp the end, scootch down the rope
-                    # but don't scootch past where we are currently grasping it.
-                    goal.loc = max(goal.loc - hp['ours_scootch_fraction'], max(get_grasp_locs(phy)))
-                    print("No plans found!")
-            elif np.all(grasp_goal.get_grasp_locs() == -1):
-                print("Doing initial grasp!")
-                mppi.reset()
-
-                # open the right gripper
-                qvel_open = np.zeros(phy.m.nu)
-                qvel_open[-1] = 0.5
-                control_step(phy, qvel_open, sub_time_s=2, mov=None, val_cmd=val_cmd)
-
-                planner = HomotopyThreadingPlanner(loc0, grasp_rrt, skeletons, goal.skeleton_names)
-                print(f"Planning with {planner.key_loc=}...")
-                sim_grasps = planner.simulate_sampled_grasps(phy, viz, viz_execution=False)
-                best_grasp = planner.get_best(sim_grasps, viz=viz)
-                viz.viz(best_grasp.phy, is_planning=True)
-                # now execute the plan
-                if best_grasp.res.error_code.val == MoveItErrorCodes.SUCCESS:
-                    scene_msg = make_planning_scene(phy)
-                    grasp_rrt.display_result(viz, best_grasp.res, scene_msg)
-                    print(f"Regrasping from {best_grasp.initial_locs} to {best_grasp.locs}")
-                    # temporarily disable collision for the grippers
-                    phy.m.geom('rightgripper').contype = 0
-                    phy.m.geom('rightgripper2').contype = 0
-                    execute_grasp_change_plan(best_grasp, grasp_goal, phy, viz, mov, val_cmd, grasp_pos_inset=0.014)
-                    phy.m.geom('rightgripper').contype = 1  # re-enable
-                    phy.m.geom('rightgripper2').contype = 1
-                    traps.reset_trap_detection()
-                    needs_reset = True
-                else:
-                    raise RuntimeError("No plans found!")
-
-            if through_skels(skeletons, goal.skeleton_names, phy):
-                print(f"Through {goal.skeleton_names}!")
-                goal_idx += 1
-                goal = goals[goal_idx]
+        is_stuck = traps.check_is_stuck(phy, grasp_goal)
+        needs_reset = False
+        if itr == 10 or is_stuck:
+            print("DEBUGGING!!!")
+            print(Fore.YELLOW + "Stuck! Replanning..." + Fore.RESET)
+            osm.on_stuck(phy, viz, mov, val_cmd)
+            needs_reset = True
 
         if needs_reset:
             for _ in range(6):

@@ -2,6 +2,7 @@ import numpy as np
 import rerun as rr
 
 from mjregrasping.buffer import Buffer
+from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.goals import GraspLocsGoal
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics

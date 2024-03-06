@@ -14,10 +14,11 @@
             </body>
             <body name="table" pos="0.1 0 0.72">
                 <geom type="box" name="table" pos="0.19 0 0" size="0.25 1.0 0.02" rgba="0.6 0.8 0.8 1"/>
+                <geom type="box" name="right_arm_blocker" pos="0.35 0.4 0.09" size="0.05 0.02 0.07" rgba="0.7 0.7 0.4 1"/>
                 <body name="goal" pos="0.14 0.4 0.05">
                     <geom name="goal" class="visual" type="sphere" size="0.07" pos="0.045 0 0" rgba="1 0 1 0.3"/>
                 </body>
-                <body name="loop1" pos="0.23 0 0.27">
+                <body name="loop1" pos="0.23 0.1 0.27">
                     <geom type="box" name="loop1_top" pos="0 0 0.225" size="0.25 0.025 0.025" rgba="0.5 0.5 1.0 1"/>
                     <geom type="box" name="loop1_bottom" pos="0 0 -0.225" size="0.25 0.025 0.025" rgba="0.5 0.5 1.0 1"/>
                     <geom type="box" name="loop1_front" pos="0.225 0 0.0" size="0.025 0.025 0.25" rgba="0.5 0.5 1.0 1"/>

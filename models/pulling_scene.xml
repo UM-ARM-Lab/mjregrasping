@@ -10,39 +10,39 @@
     <include file="materials.xml"/>
     <include file="val.xml"/>
     <include file="floor.xml"/>
-    <include file="cc_sphere.xml"/>
     <include file="val_eq_constraints.xml"/>
     <worldbody>
         <!-- used for recording what happens in the simulation -->
         <body name="mycamera">
-            <camera mode="fixed" name="mycamera" xyaxes="1 -0.4 0 0 1 1" pos="-0.3 -0.5 1.4"/>
+            <camera mode="fixed" name="mycamera" xyaxes="-0.839 0.544 -0.000 -0.372 -0.573 0.730" pos="1.584 3.270 1.947"/>
         </body>
         <light name="top" pos="0 0 105" mode="trackcom"/>
         <body name="obstacles">
             <body name="wall" pos="-1.0 0 0.5">
                 <geom name="wall" type="box" size="0.05 2.5 1.0" rgba="0.5 0.5 0.5 1"/>
-                <body name="attach" pos="0.05 0.75 -0.75">
+                <body name="attach" pos="0.05 0.5 -0.75">
                     <geom name="attach" class="visual" type="box" size="0.01 0.03 0.03" rgba="1 0 0 1"/>
                     <body pos="0.03 0 0" euler="0 0 0" name="rope">
-<!--                        <geom name="head" type="box" size="0.03 0.07 0.02" pos="-0.04 0 0" rgba="0.8 0.2 0.1 1"/>-->
-                        <inertial pos="0 0 0" quat="1 0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001"/>
-                        <composite type="cable" curve="s" count="15 1 1" size="3 0.22 1">
-                            <joint kind="main" damping=".02"/>
-                            <geom type="capsule" size=".02" rgba=".8 .2 .1 1" condim="1" group="1"/>
+                        <inertial pos="0 0 0" quat="1 0 0 0" mass="0.5" diaginertia="0.001 0.001 0.001"/>
+                        <composite type="cable" curve="s" count="35 1 1" size="3 0.22 1">
+                            <joint kind="main" damping=".02" stiffness="0.2"/>
+                            <geom type="capsule" size=".018" rgba=".8 .2 .1 1" condim="1" group="1"/>
                         </composite>
                         <joint type="ball" damping=".02"/>
                     </body>
                 </body>
             </body>
         </body>
-        <body name="mess" pos="0.4 0.6 -0.445">
-            <!--            <geom name="mess" class="visual" type="mesh" mesh="mesh"/>-->
+        <body name="mess" pos="0.0 0.5 -0.445">
             <body name="goal">
-                <geom name="goal" class="visual" type="sphere" pos="0 0 0.03" size="0.05" rgba="1 0 1 0.3"/>
+                <geom name="goal" class="visual" type="sphere" pos="0 0 0.03" size="0.08" rgba="1 0 1 0.3"/>
             </body>
         </body>
     </worldbody>
     <equality>
         <connect body1="attach" body2="B_first" name="attach" anchor="0 0 0" active="true" solref="0.03 1"/>
+
+        <!-- used to randomize the rope -->
+        <connect body1="world" body2="B_first" name="perturb" anchor="0 0 0" active="false" solref="0.1 1"/>
     </equality>
 </mujoco>

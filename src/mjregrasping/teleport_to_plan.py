@@ -4,7 +4,7 @@ import mujoco
 import numpy as np
 
 from mjregrasping.movie import MjMovieMaker
-from mjregrasping.physics import Physics
+from mjregrasping.physics import Physics, get_qpos_ids_for_actuators
 from mjregrasping.viz import Viz
 
 
@@ -14,8 +14,8 @@ def teleport_to_end_of_plan(phy_plan, res):
 
 
 def teleport_to_planned_q(phy_plan, plan_final_q):
-    qpos_for_act = phy_plan.m.actuator_trnid[:, 0]
-    phy_plan.d.qpos[qpos_for_act] = plan_final_q
+    qpos_ids = get_qpos_ids_for_actuators(phy_plan)
+    phy_plan.d.qpos[qpos_ids] = plan_final_q
     phy_plan.d.act = plan_final_q
     mujoco.mj_forward(phy_plan.m, phy_plan.d)
 

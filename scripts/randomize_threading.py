@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 from pathlib import Path
-from typing import Optional
 
 import mujoco
 import numpy as np
@@ -14,7 +13,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rviz import MujocoXmlExpander
-from mjregrasping.scenarios import threading, get_threading_skeletons
+from mjregrasping.scenarios import threading_cable, get_threading_skeletons
 from mjregrasping.settle import settle
 from mjregrasping.trials import save_trial
 from mjregrasping.viz import make_viz, Viz
@@ -57,7 +56,7 @@ def main():
     rr.init('randomize_threading')
     rr.connect()
 
-    scenario = threading
+    scenario = threading_cable
 
     viz = make_viz(scenario)
 
@@ -65,13 +64,16 @@ def main():
     root.mkdir(exist_ok=True, parents=True)
 
     rng = np.random.RandomState(0)
-    for i in range(10):
+    for i in range(3, 25):
         # Configure the model before we construct the data and physics object
         m = randomize_loop_positions(scenario.xml_path, rng)
 
         d = mujoco.MjData(m)
         objects = MjObjects(m, scenario.obstacle_name, scenario.robot_data, scenario.rope_name)
         phy = Physics(m, d, objects)
+
+        skeletons = get_threading_skeletons(phy)
+        viz.skeletons(skeletons)
 
         rope_xyz_q_indices = phy.o.rope.qpos_indices[:3]
         rope_quat_q_indices = phy.o.rope.qpos_indices[3:7]
@@ -102,11 +104,6 @@ def main():
         loc = rng.uniform(0.93, 0.96)
         activate_grasp(phy, 'right', loc)
         settle(phy, DEFAULT_SUB_TIME_S, viz, is_planning=False)
-
-        if viz:
-            viz.viz(phy)
-
-        skeletons = get_threading_skeletons(phy)
 
         save_trial(i, phy, scenario, None, skeletons)
         print(f"Saved trial {i}")

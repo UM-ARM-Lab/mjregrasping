@@ -9,7 +9,7 @@ import rospy
 from dynamic_reconfigure.client import Client
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
-from mjregrasping.grasping import get_is_grasping
+from mjregrasping.grasping import get_is_grasping, get_grasp_locs
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.moveit_planning import make_planning_scene
 from mjregrasping.params import hp
@@ -29,15 +29,24 @@ class GraspRRT:
         client.update_configuration({"maximum_waypoint_distance": 0.15})
         self.fix_start_rng = np.random.RandomState(0)
 
-    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], pos_noise=0.01, **kwargs):
+    def plan(self, phy: Physics, strategy, locs: np.ndarray, viz: Optional[Viz], allowed_planning_time=5.0,
+             pos_noise=0.02, **kwargs):
         phy_plan = phy.copy_all()
         goals, group_name, q0 = plan_to_grasp(locs, phy_plan, strategy)
 
         scene_msg = make_planning_scene(phy_plan)
-        if viz:
-            for k, v in goals.items():
-                viz.sphere(f"rrt_plan/{k}", v, pos_noise, color=[1, 1, 1, 0.2])
-        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), pos_noise=pos_noise, **kwargs)
+
+        # Start by opening the gripper if we are moving or creating a new grasp
+        current_locs = get_grasp_locs(phy)
+        for name, s_i, l_i in zip(phy.o.rd.gripper_joint_names, strategy, current_locs):
+            i = scene_msg.robot_state.joint_state.name.index(name)
+            if s_i in [Strategies.NEW_GRASP, Strategies.MOVE]:
+                scene_msg.robot_state.joint_state.position[i] = hp['finger_q_open']
+            elif s_i == Strategies.STAY and l_i != -1:
+                scene_msg.robot_state.joint_state.position[i] = hp['finger_q_closed']
+
+        res: MotionPlanResponse = self.rrt.plan(scene_msg, group_name, goals, bool(viz), allowed_planning_time,
+                                                pos_noise, **kwargs)
         return res, scene_msg
 
     def display_result(self, viz, res, scene_msg):

@@ -11,7 +11,10 @@ from PyQt5.QtCore import QTimer
 from PyQt5.QtWidgets import QMainWindow, QApplication
 
 import rospy
-from mjregrasping.grasping import activate_grasp, let_rope_move_through_gripper_geoms
+from geometry_msgs.msg import Pose, Quaternion
+from mjregrasping.basic_3d_pose_marker import Basic3DPoseInteractiveMarker
+from mjregrasping.grasping import activate_grasp
+from mjregrasping.jacobian_ctrl import get_w_in_tool, warn_near_joint_limits
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import limit_actuator_windup, slow_when_eqs_bad

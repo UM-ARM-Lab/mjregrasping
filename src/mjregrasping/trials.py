@@ -1,4 +1,5 @@
 import json
+import logging
 import pickle
 import time
 from pathlib import Path
@@ -28,23 +29,16 @@ def save_trial(i, phy, scenario, sdf_path, skeletons):
 
 
 def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
-    trials_root = Path("trial_data") / scenario.name
-    trial_path = trials_root / f"{scenario.name}_{i}.pkl"
-    with trial_path.open("rb") as f:
-        trial_info = pickle.load(f)
-    phy_path = trial_info['phy_path']
-    sdf_path = trial_info['sdf_path']
-    skeletons = trial_info['skeletons']
-    with phy_path.open("rb") as f:
-        phy = pickle.load(f)
-    mujoco.mj_forward(phy.m, phy.d)
-    viz.viz(phy)
+    phy, sdf_path, skeletons = load_phy_and_skeletons(i, scenario)
+    if viz:
+        viz.viz(phy)
     if sdf_path:
         sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(sdf_path))
         # viz_slices(sdf)
     else:
         sdf = None
-    viz.skeletons(skeletons)
+    if viz:
+        viz.skeletons(skeletons)
 
     mov = MjMovieMaker(gl_ctx, phy.m)
 
@@ -57,4 +51,23 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     print(f"Saving output to {mov_path}")
     mov.start(mov_path)
 
+    # FIXME: doesn't create a new file for each trial
+    log_filename = results_root / f'{scenario.name}_{now}_{i}.log'
+    logging.basicConfig(filename=log_filename, level=logging.DEBUG)
+    logging.getLogger().addHandler(logging.StreamHandler())
+
     return phy, sdf, skeletons, mov
+
+
+def load_phy_and_skeletons(i, scenario):
+    trials_root = Path("trial_data") / scenario.name
+    trial_path = trials_root / f"{scenario.name}_{i}.pkl"
+    with trial_path.open("rb") as f:
+        trial_info = pickle.load(f)
+    phy_path = trial_info['phy_path']
+    sdf_path = trial_info['sdf_path']
+    skeletons = trial_info['skeletons']
+    with phy_path.open("rb") as f:
+        phy = pickle.load(f)
+    mujoco.mj_forward(phy.m, phy.d)
+    return phy, sdf_path, skeletons

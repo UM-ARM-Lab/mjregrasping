@@ -5,6 +5,7 @@ import pysdf_tools
 import rerun as rr
 from matplotlib.colors import to_rgba
 
+np.float = np.float64
 import ros_numpy
 import rospy
 from arc_utilities.tf2wrapper import TF2Wrapper

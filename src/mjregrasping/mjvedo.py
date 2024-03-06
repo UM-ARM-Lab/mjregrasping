@@ -4,12 +4,14 @@ from typing import Callable
 import mujoco
 import numpy as np
 from mujoco import mjtGeom, mj_id2name
-from vedo import Plotter, Video, ProgressBarWidget, Box, Cylinder, Sphere, load, Points, Light
+from vedo import Plotter, Video, Box, Cylinder, Sphere, load, Points
 
+from mjregrasping.mujoco_object import MjObject
 from mjregrasping.physics import Physics
 from mjregrasping.rviz import MujocoXmlExpander
+from mjregrasping.trials import load_phy_and_skeletons
 
-COLORS = ['r', 'g', 'b', 'c', 'm', 'y', 'k', 'w']
+COLORS = ['r', 'b', 'g', 'c', 'm', 'y', 'k', 'w']
 
 
 class MjVedo:
@@ -18,28 +20,25 @@ class MjVedo:
         self.mj_xml_parser = MujocoXmlExpander(xml_path)
         self.fps = fps
 
-        self.plotter = Plotter(title="drone_example", axes=1)
+        self.plotter = Plotter(title="mjvedo", axes=0, interactive=False)
 
         self.mesh_cache = {}
         # maps from mujoco geom IDs to Vedo actors
         self.actor_map = {}
 
     def record(self, filename, anim_func: Callable, num_frames: int):
-        pb = ProgressBarWidget(num_frames)
-        self.plotter += pb
-
         video = Video(filename, fps=self.fps, backend="ffmpeg")
 
         for t in range(num_frames):
-            anim_func(t, self.plotter)
-            # self.plotter.render()
-            self.plotter.show(interactive=False)
+            done = anim_func(t, self.plotter)
+            self.plotter.show(interactive=False, resetcam=False)
             video.add_frame()
-            pb.update()
+            if done:
+                break
 
         video.close()
 
-    def viz(self, phy: Physics, is_planning=False):
+    def viz(self, phy: Physics, is_planning=False, excluded_geom_names=[]):
         m = phy.m
         d = phy.d
         for geom_id in range(m.ngeom):
@@ -48,6 +47,9 @@ class MjVedo:
             geom_type = m_geom.type
             geom_bodyid = m_geom.bodyid
             d_body = d.body(geom_bodyid)
+
+            if m_geom.name in excluded_geom_names:
+                continue
 
             geom_xmat = d_geom.xmat.reshape(3, 3)
             geom_transform = np.eye(4)
@@ -65,34 +67,45 @@ class MjVedo:
                 alpha *= 0.3
 
             if geom_type == mjtGeom.mjGEOM_BOX:
-                fulL_size = (2 * m_geom.size)
-                box = Box(geom_xpos, *fulL_size, c=c, alpha=alpha)
+                full_size = (2 * m_geom.size)
+                if 'post' in m_geom.name:
+                    # Hack to fix z-fighting
+                    full_size[2] -= 1e-3
+                box = Box(geom_xpos, *full_size, c=c, alpha=alpha)
+                if geom_id not in self.actor_map:
+                    self.plotter += box
+                    self.actor_map[geom_id] = box
+                box = self.actor_map[geom_id]
                 box.apply_transform(geom_transform)
-                self.plotter += box
-                self.actor_map[geom_id] = box
             elif geom_type == mjtGeom.mjGEOM_CYLINDER:
                 cy = Cylinder(geom_xpos, m_geom.size[0], 2 * m_geom.size[1], c=c, alpha=alpha)
+                if geom_id not in self.actor_map:
+                    self.plotter += cy
+                    self.actor_map[geom_id] = cy
+                cy = self.actor_map[geom_id]
                 cy.apply_transform(geom_transform)
-                self.plotter += cy
-                self.actor_map[geom_id] = cy
             elif geom_type == mjtGeom.mjGEOM_SPHERE:
                 sphere = Sphere(geom_xpos, m_geom.size[0], c=c, alpha=alpha)
+                if geom_id not in self.actor_map:
+                    self.plotter += sphere
+                    self.actor_map[geom_id] = sphere
+                sphere = self.actor_map[geom_id]
                 sphere.apply_transform(geom_transform)
-                self.plotter += sphere
-                self.actor_map[geom_id] = sphere
             elif geom_type == mjtGeom.mjGEOM_CAPSULE:
-                cy = Cylinder(geom_xpos, m_geom.size[0], 2 * m_geom.size[1], c=c, alpha=alpha)
-                cy.apply_transform(geom_transform)
-                self.plotter += cy
                 start = geom_xpos - m_geom.size[1] * geom_xmat[:, 2]
                 end = geom_xpos + m_geom.size[1] * geom_xmat[:, 2]
-                s1 = Sphere(start, m_geom.size[0], c=c, alpha=alpha)
-                s1.apply_transform(geom_transform)
-                self.plotter += s1
-                s2 = Sphere(end, m_geom.size[0], c=c, alpha=alpha)
-                s2.apply_transform(geom_transform)
-                self.plotter += s2
-                self.actor_map[geom_id] = [cy, s1, s2]
+                if geom_id not in self.actor_map:
+                    cy = Cylinder(geom_xpos, m_geom.size[0], 2 * m_geom.size[1], c=c, alpha=alpha)
+                    s1 = Sphere(start, m_geom.size[0], c=c, alpha=alpha)
+                    s2 = Sphere(end, m_geom.size[0], c=c, alpha=alpha)
+                    self.plotter += cy
+                    self.plotter += s1
+                    self.plotter += s2
+                    self.actor_map[geom_id] = [cy, s1, s2]
+                cy, s1, s2 = self.actor_map[geom_id]
+                cy.apply_transform(geom_transform)
+                s1.pos(start)
+                s2.pos(end)
             elif geom_type == mjtGeom.mjGEOM_MESH:
                 mesh_name = mj_id2name(m, mujoco.mjtObj.mjOBJ_MESH, m_geom.dataid)
                 # skip the model prefix, e.g. val/my_mesh
@@ -103,15 +116,24 @@ class MjVedo:
                 if mesh_name not in self.mesh_cache:
                     self.load_and_cache_mesh(mesh_name)
 
-                mesh = self.mesh_cache[mesh_name].clone()
+                if geom_id not in self.actor_map:
+                    mesh = self.mesh_cache[mesh_name].clone()
+                    self.plotter += mesh
+                    self.actor_map[geom_id] = mesh
+                mesh = self.actor_map[geom_id]
+                if is_planning:
+                    mesh.alpha(0.5)
                 mesh.apply_transform(body_transform)
-                self.plotter += mesh
-                self.actor_map[geom_id] = mesh
-        for light_id in range(m.nlight):
-            light = m.light(light_id)
-            if light.mode[0] == 2:
-                vlight = Light(light.pos, intensity=0.4)
-                # self.plotter += vlight
+
+    def get_object_actors(self, mjobject: MjObject):
+        actors = []
+        for geom_id in mjobject.geom_indices:
+            actor = self.actor_map[geom_id]
+            if isinstance(actor, list):
+                actors.extend(actor)
+            else:
+                actors.append(actor)
+        return actors
 
     def get_actor(self, phy, geom_name: str) -> Points:
         goem_id = phy.m.geom(geom_name).id
@@ -133,3 +155,23 @@ class MjVedo:
             self.mesh_cache[mesh_name] = mesh
             return
         raise RuntimeError(f"Mesh {mesh_name} not found")
+
+
+def load_frame_from_npy(frame_idx, qpos_filename, scenario):
+    outdir, phy, qpos, skeletons, trial_idx = load_from_npy(qpos_filename, scenario)
+    # Load the given frame and render it with mjvedo
+    set_phy_to_frame(phy, qpos, frame_idx)
+    return outdir, phy, qpos, skeletons, trial_idx
+
+
+def load_from_npy(qpos_filename, scenario):
+    outdir = qpos_filename.parent
+    qpos = np.load(qpos_filename)
+    trial_idx = int(qpos_filename.stem.split('_')[-3])
+    phy, sdf_path, skeletons = load_phy_and_skeletons(trial_idx, scenario)
+    return outdir, phy, qpos, skeletons, trial_idx
+
+
+def set_phy_to_frame(phy, qpos, frame_idx):
+    phy.d.qpos = qpos[frame_idx]
+    mujoco.mj_forward(phy.m, phy.d)

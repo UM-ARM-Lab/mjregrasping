@@ -67,7 +67,6 @@ def warn_near_joint_limits(current_q, phy):
             print(f"WARNING: joint {name_i} is at {q_i}, near lower limit of {limit_i}!")
     elif np.any(near_high):
         i = np.where(near_high)[0][0]
-        joint_i = phy.m.actuator_trnid[:, 0][i]
         name_i = phy.m.actuator(i).name
 
         q_i = current_q[i]
