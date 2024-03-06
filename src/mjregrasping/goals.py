@@ -4,6 +4,9 @@ from typing import Dict, Optional, List
 import numpy as np
 from numpy.linalg import norm
 
+import torch
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
 from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.geometry import pairwise_squared_distances
 from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, \
@@ -136,6 +139,128 @@ class GraspLocsGoal:
         self.locs = grasp_locs
         if not is_planning:
             self.history.append(grasp_locs)
+
+class SinglePointGoal(ObjectPointGoalBase):
+    def __init__(self, goal_point: np.array, goal_radius: float, loc: float, var_loc: float, occ_model, viz: Viz, config: Dict,
+                 depth, intrinsic, cam2world_mat, cam_pos_in_world):
+        super().__init__(goal_point, loc, viz)
+        self.var_loc = var_loc
+        self.goal_radius = goal_radius
+        self.occ_model = occ_model
+        self.config = config
+        self.inds = []
+        for i in range(25):
+            self.inds.append(f'cable/rG{i}')
+        self.goal_tensor = torch.tensor(goal_point, device=device)
+        self.depth = depth
+        self.intrinsic = intrinsic
+        self.cam2world_mat = torch.tensor(cam2world_mat, device=device)
+        self.cam_pos_in_world = torch.tensor(cam_pos_in_world, device=device)
+
+    def get_results(self, phy: Physics):
+        cur_state = phy.p.named.data.geom_xpos[self.inds]
+
+        return result(cur_state)
+    
+    def identify_visible(self, cur_state):
+        """ 
+        Takes in the current state (torch tensor) with shape 25 x 3, a depth image, and a camera intrinsic matrix
+        Returns a torch tensor of shape 1 x 25 with 1 for visible points and 0 for occluded points
+        Points are visible if the depth value is greater than the depth value of the point in the current state
+        """
+        cur_state = torch.tensor(cur_state, device=device)
+        cur_state = cur_state.reshape(-1, 3)
+        cur_state_homog = torch.cat((cur_state, torch.ones(cur_state.shape[0], 1, dtype=cur_state.dtype, device=cur_state.device)), dim=1)
+        cam2world = torch.cat((self.cam2world_mat, self.cam_pos_in_world.reshape(3, 1)), dim=1)
+        cam2world = torch.cat((cam2world, torch.tensor([[0, 0, 0, 1]], dtype=cur_state.dtype, device=cur_state.device)), dim=0)
+        cur_state_cam = (torch.inverse(cam2world) @ cur_state_homog.T).T[:, :3]
+
+        image_space_vertices = (self.intrinsic @ cur_state_cam.T).T
+        vert_depth = image_space_vertices[:, 2].clone()
+        image_space_vertices[:, 0] /= vert_depth
+        image_space_vertices[:, 1] /= vert_depth
+
+        image_space_vertices = image_space_vertices.round().long()
+        xs = image_space_vertices[:, 0]
+        ys = image_space_vertices[:, 1]
+        #Generate mask for cur_state_points that are within the image
+        mask = (image_space_vertices[:, 1] >= 0) & (image_space_vertices[:, 1] < self.depth.shape[0]) & (image_space_vertices[:, 0] >= 0) & (image_space_vertices[:, 0] < self.depth.shape[1])
+        
+        n_rows, n_cols = self.depth.shape
+        xs[xs < 0] = 0
+        xs[xs > n_cols - 1] = n_cols - 1
+        ys[ys < 0] = 0
+        ys[ys > n_rows - 1] = n_rows - 1
+        #Get the depth values for the current state points
+        bg_depth = self.depth[ys, xs]
+        #Replace nan depths with inf
+        bg_depth[torch.isnan(bg_depth)] = torch.inf
+        # print('bg_depth', bg_depth)
+        # print('vert_depth', vert_depth)
+        depth_copy = self.depth.clone()
+        depth_copy[ys, xs] = 0
+        depth_copy = depth_copy.cpu().numpy()
+        # plt.imshow(depth_copy)
+        # plt.savefig('../plots/depth_online.png')
+        visible = vert_depth < bg_depth
+        visible = visible & mask
+        
+        return visible.reshape(1, -1)
+    
+    def costs(self, results, u_sample):
+        # Don't know what shapes I'm getting. Depending on that, will need to change the code
+
+        action_norm = np.linalg.norm(u_sample, axis=1).sum() * self.config['lambda_u']
+
+        cur_state, = as_floats(results)
+        orig_shape = cur_state.shape
+
+        cur_state = torch.tensor(cur_state, device=device).squeeze()[1:].reshape(orig_shape[0]-1, -1)
+
+        distance = torch.norm(cur_state[:, self.loc*3: (self.loc+1)*3] - self.goal_tensor, dim=1)
+        distance_cost = distance.sum().item()
+
+        goal_indicator = -(distance < self.goal_radius).sum().item() * self.config['eta']
+
+        exploration = 0
+        collision = 0
+        if self.occ_model is not None:
+            progress_pred, progress_pred_var = self.occ_model.predict(cur_state)
+
+            visible = self.identify_visible(cur_state).reshape(progress_pred.shape)
+
+            exploration = progress_pred_var[..., self.var_loc] * self.config['beta']
+            exploration = -exploration.sum().item()
+
+            collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
+
+
+        return (
+            distance_cost,
+            exploration,
+            collision,
+            goal_indicator,
+            action_norm
+        )
+
+    @staticmethod
+    def cost_names():
+        return [
+            "distance",
+            "exploration",
+            "collision",
+            "goal_indicator",
+            "action_norm"
+        ]
+
+    def satisfied(self, phy: Physics):
+        body_idx, offset = grasp_locations_to_indices_and_offsets(self.loc, phy)
+        keypoint = get_keypoint(phy, body_idx, offset)
+        error = self.keypoint_dist_to_goal(keypoint).squeeze()
+        return error < self.goal_radius
+
+    def viz_goal(self, phy: Physics):
+        return
 
 
 class ObjectPointGoal(ObjectPointGoalBase):

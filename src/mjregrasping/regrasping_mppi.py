@@ -17,10 +17,12 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
+hp['min_sub_time_s'] = 0.02
+hp['max_sub_time_s'] = 0.02
 
 class RegraspMPPI:
 
-    def __init__(self, pool, nu, seed, horizon, noise_sigma, temp):
+    def __init__(self, pool, nu, seed, horizon, noise_sigma, temp, lower, upper):
         self.pool = pool
         self.horizon = horizon
         self.nu = nu
@@ -39,6 +41,8 @@ class RegraspMPPI:
         self.rollout_results = None
         self.cost = None
         self.cost_normalized = None
+        self.lower = lower
+        self.upper = upper
 
     def reset(self):
         self.u_sigma_diag = np.ones(self.nu) * self.initial_noise_sigma
@@ -60,8 +64,8 @@ class RegraspMPPI:
         time_samples = self.noise_rng.normal(self.time_mu, self.time_sigma, size=num_samples)
 
         # Bound u
-        lower = np.tile(phy.m.actuator_ctrlrange[:, 0], self.horizon)
-        upper = np.tile(phy.m.actuator_ctrlrange[:, 1], self.horizon)
+        lower = np.tile(self.lower, self.horizon)
+        upper = np.tile(self.upper, self.horizon)
         u_samples = np.clip(u_samples, lower, upper)
         # Also bound time
         time_samples = np.clip(time_samples, hp['min_sub_time_s'], hp['max_sub_time_s'])
@@ -77,8 +81,9 @@ class RegraspMPPI:
                                                                           num_samples,
                                                                           viz=None)
 
-        for cost_term_name, costs_for_term in zip(goal.cost_names(), costs_by_term.T):
-            rr.log_scalar(f'mpc_costs/{cost_term_name}', np.mean(costs_for_term))
+        if viz is not None:
+            for cost_term_name, costs_for_term in zip(goal.cost_names(), costs_by_term.T):
+                rr.log_scalar(f'mpc_costs/{cost_term_name}', np.mean(costs_for_term))
 
         # normalized cost is only used for visualization, so we avoid numerical issues
         cost_range = (self.cost.max() - self.cost.min())
@@ -88,8 +93,9 @@ class RegraspMPPI:
 
         weights = softmax(-self.cost, self.temp)
         # print(f'weights: std={float(np.std(weights)):.3f} max={float(np.max(weights)):.2f}')
-        rr.log_tensor('weights', weights)
-        rr.log_tensor('σ', self.u_sigma_diag)
+        if viz is not None:
+            rr.log_tensor('weights', weights)
+            rr.log_tensor('σ', self.u_sigma_diag)
 
         # compute the (weighted) average noise and add that to the reference control
         weighted_avg_u_noise = np.sum(weights[..., None] * u_noise, axis=0)
@@ -106,16 +112,18 @@ class RegraspMPPI:
         self.u_mu += weighted_avg_u_noise
         self.time_mu += weight_avg_time_noise
 
-        rr.log_scalar("time μ", self.time_mu)
+        if viz is not None:
+            rr.log_scalar("time μ", self.time_mu)
 
         new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
+        self.U = new_u_mu_square
         command = new_u_mu_square[0]
         return command, self.time_mu
 
 
 def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_samples, viz):
     u_samples_square = u_samples.reshape(num_samples, horizon, nu)
-
+    # u_samples_square[..., [2, 5]] = .01
     # We must also copy model here because EQs are going to be changing
     args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
 
@@ -154,9 +162,8 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     results_0 = goal.get_results(phy)
     # Only do this at the beginning, since it's expensive and if it went in the loop, it could potentially cause
     # rapid oscillations of grasping/not grasping which seems undesirable.
-    do_grasp_dynamics(phy)
+    # do_grasp_dynamics(phy)
     results = [results_0]
-
     for t, u in enumerate(u_sample):
         control_step(phy, u, sub_time_s=sub_time_s)
         if viz:
@@ -165,8 +172,8 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
         results_t = goal.get_results(phy)
 
         results.append(results_t)
-
     results = np.stack(results, dtype=object, axis=1)
+
     costs_by_term = goal.costs(results, u_sample)  # ignore cost of initial state, it doesn't matter for planning
 
     cost = sum(costs_by_term)
@@ -227,3 +234,4 @@ def mppi_viz(mppi: RegraspMPPI, goal: MPPIGoal, phy: Physics, command: np.ndarra
         cmd_rollout_results, _, _ = rollout(phy.copy_all(), goal, np.expand_dims(command, 0),
                                             np.expand_dims(sub_time_s, 0), viz=None)
         goal.viz_result(phy, cmd_rollout_results, i, color='b', scale=0.004)
+
