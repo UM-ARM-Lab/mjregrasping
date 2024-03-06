@@ -15,7 +15,7 @@ from tf.transformations import quaternion_from_matrix
 
 def assisted_capture(camera: zivid.Camera) -> zivid.Frame:
     suggest_settings_parameters = zivid.capture_assistant.SuggestSettingsParameters(
-        max_capture_time=datetime.timedelta(milliseconds=800),
+        max_capture_time=datetime.timedelta(milliseconds=10000),
         ambient_light_frequency=zivid.capture_assistant.SuggestSettingsParameters.AmbientLightFrequency.none,
     )
     settings = zivid.capture_assistant.suggest_settings(camera, suggest_settings_parameters)
@@ -37,7 +37,7 @@ def main():
     board_in_cam_list = []
     robot_to_hand_transforms = []
 
-    n_poses = 10
+    n_poses = 7
     while current_pose_id < n_poses:
         frame = assisted_capture(camera)
 
