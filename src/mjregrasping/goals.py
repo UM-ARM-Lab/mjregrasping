@@ -5,6 +5,7 @@ import numpy as np
 from numpy.linalg import norm
 
 import torch
+torch.inverse(torch.ones((1, 1), device="cuda:0"))
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 from mjregrasping.eq_errors import compute_total_eq_error
@@ -151,16 +152,37 @@ class SinglePointGoal(ObjectPointGoalBase):
         self.inds = []
         for i in range(25):
             self.inds.append(f'cable/rG{i}')
-        self.goal_tensor = torch.tensor(goal_point, device=device)
-        self.depth = depth
-        self.intrinsic = intrinsic
-        self.cam2world_mat = torch.tensor(cam2world_mat, device=device)
-        self.cam_pos_in_world = torch.tensor(cam_pos_in_world, device=device)
+        self.goal_tensor = torch.tensor(goal_point)
+        self.depth = depth.cpu()
+        self.intrinsic = intrinsic.cpu()
+        self.cam2world_mat = torch.tensor(cam2world_mat)
+        self.cam_pos_in_world = torch.tensor(cam_pos_in_world)
 
     def get_results(self, phy: Physics):
         cur_state = phy.p.named.data.geom_xpos[self.inds]
+        # Get list of contacts from mujoco
+        contacts = phy.p.data.contact
+        contact_cost = 0
+        visible = self.identify_visible(cur_state)
 
-        return result(cur_state)
+        for contact in contacts:
+            geom_name1 = phy.m.geom(contact.geom1).name
+            geom_name2 = phy.m.geom(contact.geom2).name
+
+            if ('bg' in geom_name1 and 'cable' in geom_name2):
+                #Get the index of the cable point that is in contact
+                cable_point = int(geom_name2.split('rG')[1])
+                #If the cable point is not visible, add a cost
+                if (not visible[cable_point]):
+                    contact_cost += 1
+            elif ('bg' in geom_name2 and 'cable' in geom_name1):
+                #Get the index of the cable point that is in contact
+                cable_point = int(geom_name1.split('rG')[1])
+                #If the cable point is not visible, add a cost
+                if (not visible[cable_point]):
+                    contact_cost += 1
+
+        return result(cur_state, contact_cost)
     
     def identify_visible(self, cur_state):
         """ 
@@ -168,7 +190,8 @@ class SinglePointGoal(ObjectPointGoalBase):
         Returns a torch tensor of shape 1 x 25 with 1 for visible points and 0 for occluded points
         Points are visible if the depth value is greater than the depth value of the point in the current state
         """
-        cur_state = torch.tensor(cur_state, device=device)
+        if not torch.is_tensor(cur_state):
+            cur_state = torch.tensor(cur_state)
         cur_state = cur_state.reshape(-1, 3)
         cur_state_homog = torch.cat((cur_state, torch.ones(cur_state.shape[0], 1, dtype=cur_state.dtype, device=cur_state.device)), dim=1)
         cam2world = torch.cat((self.cam2world_mat, self.cam_pos_in_world.reshape(3, 1)), dim=1)
@@ -205,17 +228,17 @@ class SinglePointGoal(ObjectPointGoalBase):
         visible = vert_depth < bg_depth
         visible = visible & mask
         
-        return visible.reshape(1, -1)
+        return visible.flatten()
     
     def costs(self, results, u_sample):
         # Don't know what shapes I'm getting. Depending on that, will need to change the code
 
         action_norm = np.linalg.norm(u_sample, axis=1).sum() * self.config['lambda_u']
 
-        cur_state, = as_floats(results)
+        cur_state, contact_cost = as_floats(results)
         orig_shape = cur_state.shape
 
-        cur_state = torch.tensor(cur_state, device=device).squeeze()[1:].reshape(orig_shape[0]-1, -1)
+        cur_state = torch.tensor(cur_state).squeeze()[1:].reshape(orig_shape[0]-1, -1)
 
         distance = torch.norm(cur_state[:, self.loc*3: (self.loc+1)*3] - self.goal_tensor, dim=1)
         distance_cost = distance.sum().item()
@@ -225,15 +248,18 @@ class SinglePointGoal(ObjectPointGoalBase):
         exploration = 0
         collision = 0
         if self.occ_model is not None:
-            progress_pred, progress_pred_var = self.occ_model.predict(cur_state)
+            visible = self.identify_visible(cur_state)
 
-            visible = self.identify_visible(cur_state).reshape(progress_pred.shape)
-
+            progress_pred, progress_pred_var = self.occ_model.predict(cur_state.to(device).detach())
+            visible = visible.reshape(progress_pred.shape)
+            progress_pred = progress_pred.cpu()
+            progress_pred_var = progress_pred_var.cpu()
             exploration = progress_pred_var[..., self.var_loc] * self.config['beta']
             exploration = -exploration.sum().item()
 
             collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
-
+            print('gpis col cost', collision)
+        collision += contact_cost.sum() * self.config['C']
 
         return (
             distance_cost,

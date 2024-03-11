@@ -32,7 +32,7 @@ def activate_grasp(phy: Physics, name, loc):
     offset_body = np.array([offset, 0, 0])
     grasp_eq = phy.m.eq(name)
     grasp_eq.obj2id = grasp_index
-    grasp_eq.active = 1
+    # grasp_eq.active = 1
 
     if grasp_eq.type == mujoco.mjtEq.mjEQ_CONNECT:
         grasp_eq.data[3:6] = offset_body

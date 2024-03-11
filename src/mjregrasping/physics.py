@@ -7,6 +7,14 @@ from mujoco import mj_id2name, mju_str2Type
 
 from mjregrasping.mujoco_objects import MjObjects
 
+class Rope:
+    def __init__(self):
+        self.body_indices = np.arange(51, 76)
+        self.geom_indices = np.arange(57, 82)
+
+class Objects:
+    def __init__(self):
+        self.rope = Rope()
 
 class Physics:
     # m: mujoco.MjModel
@@ -21,6 +29,7 @@ class Physics:
         self.p = physics
         self.d = physics.data
         self.m = physics.model
+        self.o = Objects()
         # self.o = MJObjects(self.m, 'obj1', )
 
     def __copy__(self):

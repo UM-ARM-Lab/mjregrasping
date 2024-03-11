@@ -46,8 +46,9 @@ class RegraspMPPI:
         self.upper = upper
 
     def zero_grippers_sigma(self):
-        self.u_sigma_diag[9] = 0
-        self.u_sigma_diag[17] = 0
+        # self.u_sigma_diag[9] = 0
+        # self.u_sigma_diag[17] = 0
+        pass
 
     def reset(self):
         self.u_sigma_diag = np.ones(self.nu) * self.initial_noise_sigma
@@ -73,6 +74,7 @@ class RegraspMPPI:
         lower = np.tile(self.lower, self.horizon)
         upper = np.tile(self.upper, self.horizon)
         u_samples = np.clip(u_samples, lower, upper)
+
         # Also bound time
         time_samples = np.clip(time_samples, hp['min_sub_time_s'], hp['max_sub_time_s'])
 
@@ -156,6 +158,7 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
 
     results = np.stack(results, dtype=object, axis=1)
     costs = np.stack(costs, axis=0)
+
     costs_by_term = np.stack(costs_by_term, axis=0)
 
     return results, costs, costs_by_term
