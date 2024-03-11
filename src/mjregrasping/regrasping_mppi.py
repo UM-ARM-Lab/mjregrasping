@@ -136,7 +136,7 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
     # We must also copy model here because EQs are going to be changing
     args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
 
-    if viz:
+    if True:
         results = []
         costs = []
         costs_by_term = []

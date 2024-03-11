@@ -13,6 +13,32 @@ from dm_control.mujoco.wrapper.mjbindings import mjlib
 
 import collections
 
+USEFUL_INDICES_vel = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17]
+USEFUL_INDICES_pos = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17]
+def velocity_control(gripper_delta, physics, n_sub_time):
+    if len(gripper_delta) < 6:
+        gripper_delta = np.concatenate((np.zeros(6 - len(gripper_delta)), gripper_delta), axis=0)
+    jac_pos_l = np.zeros((3, physics.model.nv))
+    jac_rot_l = np.zeros((3, physics.model.nv))
+    jac_pos_r = np.zeros((3, physics.model.nv))
+    jac_rot_r = np.zeros((3, physics.model.nv))
+
+    mjlib.mj_jacGeom(physics.model.ptr, physics.data.ptr, jac_pos_l, jac_rot_l, physics.model.name2id('val/left_finger_pad', 'geom'))
+    mjlib.mj_jacGeom(physics.model.ptr, physics.data.ptr, jac_pos_r, jac_rot_r, physics.model.name2id('val/right_finger_pad', 'geom'))
+
+    J = np.concatenate((jac_pos_l[:, USEFUL_INDICES_vel], jac_pos_r[:, USEFUL_INDICES_vel]), axis=0)
+    J_T = J.T
+    ctrl = J_T @ np.linalg.solve(J @ J_T + 1e-6 * np.eye(6), gripper_delta)
+    current_qpos = physics.data.qpos[USEFUL_INDICES_pos]
+
+    vmin = physics.model.actuator_ctrlrange[:, 0]
+    vmax = physics.model.actuator_ctrlrange[:, 1]
+    #Create a list of length 10 that interpolates between the current position and the desired position
+    frac = np.linspace(1/n_sub_time, 1, n_sub_time)
+    qpos_list = [np.clip(current_qpos + frac[i] * ctrl, vmin, vmax) for i in range(len(frac))]
+
+    return qpos_list
+
 DEFAULT_SUB_TIME_S = 0.1
 
 _INVALID_JOINT_NAMES_TYPE = (
@@ -162,7 +188,7 @@ def qpos_from_site_pose(physics,
       mjlib.mju_mulQuat(err_rot_quat, target_quat, neg_site_xquat)
       mjlib.mju_quat2Vel(err_rot, err_rot_quat, 1)
       err_norm += np.linalg.norm(err_rot) * rot_weight
-
+    
     if err_norm < tol:
     #   logging.debug('Converged after %i steps: err_norm=%3g', steps, err_norm)
       success = True
@@ -223,7 +249,6 @@ def qpos_from_site_pose(physics,
 def no_results(*args, **kwargs):
     return (None,)
 
-
 def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None,
                  val_cmd: Optional[RealValCommander] = None):
     m = phy.m
@@ -231,7 +256,9 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
 
     n_sub_time = int(sub_time_s / m.opt.timestep)
 
-    if eef_delta_target is None:
+    if eef_delta_target is not None:
+        setpoints = velocity_control(eef_delta_target, phy.p, n_sub_time)
+    else:
         print("control is None!!!")
 
     # slow_when_eqs_bad(phy)
@@ -244,23 +271,38 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
             mujoco.mj_step(m, d, nstep=1)
             mov.render(d)
     else:
-        # for i in range(n_sub_time):
-        #     phy.p.set_control(setpoints[i])
-        #     phy.p.data.qpos[USEFUL_INDICES_pos] = setpoints[i]
-        #     phy.p.named.data.qpos['val/rightgripper'] = .5
-        #     phy.p.named.data.qpos['val/rightgripper2'] = .5
-        #     phy.p.step()
-        cur_eef_pos = d.site_xpos[m.site_name2id('val/right_tool')]
-        ik_result = qpos_from_site_pose(phy, 'val/right_tool', target_pos=cur_eef_pos + eef_delta_target, 
-                                joint_names=['joint56', 'joint57', 'joint1', 'joint2', 'joint3', 'joint4', 'joint5', 'joint6', 'joint7'], 
-                                regularization_strength=0, 
-                                regularization_threshold=0,
-                                jnt_lim_avoidance=.01,
-                                max_update_norm=2,
-                                max_steps=1000, 
-                                inplace=True)
-        if not ik_result.success:
-            print('IK failed')
+        for i in range(n_sub_time):
+            phy.p.set_control(setpoints[i])
+            phy.p.data.qpos[USEFUL_INDICES_pos] = setpoints[i]
+            phy.p.named.data.qpos['val/rightgripper'] = .5
+            phy.p.named.data.qpos['val/rightgripper2'] = .5
+            phy.p.step()
+        
+        # cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
+        # cur_useful_qpos = phy.p.data.qpos[USEFUL_INDICES_pos].copy()
+
+        # ik_result = qpos_from_site_pose(phy.p, 'val/right_tool', target_pos=cur_eef_pos + eef_delta_target, 
+        #                         joint_names=['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7'], 
+        #                         regularization_strength=0, 
+        #                         regularization_threshold=0,
+        #                         jnt_lim_avoidance=.01,
+        #                         max_update_norm=2,
+        #                         max_steps=1000,                         
+        #                         inplace=False)
+        # if not ik_result.success:
+        #     print('IK failed')
+        # else:
+        #     vmin = phy.p.model.actuator_ctrlrange[:, 0]
+        #     vmax = phy.p.model.actuator_ctrlrange[:, 1]
+
+        #     frac = np.linspace(1/n_sub_time, 1, n_sub_time)
+        #     qpos_list = [np.clip(cur_useful_qpos + frac[i] * ik_result.qpos[USEFUL_INDICES_pos], vmin, vmax) for i in range(len(frac))]
+
+        #     for i in range(n_sub_time):
+        #         phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
+        #         phy.p.named.data.qpos['val/rightgripper'] = .5
+        #         phy.p.named.data.qpos['val/rightgripper2'] = .5
+        #         phy.p.step()
     if val_cmd:
         mj_q = get_full_q(phy)
         val_cmd.send_pos_command(mj_q, slow=slow)
