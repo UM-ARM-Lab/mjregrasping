@@ -11,7 +11,7 @@ class Rope:
     def __init__(self):
         self.body_indices = np.arange(51, 76)
         self.geom_indices = np.arange(57, 82)
-
+        self.geom_indices_name = [f'cable/rG{i}' for i in range(25)]
 class Objects:
     def __init__(self):
         self.rope = Rope()

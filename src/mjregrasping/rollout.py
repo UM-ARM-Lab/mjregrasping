@@ -13,8 +13,9 @@ from dm_control.mujoco.wrapper.mjbindings import mjlib
 
 import collections
 
-USEFUL_INDICES_vel = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17]
-USEFUL_INDICES_pos = [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16, 17]
+USEFUL_INDICES_vel = [0, 1, 11, 12, 13, 14, 15, 16, 17]
+USEFUL_INDICES_pos = [0, 1, 11, 12, 13, 14, 15, 16, 17]
+USEFUL_INDICES_ctrl = [0, 1, 9, 10, 11, 12, 13, 14, 15]
 def velocity_control(gripper_delta, physics, n_sub_time):
     if len(gripper_delta) < 6:
         gripper_delta = np.concatenate((np.zeros(6 - len(gripper_delta)), gripper_delta), axis=0)
@@ -57,7 +58,7 @@ def qpos_from_site_pose(physics,
                         target_pos=None,
                         target_quat=None,
                         joint_names=None,
-                        tol=1e-5,
+                        tol=1e-3,
                         rot_weight=1.0,
                         regularization_threshold=0.1,
                         regularization_strength=3e-2,
@@ -174,7 +175,6 @@ def qpos_from_site_pose(physics,
   success = False
 
   for steps in range(max_steps):
-
     err_norm = 0.0
 
     if target_pos is not None:
@@ -188,6 +188,7 @@ def qpos_from_site_pose(physics,
       mjlib.mju_mulQuat(err_rot_quat, target_quat, neg_site_xquat)
       mjlib.mju_quat2Vel(err_rot, err_rot_quat, 1)
       err_norm += np.linalg.norm(err_rot) * rot_weight
+    # print(f'step {steps}, err: {err_norm}')
     
     if err_norm < tol:
     #   logging.debug('Converged after %i steps: err_norm=%3g', steps, err_norm)
@@ -257,7 +258,8 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
     n_sub_time = int(sub_time_s / m.opt.timestep)
 
     if eef_delta_target is not None:
-        setpoints = velocity_control(eef_delta_target, phy.p, n_sub_time)
+        pass
+        # setpoints = velocity_control(eef_delta_target, phy.p, n_sub_time)
     else:
         print("control is None!!!")
 
@@ -271,38 +273,54 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
             mujoco.mj_step(m, d, nstep=1)
             mov.render(d)
     else:
-        for i in range(n_sub_time):
-            phy.p.set_control(setpoints[i])
-            phy.p.data.qpos[USEFUL_INDICES_pos] = setpoints[i]
-            phy.p.named.data.qpos['val/rightgripper'] = .5
-            phy.p.named.data.qpos['val/rightgripper2'] = .5
-            phy.p.step()
+        # for i in range(n_sub_time):
+        #     phy.p.set_control(setpoints[i])
+        #     phy.p.data.qpos[USEFUL_INDICES_pos] = setpoints[i]
+        #     phy.p.named.data.qpos['val/rightgripper'] = .5
+        #     phy.p.named.data.qpos['val/rightgripper2'] = .5
+        #     phy.p.step()
         
-        # cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
-        # cur_useful_qpos = phy.p.data.qpos[USEFUL_INDICES_pos].copy()
+        cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
+        cur_useful_qpos = phy.p.data.qpos[USEFUL_INDICES_pos].copy()
 
-        # ik_result = qpos_from_site_pose(phy.p, 'val/right_tool', target_pos=cur_eef_pos + eef_delta_target, 
-        #                         joint_names=['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7'], 
-        #                         regularization_strength=0, 
-        #                         regularization_threshold=0,
-        #                         jnt_lim_avoidance=.01,
-        #                         max_update_norm=2,
-        #                         max_steps=1000,                         
-        #                         inplace=False)
-        # if not ik_result.success:
-        #     print('IK failed')
-        # else:
-        #     vmin = phy.p.model.actuator_ctrlrange[:, 0]
-        #     vmax = phy.p.model.actuator_ctrlrange[:, 1]
+        ik_result = qpos_from_site_pose(phy.p, 'val/right_tool', target_pos=cur_eef_pos + eef_delta_target, 
+                                joint_names=['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7'], 
+                                regularization_strength=0, 
+                                regularization_threshold=0,
+                                jnt_lim_avoidance=.01,
+                                max_update_norm=2,
+                                max_steps=1000,                         
+                                inplace=False)
+        if not ik_result.success:
+            print('IK failed')
+        else:
+            # phy.d.ctrl[USEFUL_INDICES_ctrl] = ik_result.qpos[USEFUL_INDICES_pos]
 
-        #     frac = np.linspace(1/n_sub_time, 1, n_sub_time)
-        #     qpos_list = [np.clip(cur_useful_qpos + frac[i] * ik_result.qpos[USEFUL_INDICES_pos], vmin, vmax) for i in range(len(frac))]
+            vmin = phy.p.model.actuator_ctrlrange[USEFUL_INDICES_ctrl, 0]
+            vmax = phy.p.model.actuator_ctrlrange[USEFUL_INDICES_ctrl, 1]
 
-        #     for i in range(n_sub_time):
-        #         phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
-        #         phy.p.named.data.qpos['val/rightgripper'] = .5
-        #         phy.p.named.data.qpos['val/rightgripper2'] = .5
-        #         phy.p.step()
+            frac = np.linspace(1/n_sub_time, 1, n_sub_time)
+            qpos_list = [np.clip(cur_useful_qpos * (1-frac[i]) + frac[i] * ik_result.qpos[USEFUL_INDICES_pos], vmin, vmax) for i in range(len(frac))]
+            phy.d.ctrl[USEFUL_INDICES_ctrl] = ik_result.qpos[USEFUL_INDICES_pos]
+            phy.p.data.qpos[USEFUL_INDICES_pos] = ik_result.qpos[USEFUL_INDICES_pos]
+            for i in range(n_sub_time * 2):
+                # phy.p.set_control(qpos_list[i])
+                # phy.d.ctrl[USEFUL_INDICES_ctrl] = qpos_list[i]
+                # phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
+                phy.p.named.data.qpos['val/rightgripper'] = .5
+                phy.p.named.data.qpos['val/rightgripper2'] = .5
+                phy.p.step()
+                #Check error of qpos
+                # for i in range(100):
+
+                # err = qpos_list[i] - phy.p.data.qpos[USEFUL_INDICES_pos]
+                # print('err 0:', np.linalg.norm(err))
+                # count = 0
+                # while np.linalg.norm(err) > 1e-3 and count < 100:
+                #     count += 1
+                #     print(f'err {count}:', np.linalg.norm(err))
+                #     phy.p.step()
+                #     err = qpos_list[i] - phy.p.data.qpos[USEFUL_INDICES_pos]
     if val_cmd:
         mj_q = get_full_q(phy)
         val_cmd.send_pos_command(mj_q, slow=slow)

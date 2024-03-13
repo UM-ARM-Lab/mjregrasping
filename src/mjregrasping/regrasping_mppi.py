@@ -74,6 +74,7 @@ class RegraspMPPI:
         lower = np.tile(self.lower, self.horizon)
         upper = np.tile(self.upper, self.horizon)
         u_samples = np.clip(u_samples, lower, upper)
+        self.u_samples = u_samples.reshape(num_samples, self.horizon, self.nu)
 
         # Also bound time
         time_samples = np.clip(time_samples, hp['min_sub_time_s'], hp['max_sub_time_s'])
@@ -109,12 +110,12 @@ class RegraspMPPI:
         weighted_avg_u_noise = np.sum(weights[..., None] * u_noise, axis=0)
         weight_avg_time_noise = np.sum(weights * time_noise, axis=0)
 
-        u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
+        # u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
 
         # Update covariance
-        u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
-        self.u_sigma_diag = weights @ np.mean((u_samples_square - u_mu_square) ** 2, axis=1)
-        self.zero_grippers_sigma()
+        # u_samples_square = u_samples.reshape(num_samples, self.horizon, self.nu)
+        # self.u_sigma_diag = weights @ np.mean((u_samples_square - u_mu_square) ** 2, axis=1)
+        # self.zero_grippers_sigma()
         # NOTE: we could adapt time_sigma with this: weights @ (time_samples - self.time_mu) ** 2
 
         # Update mean
@@ -136,7 +137,7 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
     # We must also copy model here because EQs are going to be changing
     args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
 
-    if True:
+    if viz:
         results = []
         costs = []
         costs_by_term = []

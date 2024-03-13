@@ -159,7 +159,7 @@ class SinglePointGoal(ObjectPointGoalBase):
         self.cam_pos_in_world = torch.tensor(cam_pos_in_world)
 
     def get_results(self, phy: Physics):
-        cur_state = phy.p.named.data.geom_xpos[self.inds]
+        cur_state = phy.p.named.data.geom_xpos[self.inds].copy()
         # Get list of contacts from mujoco
         contacts = phy.p.data.contact
         contact_cost = 0
@@ -258,7 +258,7 @@ class SinglePointGoal(ObjectPointGoalBase):
             exploration = -exploration.sum().item()
 
             collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
-            print('gpis col cost', collision)
+
         collision += contact_cost.sum() * self.config['C']
 
         return (
