@@ -17,8 +17,8 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
-hp['min_sub_time_s'] = 0.02
-hp['max_sub_time_s'] = 0.02
+hp['min_sub_time_s'] = 0.04
+hp['max_sub_time_s'] = 0.04
 
 class RegraspMPPI:
 
@@ -64,6 +64,7 @@ class RegraspMPPI:
         self.u_mu = u_mu_square.reshape(-1)
 
     def command(self, phy, goal, num_samples, viz=None):
+        self.roll()
         u_sigma_diag_rep = np.tile(self.u_sigma_diag, self.horizon)
         u_sigma_mat = np.diagflat(u_sigma_diag_rep)
 
@@ -80,6 +81,7 @@ class RegraspMPPI:
         time_samples = np.clip(time_samples, hp['min_sub_time_s'], hp['max_sub_time_s'])
 
         u_noise = u_samples - self.u_mu
+        self.u_noise = u_noise
         time_noise = time_samples - self.time_mu
 
         self.rollout_results, self.cost, costs_by_term = parallel_rollout(self.pool,
@@ -95,10 +97,10 @@ class RegraspMPPI:
                 rr.log_scalar(f'mpc_costs/{cost_term_name}', np.mean(costs_for_term))
 
         # normalized cost is only used for visualization, so we avoid numerical issues
-        cost_range = (self.cost.max() - self.cost.min())
-        if cost_range < 1e-6:
-            cost_range = 1.0
-        self.cost_normalized = (self.cost - self.cost.min()) / cost_range
+        self.cost_range = (self.cost.max() - self.cost.min())
+        if self.cost_range < 1e-6:
+            self.cost_range = 1.0
+        self.cost_normalized = (self.cost - self.cost.min()) / self.cost_range
 
         weights = softmax(-self.cost, self.temp)
         # print(f'weights: std={float(np.std(weights)):.3f} max={float(np.max(weights)):.2f}')

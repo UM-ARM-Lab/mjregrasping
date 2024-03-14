@@ -181,7 +181,8 @@ class SinglePointGoal(ObjectPointGoalBase):
                 #If the cable point is not visible, add a cost
                 if (not visible[cable_point]):
                     contact_cost += 1
-
+            elif  ('bg' in geom_name1 or 'bg' in geom_name2) and ('_' in geom_name1 or '_' in geom_name2):
+                contact_cost += 1
         return result(cur_state, contact_cost)
     
     def identify_visible(self, cur_state):

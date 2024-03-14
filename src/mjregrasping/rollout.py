@@ -51,7 +51,7 @@ _REQUIRE_TARGET_POS_OR_QUAT = (
 IKResult = collections.namedtuple(
     'IKResult', ['qpos', 'err_norm', 'steps', 'success'])
 
-ZEROS = np.array([ 0.,   0.,  0.,    -1.57,    0.,    0.,    0.,    -.5,    0.  ])
+ZEROS = np.array([ -.387,   -.743,  0.542,    -1.227,    1.15,    -.186,    0.265,    -.546,    -.565  ])
 
 def qpos_from_site_pose(physics,
                         site_name,
@@ -287,7 +287,7 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
                                 joint_names=['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7'], 
                                 regularization_strength=0, 
                                 regularization_threshold=0,
-                                jnt_lim_avoidance=.01,
+                                jnt_lim_avoidance=.05,
                                 max_update_norm=2,
                                 max_steps=1000,                         
                                 inplace=False)
@@ -299,14 +299,14 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
             vmin = phy.p.model.actuator_ctrlrange[USEFUL_INDICES_ctrl, 0]
             vmax = phy.p.model.actuator_ctrlrange[USEFUL_INDICES_ctrl, 1]
 
-            frac = np.linspace(1/n_sub_time, 1, n_sub_time)
+            frac = np.linspace(1/(n_sub_time), 1, (n_sub_time))
             qpos_list = [np.clip(cur_useful_qpos * (1-frac[i]) + frac[i] * ik_result.qpos[USEFUL_INDICES_pos], vmin, vmax) for i in range(len(frac))]
-            phy.d.ctrl[USEFUL_INDICES_ctrl] = ik_result.qpos[USEFUL_INDICES_pos]
-            phy.p.data.qpos[USEFUL_INDICES_pos] = ik_result.qpos[USEFUL_INDICES_pos]
-            for i in range(n_sub_time * 2):
+            phy.d.ctrl[USEFUL_INDICES_ctrl] = qpos_list[-1]
+            # phy.d.ctrl[USEFUL_INDICES_ctrl] = ik_result.qpos[USEFUL_INDICES_pos]
+            # phy.p.data.qpos[USEFUL_INDICES_pos] = ik_result.qpos[USEFUL_INDICES_pos]
+            for i in range(n_sub_time):
                 # phy.p.set_control(qpos_list[i])
-                # phy.d.ctrl[USEFUL_INDICES_ctrl] = qpos_list[i]
-                # phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
+                phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
                 phy.p.named.data.qpos['val/rightgripper'] = .5
                 phy.p.named.data.qpos['val/rightgripper2'] = .5
                 phy.p.step()
@@ -321,6 +321,12 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
                 #     print(f'err {count}:', np.linalg.norm(err))
                 #     phy.p.step()
                 #     err = qpos_list[i] - phy.p.data.qpos[USEFUL_INDICES_pos]
+            for i in range(n_sub_time):
+                # phy.p.set_control(qpos_list[i])
+                phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[-1]
+                phy.p.named.data.qpos['val/rightgripper'] = .5
+                phy.p.named.data.qpos['val/rightgripper2'] = .5
+                phy.p.step()
     if val_cmd:
         mj_q = get_full_q(phy)
         val_cmd.send_pos_command(mj_q, slow=slow)
