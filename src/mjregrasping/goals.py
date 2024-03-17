@@ -158,7 +158,7 @@ class SinglePointGoal(ObjectPointGoalBase):
         self.cam2world_mat = torch.tensor(cam2world_mat)
         self.cam_pos_in_world = torch.tensor(cam_pos_in_world)
 
-    def get_results(self, phy: Physics):
+    def get_results(self, phy: Physics, sim_crash=False):
         cur_state = phy.p.named.data.geom_xpos[self.inds].copy()
         # Get list of contacts from mujoco
         contacts = phy.p.data.contact
@@ -182,8 +182,8 @@ class SinglePointGoal(ObjectPointGoalBase):
                 if (not visible[cable_point]):
                     contact_cost += 1
             elif  ('bg' in geom_name1 or 'bg' in geom_name2) and ('_' in geom_name1 or '_' in geom_name2):
-                contact_cost += 1
-        return result(cur_state, contact_cost)
+                contact_cost += 10
+        return result(cur_state, contact_cost, float(sim_crash))
     
     def identify_visible(self, cur_state):
         """ 
@@ -236,7 +236,7 @@ class SinglePointGoal(ObjectPointGoalBase):
 
         action_norm = np.linalg.norm(u_sample, axis=1).sum() * self.config['lambda_u']
 
-        cur_state, contact_cost = as_floats(results)
+        cur_state, contact_cost, sim_crash = as_floats(results)
         orig_shape = cur_state.shape
 
         cur_state = torch.tensor(cur_state).squeeze()[1:].reshape(orig_shape[0]-1, -1)
@@ -258,16 +258,19 @@ class SinglePointGoal(ObjectPointGoalBase):
             exploration = progress_pred_var[..., self.var_loc] * self.config['beta']
             exploration = -exploration.sum().item()
 
-            collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
+            collision = ((progress_pred <= 0)).sum().item() * self.config['C']
 
         collision += contact_cost.sum() * self.config['C']
+
+        sim_crash_cost = sim_crash.sum() * 1000000
 
         return (
             distance_cost,
             exploration,
             collision,
             goal_indicator,
-            action_norm
+            action_norm,
+            sim_crash_cost
         )
 
     @staticmethod

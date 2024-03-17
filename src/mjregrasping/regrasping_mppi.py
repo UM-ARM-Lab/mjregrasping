@@ -17,12 +17,13 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
-hp['min_sub_time_s'] = 0.04
-hp['max_sub_time_s'] = 0.04
+hp['min_sub_time_s'] = 0.05
+hp['max_sub_time_s'] = 0.05
 
 class RegraspMPPI:
 
-    def __init__(self, pool, nu, seed, horizon, noise_sigma, temp, lower, upper):
+    def __init__(self, pool, nu, seed, horizon, noise_sigma, temp, lower, upper,
+                 u_per_command=1):
         self.pool = pool
         self.horizon = horizon
         self.nu = nu
@@ -45,6 +46,8 @@ class RegraspMPPI:
         self.lower = lower
         self.upper = upper
 
+        self.u_per_command = u_per_command
+
     def zero_grippers_sigma(self):
         # self.u_sigma_diag[9] = 0
         # self.u_sigma_diag[17] = 0
@@ -64,7 +67,6 @@ class RegraspMPPI:
         self.u_mu = u_mu_square.reshape(-1)
 
     def command(self, phy, goal, num_samples, viz=None):
-        self.roll()
         u_sigma_diag_rep = np.tile(self.u_sigma_diag, self.horizon)
         u_sigma_mat = np.diagflat(u_sigma_diag_rep)
 
@@ -129,7 +131,10 @@ class RegraspMPPI:
 
         new_u_mu_square = self.u_mu.reshape(self.horizon, self.nu)
         self.U = new_u_mu_square
-        command = new_u_mu_square[0]
+        if self.u_per_command == 1:
+            command = new_u_mu_square[0]
+        else:
+            command = new_u_mu_square[:self.u_per_command].copy()
         return command, self.time_mu
 
 
@@ -178,11 +183,15 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     # do_grasp_dynamics(phy)
     results = [results_0]
     for t, u in enumerate(u_sample):
-        control_step(phy, u, sub_time_s=sub_time_s)
+        sim_crash = False
+        try:
+            control_step(phy, u, sub_time_s=sub_time_s)
+        except Exception as e:
+            sim_crash=True
         if viz:
             time.sleep(0.01)
             viz.viz(phy, is_planning=True)
-        results_t = goal.get_results(phy)
+        results_t = goal.get_results(phy, sim_crash)
 
         results.append(results_t)
     results = np.stack(results, dtype=object, axis=1)
