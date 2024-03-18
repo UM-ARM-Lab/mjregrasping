@@ -170,19 +170,21 @@ class SinglePointGoal(ObjectPointGoalBase):
             geom_name2 = phy.m.geom(contact.geom2).name
 
             if ('bg' in geom_name1 and 'cable' in geom_name2):
+                pass
                 #Get the index of the cable point that is in contact
-                cable_point = int(geom_name2.split('rG')[1])
-                #If the cable point is not visible, add a cost
-                if (not visible[cable_point]):
-                    contact_cost += 1
+                # cable_point = int(geom_name2.split('rG')[1])
+                # #If the cable point is not visible, add a cost
+                # if (not visible[cable_point]):
+                #     contact_cost += 1
             elif ('bg' in geom_name2 and 'cable' in geom_name1):
+                pass
                 #Get the index of the cable point that is in contact
-                cable_point = int(geom_name1.split('rG')[1])
-                #If the cable point is not visible, add a cost
-                if (not visible[cable_point]):
-                    contact_cost += 1
+                # cable_point = int(geom_name1.split('rG')[1])
+                # #If the cable point is not visible, add a cost
+                # if (not visible[cable_point]):
+                #     contact_cost += 1
             elif  ('bg' in geom_name1 or 'bg' in geom_name2) and ('_' in geom_name1 or '_' in geom_name2):
-                contact_cost += 10
+                contact_cost += 100
         return result(cur_state, contact_cost, float(sim_crash))
     
     def identify_visible(self, cur_state):
@@ -257,8 +259,8 @@ class SinglePointGoal(ObjectPointGoalBase):
             progress_pred_var = progress_pred_var.cpu()
             exploration = progress_pred_var[..., self.var_loc] * self.config['beta']
             exploration = -exploration.sum().item()
-
-            collision = ((progress_pred <= 0)).sum().item() * self.config['C']
+            collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
+            # collision = ((progress_pred <= 0)).sum().item() * self.config['C']
 
         collision += contact_cost.sum() * self.config['C']
 

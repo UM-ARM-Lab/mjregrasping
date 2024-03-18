@@ -17,8 +17,8 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
-hp['min_sub_time_s'] = 0.05
-hp['max_sub_time_s'] = 0.05
+hp['min_sub_time_s'] = 0.2
+hp['max_sub_time_s'] = 0.2
 
 class RegraspMPPI:
 
@@ -194,6 +194,8 @@ def rollout(phy, goal, u_sample, sub_time_s, viz=None):
         results_t = goal.get_results(phy, sim_crash)
 
         results.append(results_t)
+    if sim_crash:
+        print('Simulation crashed')
     results = np.stack(results, dtype=object, axis=1)
 
     costs_by_term = goal.costs(results, u_sample)  # ignore cost of initial state, it doesn't matter for planning
