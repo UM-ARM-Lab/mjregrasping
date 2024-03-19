@@ -51,7 +51,7 @@ _REQUIRE_TARGET_POS_OR_QUAT = (
 IKResult = collections.namedtuple(
     'IKResult', ['qpos', 'err_norm', 'steps', 'success'])
 
-ZEROS = np.array([ -.571,   -.287,  .789  ,    -.902,    1.746,    -.27,    -.175,    .538,    -.016  ])
+ZEROS = np.array([ -.405,   -.214,  -.161  ,    -1.102,    .831,    .054,    .018,    .64,    .011  ])
 
 def qpos_from_site_pose(physics,
                         site_name,
