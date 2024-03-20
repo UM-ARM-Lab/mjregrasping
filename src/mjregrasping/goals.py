@@ -164,6 +164,7 @@ class SinglePointGoal(ObjectPointGoalBase):
         contacts = phy.p.data.contact
         contact_cost = 0
         visible = self.identify_visible(cur_state)
+        eq_error = compute_total_eq_error(phy)
 
         for contact in contacts:
             geom_name1 = phy.m.geom(contact.geom1).name
@@ -181,9 +182,10 @@ class SinglePointGoal(ObjectPointGoalBase):
                 #If the cable point is not visible, add a cost
                 if (not visible[cable_point]):
                     contact_cost += 1
-            elif  ('bg' in geom_name1 or 'bg' in geom_name2) and ('_' in geom_name1 or '_' in geom_name2):
-                contact_cost += 10
-        return result(cur_state, contact_cost, float(sim_crash))
+            elif  ('val' in geom_name1 and 'val' in geom_name2) and not ('finger' in geom_name1 and 'finger' in geom_name2):
+                # print('bg', geom_name1, geom_name2)
+                contact_cost += .0
+        return result(cur_state, contact_cost, float(sim_crash), eq_error)
     
     def identify_visible(self, cur_state):
         """ 
@@ -236,7 +238,7 @@ class SinglePointGoal(ObjectPointGoalBase):
 
         action_norm = np.linalg.norm(u_sample, axis=1).sum() * self.config['lambda_u']
 
-        cur_state, contact_cost, sim_crash = as_floats(results)
+        cur_state, contact_cost, sim_crash, eq_error = as_floats(results)
         orig_shape = cur_state.shape
 
         cur_state = torch.tensor(cur_state).squeeze()[1:].reshape(orig_shape[0]-1, -1)
@@ -258,11 +260,14 @@ class SinglePointGoal(ObjectPointGoalBase):
             exploration = progress_pred_var[..., self.var_loc] * self.config['beta']
             exploration = -exploration.sum().item()
 
-            collision = ((progress_pred <= 0)).sum().item() * self.config['C']
+            # collision = ((progress_pred <= 0)).sum().item() * self.config['C']
+            collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
 
         collision += contact_cost.sum() * self.config['C']
 
-        sim_crash_cost = sim_crash.sum() * 1000000
+        sim_crash_cost = sim_crash.sum() * 100000
+
+        eq_error_cost = eq_error.sum() * self.config['eq_error']
 
         return (
             distance_cost,
@@ -270,7 +275,8 @@ class SinglePointGoal(ObjectPointGoalBase):
             collision,
             goal_indicator,
             action_norm,
-            sim_crash_cost
+            sim_crash_cost,
+            eq_error_cost
         )
 
     @staticmethod
