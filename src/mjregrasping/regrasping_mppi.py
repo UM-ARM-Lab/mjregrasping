@@ -17,8 +17,8 @@ from mjregrasping.physics import Physics
 from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
-hp['min_sub_time_s'] = 0.2
-hp['max_sub_time_s'] = 0.2
+hp['min_sub_time_s'] = 0.08
+hp['max_sub_time_s'] = 0.08
 
 class RegraspMPPI:
 
