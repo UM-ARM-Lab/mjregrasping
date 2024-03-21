@@ -175,16 +175,18 @@ class SinglePointGoal(ObjectPointGoalBase):
                 cable_point = int(geom_name2.split('rG')[1])
                 #If the cable point is not visible, add a cost
                 if (not visible[cable_point]):
+                    # pass
                     contact_cost += 1
             elif ('bg' in geom_name2 and 'cable' in geom_name1):
                 #Get the index of the cable point that is in contact
                 cable_point = int(geom_name1.split('rG')[1])
                 #If the cable point is not visible, add a cost
                 if (not visible[cable_point]):
+                    # pass
                     contact_cost += 1
             elif  ('val' in geom_name1 and 'val' in geom_name2) and not ('finger' in geom_name1 and 'finger' in geom_name2):
                 # print('bg', geom_name1, geom_name2)
-                contact_cost += .0
+                contact_cost += 1
         return result(cur_state, contact_cost, float(sim_crash), eq_error)
     
     def identify_visible(self, cur_state):
