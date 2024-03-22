@@ -1,5 +1,8 @@
+import gc
 import time
 from typing import Optional
+from concurrent.futures import ThreadPoolExecutor
+import multiprocessing
 
 import numpy as np
 import rerun as rr
@@ -154,16 +157,19 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
             costs.append(cost_i)
             costs_by_term.append(costs_i_by_term)
     else:
-        futures = [pool.submit(rollout, *args) for args in args_sets]
-        results = []
-        costs = []
-        costs_by_term = []
-        for f in futures:
-            results_i, cost_i, costs_i_by_term = f.result()
-            results.append(results_i)
-            costs.append(cost_i)
-            costs_by_term.append(costs_i_by_term)
-
+        with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:            
+            futures = [pool.submit(rollout, *args) for args in args_sets]
+            results = []
+            costs = []
+            costs_by_term = []
+            for f in futures:
+                results_i, cost_i, costs_i_by_term = f.result()
+                results.append(results_i)
+                costs.append(cost_i)
+                costs_by_term.append(costs_i_by_term)
+            del futures
+            pool.shutdown(wait=True)
+            gc.collect()
     results = np.stack(results, dtype=object, axis=1)
     costs = np.stack(costs, axis=0)
 

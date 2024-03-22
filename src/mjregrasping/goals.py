@@ -186,9 +186,9 @@ class SinglePointGoal(ObjectPointGoalBase):
                 if (not visible[cable_point]):
                     # pass
                     contact_cost += 1
-            elif  ('val' in geom_name1 and 'val' in geom_name2) and not ('finger' in geom_name1 and 'finger' in geom_name2):
-                # print('bg', geom_name1, geom_name2)
-                contact_cost += 1
+            # elif  ('val' in geom_name1 and 'val' in geom_name2) and not ('finger' in geom_name1 and 'finger' in geom_name2):
+            #     # print('bg', geom_name1, geom_name2)
+            #     contact_cost += 1
         return result(cur_state, contact_cost, float(sim_crash), eq_error)
     
     def identify_visible(self, cur_state):
@@ -266,6 +266,7 @@ class SinglePointGoal(ObjectPointGoalBase):
 
             # collision = ((progress_pred <= 0)).sum().item() * self.config['C']
             collision = ((progress_pred <= 0) & ~visible).sum().item() * self.config['C']
+            del progress_pred, progress_pred_var, visible
 
         collision += contact_cost.sum() * self.config['C']
 
@@ -273,6 +274,7 @@ class SinglePointGoal(ObjectPointGoalBase):
 
         eq_error_cost = eq_error.sum() * self.config['eq_error']
 
+        del eq_error, sim_crash, contact_cost
         return (
             distance_cost,
             exploration,
@@ -286,11 +288,13 @@ class SinglePointGoal(ObjectPointGoalBase):
     @staticmethod
     def cost_names():
         return [
-            "distance",
+            "distance_cost",
             "exploration",
             "collision",
             "goal_indicator",
-            "action_norm"
+            "action_norm",
+            "sim_crash_cost",
+            "eq_error_cost"
         ]
 
     def satisfied(self, phy: Physics):

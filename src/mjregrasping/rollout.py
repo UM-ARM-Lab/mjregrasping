@@ -53,8 +53,8 @@ IKResult = collections.namedtuple(
 
 # ZEROS = np.array([ -.405,   -.214,  -1.571  ,    -1.102,    .831,    .054,    .018,    .64,    .011  ])
 # ZEROS = np.array([ -.392,   -.298,  .2  ,    -1.571,    1.305,    -.119,    .119,    .873,    -.024  ])
-ZEROS = np.array([ -.155,   -.644,  .12  ,    -1.201,    1.345,    -.188,    .298,    .692,    -.401  ])
-# ZEROS = np.array([ 0,   0,  0  ,    -1.571,    0,    0,    0,    0,    0  ])
+# ZEROS = np.array([ -.155,   -.644,  .12  ,    -1.201,    1.345,    -.188,    .298,    .692,    -.401  ])
+ZEROS = np.array([ 0,   0,  0  ,    -1.571,    0,    0,    0,    0,    0  ])
 
 def qpos_from_site_pose(physics,
                         site_name,
@@ -288,9 +288,9 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
 
         ik_result = qpos_from_site_pose(phy.p, 'val/right_tool', target_pos=cur_eef_pos + eef_delta_target, 
                                 joint_names=['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7'], 
-                                regularization_strength=0, 
+                                regularization_strength=3e-3, 
                                 regularization_threshold=0,
-                                jnt_lim_avoidance=.05,
+                                jnt_lim_avoidance=.15,
                                 max_update_norm=2,
                                 max_steps=1000,                         
                                 inplace=False)
