@@ -9,12 +9,17 @@ from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q, get_qpos_for_actuators
 from mjregrasping.real_val import RealValCommander
+from mjregrasping.params import hp
+
 from dm_control.mujoco.wrapper.mjbindings import mjlib
 
 import collections
-
-USEFUL_INDICES_vel = [0, 1, 11, 12, 13, 14, 15, 16, 17]
-USEFUL_INDICES_pos = [0, 1, 11, 12, 13, 14, 15, 16, 17]
+if hp['real']:
+  USEFUL_INDICES_vel = [0, 1, 11, 12, 13, 14, 15, 16, 17]
+  USEFUL_INDICES_pos = [0, 1, 11, 12, 13, 14, 15, 16, 17]
+else:
+  USEFUL_INDICES_vel = [81, 82, 83, 84, 85, 86, 87, 88, 89, 92, 93, 94, 95, 96, 97, 98]
+  USEFUL_INDICES_pos = [107, 108, 109, 110, 111, 112, 113, 114, 115, 118, 119, 120, 121, 122, 123, 124]
 USEFUL_INDICES_ctrl = [0, 1, 9, 10, 11, 12, 13, 14, 15]
 def velocity_control(gripper_delta, physics, n_sub_time):
     if len(gripper_delta) < 6:

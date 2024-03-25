@@ -6,11 +6,16 @@ import numpy as np
 from mujoco import mj_id2name, mju_str2Type
 
 from mjregrasping.mujoco_objects import MjObjects
+from mjregrasping.params import hp
 
 class Rope:
     def __init__(self):
-        self.body_indices = np.arange(51, 76)
-        self.geom_indices = np.arange(57, 82)
+        if hp['real']:
+            self.body_indices = np.arange(51, 76)
+            self.geom_indices = np.arange(57, 82)
+        else:   
+            self.body_indices = np.arange(5, 30)
+            self.geom_indices = np.arange(1, 26)
         self.geom_indices_name = [f'cable/rG{i}' for i in range(25)]
 class Objects:
     def __init__(self):
