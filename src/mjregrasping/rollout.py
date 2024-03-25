@@ -8,7 +8,6 @@ from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.movie import MjMovieMaker
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_full_q, get_qpos_for_actuators
-from mjregrasping.real_val import RealValCommander
 from mjregrasping.params import hp
 
 from dm_control.mujoco.wrapper.mjbindings import mjlib
@@ -17,10 +16,16 @@ import collections
 if hp['real']:
   USEFUL_INDICES_vel = [0, 1, 11, 12, 13, 14, 15, 16, 17]
   USEFUL_INDICES_pos = [0, 1, 11, 12, 13, 14, 15, 16, 17]
+  ZEROS = np.array([ 0,   0,  0  ,    -1.571,    0,    0,    0,    0,    0  ])
+  JOINT_NAMES = ['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7']
+  USEFUL_INDICES_ctrl = [0, 1, 9, 10, 11, 12, 13, 14, 15]
 else:
   USEFUL_INDICES_vel = [81, 82, 83, 84, 85, 86, 87, 88, 89, 92, 93, 94, 95, 96, 97, 98]
   USEFUL_INDICES_pos = [107, 108, 109, 110, 111, 112, 113, 114, 115, 118, 119, 120, 121, 122, 123, 124]
-USEFUL_INDICES_ctrl = [0, 1, 9, 10, 11, 12, 13, 14, 15]
+  ZEROS = np.array([ 0,   0,  0  ,    0,    0,    0,    0,    0,    -np.pi/2, 0, 0, 0, 0, 0, 0, np.pi/2  ])
+  JOINT_NAMES = ['val/joint56', 'val/joint57', 'val/joint41', 'val/joint42', 'val/joint43', 'val/joint44', 'val/joint45', 'val/joint46', 'val/joint47',
+                 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7']
+  USEFUL_INDICES_ctrl = list(range(16))
 def velocity_control(gripper_delta, physics, n_sub_time):
     if len(gripper_delta) < 6:
         gripper_delta = np.concatenate((np.zeros(6 - len(gripper_delta)), gripper_delta), axis=0)
@@ -59,7 +64,6 @@ IKResult = collections.namedtuple(
 # ZEROS = np.array([ -.405,   -.214,  -1.571  ,    -1.102,    .831,    .054,    .018,    .64,    .011  ])
 # ZEROS = np.array([ -.392,   -.298,  .2  ,    -1.571,    1.305,    -.119,    .119,    .873,    -.024  ])
 # ZEROS = np.array([ -.155,   -.644,  .12  ,    -1.201,    1.345,    -.188,    .298,    .692,    -.401  ])
-ZEROS = np.array([ 0,   0,  0  ,    -1.571,    0,    0,    0,    0,    0  ])
 
 def qpos_from_site_pose(physics,
                         site_name,
@@ -126,12 +130,12 @@ def qpos_from_site_pose(physics,
 
   if target_pos is not None and target_quat is not None:
     jac = np.empty((6, physics.model.nv), dtype=dtype)
-    err = np.empty(6, dtype=dtype)
+    err = np.empty(6 * len(site_name), dtype=dtype)
     jac_pos, jac_rot = jac[:3], jac[3:]
     err_pos, err_rot = err[:3], err[3:]
   else:
     jac = np.empty((3, physics.model.nv), dtype=dtype)
-    err = np.empty(3, dtype=dtype)
+    err = np.empty(3 * len(site_name), dtype=dtype)
     if target_pos is not None:
       jac_pos, jac_rot = jac, None
       err_pos, err_rot = err, None
@@ -155,12 +159,13 @@ def qpos_from_site_pose(physics,
   mjlib.mj_fwdPosition(physics.model.ptr, physics.data.ptr)
 
   # Convert site name to index.
-  site_id = physics.model.name2id(site_name, 'site')
+  site_ids = [physics.model.name2id(site, 'site') for site in site_name]
 
   # These are views onto the underlying MuJoCo buffers. mj_fwdPosition will
   # update them in place, so we can avoid indexing overhead in the main loop.
-  site_xpos = physics.named.data.site_xpos[site_name]
-  site_xmat = physics.named.data.site_xmat[site_name]
+  site_xpos = [physics.named.data.site_xpos[site].copy() for site in site_name]
+  site_xpos = np.concatenate(site_xpos)
+  site_xmat = physics.named.data.site_xmat[site_name[0]]
 
   # This is an index into the rows of `update` and the columns of `jac`
   # that selects DOFs associated with joints that we are allowed to manipulate.
@@ -187,8 +192,10 @@ def qpos_from_site_pose(physics,
 
     if target_pos is not None:
       # Translational error.
+      site_xpos = [physics.named.data.site_xpos[site].copy() for site in site_name]
+      site_xpos = np.concatenate(site_xpos, axis=0)
       err_pos[:] = target_pos - site_xpos
-      err_norm += np.linalg.norm(err_pos)
+      err_norm += np.linalg.norm(err_pos.reshape(-1, 2), axis=1).mean()
     if target_quat is not None:
       # Rotational error.
       mjlib.mju_mat2Quat(site_xquat, site_xmat)
@@ -197,17 +204,20 @@ def qpos_from_site_pose(physics,
       mjlib.mju_quat2Vel(err_rot, err_rot_quat, 1)
       err_norm += np.linalg.norm(err_rot) * rot_weight
     # print(f'step {steps}, err: {err_norm}')
-    
+    # print(steps, err_norm)
     if err_norm < tol:
     #   logging.debug('Converged after %i steps: err_norm=%3g', steps, err_norm)
       success = True
       break
     else:
       # TODO(b/112141670): Generalize this to other entities besides sites.
-      mjlib.mj_jacSite(
-          physics.model.ptr, physics.data.ptr, jac_pos, jac_rot, site_id)
-      jac_joints = jac[:, dof_indices]
-
+      jacs = []
+      for site_id in site_ids:
+        mjlib.mj_jacSite(
+            physics.model.ptr, physics.data.ptr, jac_pos, jac_rot, site_id)
+        jac_joints = jac[:, dof_indices]
+        jacs.append(jac_joints.copy())
+      jac_joints = np.concatenate(jacs, axis=0)
       
       # TODO(b/112141592): This does not take joint limits into consideration.
       reg_strength = (
@@ -259,7 +269,7 @@ def no_results(*args, **kwargs):
     return (None,)
 
 def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None,
-                 val_cmd: Optional[RealValCommander] = None):
+                 val_cmd = None):
     m = phy.m
     d = phy.d
 
@@ -288,16 +298,21 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
         #     phy.p.named.data.qpos['val/rightgripper2'] = .5
         #     phy.p.step()
         
-        cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
         cur_useful_qpos = phy.p.data.qpos[USEFUL_INDICES_pos].copy()
 
-        ik_result = qpos_from_site_pose(phy.p, 'val/right_tool', target_pos=cur_eef_pos + eef_delta_target, 
-                                joint_names=['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7'], 
+        if hp['real']:
+            site = ['val/right_tool']
+            cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
+        else:
+            site = ['val/left_tool', 'val/right_tool']
+            cur_eef_pos = np.concatenate((phy.p.named.data.site_xpos['val/left_tool'], phy.p.named.data.site_xpos['val/right_tool']), axis=0)
+        ik_result = qpos_from_site_pose(phy.p, site, target_pos=cur_eef_pos + eef_delta_target, 
+                                joint_names=JOINT_NAMES, 
                                 regularization_strength=3e-3, 
                                 regularization_threshold=0,
                                 jnt_lim_avoidance=.15,
                                 max_update_norm=2,
-                                max_steps=1000,                         
+                                max_steps=1000,     
                                 inplace=False)
         if not ik_result.success:
             print('IK failed')
@@ -315,8 +330,15 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
             for i in range(n_sub_time):
                 # phy.p.set_control(qpos_list[i])
                 phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
-                phy.p.named.data.qpos['val/rightgripper'] = .5
-                phy.p.named.data.qpos['val/rightgripper2'] = .5
+
+                if not hp['real']:
+                    phy.p.named.data.qpos['val/rightgripper'] = .3
+                    phy.p.named.data.qpos['val/rightgripper2'] = .3
+                    phy.p.named.data.qpos['val/leftgripper'] = .3
+                    phy.p.named.data.qpos['val/leftgripper2'] = .3
+                else:
+                    phy.p.named.data.qpos['val/rightgripper'] = .5
+                    phy.p.named.data.qpos['val/rightgripper2'] = .5
                 phy.p.step()
                 #Check error of qpos
                 # for i in range(100):
@@ -332,8 +354,14 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
             for i in range(n_sub_time):
                 # phy.p.set_control(qpos_list[i])
                 phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[-1]
-                phy.p.named.data.qpos['val/rightgripper'] = .5
-                phy.p.named.data.qpos['val/rightgripper2'] = .5
+                if not hp['real']:
+                    phy.p.named.data.qpos['val/rightgripper'] = .3
+                    phy.p.named.data.qpos['val/rightgripper2'] = .3
+                    phy.p.named.data.qpos['val/leftgripper'] = .3
+                    phy.p.named.data.qpos['val/leftgripper2'] = .3
+                else:
+                    phy.p.named.data.qpos['val/rightgripper'] = .5
+                    phy.p.named.data.qpos['val/rightgripper2'] = .5
                 phy.p.step()
     if val_cmd:
         mj_q = get_full_q(phy)
