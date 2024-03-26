@@ -269,7 +269,7 @@ def no_results(*args, **kwargs):
     return (None,)
 
 def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None,
-                 val_cmd = None):
+                 val_cmd = None, env=None):
     m = phy.m
     d = phy.d
 
@@ -308,9 +308,9 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
             cur_eef_pos = np.concatenate((phy.p.named.data.site_xpos['val/left_tool'], phy.p.named.data.site_xpos['val/right_tool']), axis=0)
         ik_result = qpos_from_site_pose(phy.p, site, target_pos=cur_eef_pos + eef_delta_target, 
                                 joint_names=JOINT_NAMES, 
-                                regularization_strength=3e-3, 
+                                regularization_strength=0, 
                                 regularization_threshold=0,
-                                jnt_lim_avoidance=.15,
+                                jnt_lim_avoidance=.003,
                                 max_update_norm=2,
                                 max_steps=1000,     
                                 inplace=False)
@@ -339,7 +339,10 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
                 else:
                     phy.p.named.data.qpos['val/rightgripper'] = .5
                     phy.p.named.data.qpos['val/rightgripper2'] = .5
-                phy.p.step()
+                if env is not None:
+                   env.step(None)
+                else:
+                  phy.p.step()
                 #Check error of qpos
                 # for i in range(100):
 
@@ -355,14 +358,17 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
                 # phy.p.set_control(qpos_list[i])
                 phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[-1]
                 if not hp['real']:
-                    phy.p.named.data.qpos['val/rightgripper'] = .3
-                    phy.p.named.data.qpos['val/rightgripper2'] = .3
-                    phy.p.named.data.qpos['val/leftgripper'] = .3
-                    phy.p.named.data.qpos['val/leftgripper2'] = .3
+                    phy.p.named.data.qpos['val/rightgripper'] = .5
+                    phy.p.named.data.qpos['val/rightgripper2'] = .5
+                    phy.p.named.data.qpos['val/leftgripper'] = .5
+                    phy.p.named.data.qpos['val/leftgripper2'] = .5
                 else:
                     phy.p.named.data.qpos['val/rightgripper'] = .5
                     phy.p.named.data.qpos['val/rightgripper2'] = .5
-                phy.p.step()
+                if env is not None:
+                   env.step(None)
+                else:
+                  phy.p.step()
     if val_cmd:
         mj_q = get_full_q(phy)
         val_cmd.send_pos_command(mj_q, slow=slow)
