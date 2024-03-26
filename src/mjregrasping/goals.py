@@ -151,7 +151,7 @@ class SinglePointGoal(ObjectPointGoalBase):
         self.config = config
         self.inds = []
         for i in range(25):
-            self.inds.append(f'cable/rG{i}')
+            self.inds.append(f'cable/r_0G{i}')
         self.goal_tensor = torch.tensor(goal_point)
         self.depth = depth.cpu()
         self.intrinsic = intrinsic.cpu()

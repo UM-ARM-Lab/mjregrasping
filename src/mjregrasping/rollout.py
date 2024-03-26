@@ -18,14 +18,14 @@ if hp['real']:
   USEFUL_INDICES_pos = [0, 1, 11, 12, 13, 14, 15, 16, 17]
   ZEROS = np.array([ 0,   0,  0  ,    -1.571,    0,    0,    0,    0,    0  ])
   JOINT_NAMES = ['val/joint56', 'val/joint57', 'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7']
-  USEFUL_INDICES_ctrl = [0, 1, 9, 10, 11, 12, 13, 14, 15]
+  USEFUL_INDICES_ctrl = np.array([0, 1, 9, 10, 11, 12, 13, 14, 15])
 else:
   USEFUL_INDICES_vel = [81, 82, 83, 84, 85, 86, 87, 88, 89, 92, 93, 94, 95, 96, 97, 98]
-  USEFUL_INDICES_pos = [107, 108, 109, 110, 111, 112, 113, 114, 115, 118, 119, 120, 121, 122, 123, 124]
+  USEFUL_INDICES_pos = np.array([107, 108, 109, 110, 111, 112, 113, 114, 115, 118, 119, 120, 121, 122, 123, 124])
   ZEROS = np.array([ 0,   0,  0  ,    0,    0,    0,    0,    0,    -np.pi/2, 0, 0, 0, 0, 0, 0, np.pi/2  ])
   JOINT_NAMES = ['val/joint56', 'val/joint57', 'val/joint41', 'val/joint42', 'val/joint43', 'val/joint44', 'val/joint45', 'val/joint46', 'val/joint47',
                  'val/joint1', 'val/joint2', 'val/joint3', 'val/joint4', 'val/joint5', 'val/joint6', 'val/joint7']
-  USEFUL_INDICES_ctrl = list(range(16))
+  USEFUL_INDICES_ctrl = np.array(list(range(16)))
 def velocity_control(gripper_delta, physics, n_sub_time):
     if len(gripper_delta) < 6:
         gripper_delta = np.concatenate((np.zeros(6 - len(gripper_delta)), gripper_delta), axis=0)
@@ -78,7 +78,8 @@ def qpos_from_site_pose(physics,
                         max_update_norm=2.0,
                         progress_thresh=20.0,
                         max_steps=100,
-                        inplace=False):
+                        inplace=False,
+                        zeros=ZEROS):
   """Find joint positions that satisfy a target site position and/or rotation.
 
   Args:
@@ -226,7 +227,7 @@ def qpos_from_site_pose(physics,
       
       cur_q = physics.data.qpos[dof_indices]
   
-      zero_vels = (ZEROS-cur_q) * jnt_lim_avoidance
+      zero_vels = (zeros-cur_q) * jnt_lim_avoidance
 
       J_t = jac_joints.T
       J_pinv = J_t @ np.linalg.inv(jac_joints @ J_t + reg_strength**2 * np.eye(jac_joints.shape[0]))
@@ -269,7 +270,7 @@ def no_results(*args, **kwargs):
     return (None,)
 
 def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optional[MjMovieMaker] = None,
-                 val_cmd = None, env=None):
+                 val_cmd = None, env=None, num_islands=1):
     m = phy.m
     d = phy.d
 
@@ -297,48 +298,68 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
         #     phy.p.named.data.qpos['val/rightgripper'] = .5
         #     phy.p.named.data.qpos['val/rightgripper2'] = .5
         #     phy.p.step()
-        
-        cur_useful_qpos = phy.p.data.qpos[USEFUL_INDICES_pos].copy()
+        useful_indices_pos = []
+        for idx in range(num_islands):
+            useful_indices_pos.append(USEFUL_INDICES_pos + idx * 127)
+        useful_indices_pos = np.concatenate(useful_indices_pos, axis=0)
+        cur_useful_qpos = phy.p.data.qpos[useful_indices_pos].copy()
 
         if hp['real']:
             site = ['val/right_tool']
             cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
         else:
-            site = ['val/left_tool', 'val/right_tool']
-            cur_eef_pos = np.concatenate((phy.p.named.data.site_xpos['val/left_tool'], phy.p.named.data.site_xpos['val/right_tool']), axis=0)
+            site = []
+            eef_pos = []
+            for idx in range(num_islands):
+                site += [f'val_{idx}/left_tool', f'val_{idx}/right_tool']
+                eef_pos.append(phy.p.named.data.site_xpos[f'val_{idx}/left_tool'])
+                eef_pos.append(phy.p.named.data.site_xpos[f'val_{idx}/right_tool'])
+            cur_eef_pos = np.concatenate(eef_pos, axis=0)
+        joint_names = []
+        for idx in range(num_islands):
+           for joint in JOINT_NAMES:
+              split = joint.split('/')
+              joint_names.append(f'val_{idx}/{split[1]}')
         ik_result = qpos_from_site_pose(phy.p, site, target_pos=cur_eef_pos + eef_delta_target, 
-                                joint_names=JOINT_NAMES, 
+                                joint_names=joint_names, 
                                 regularization_strength=0, 
                                 regularization_threshold=0,
                                 jnt_lim_avoidance=.003,
                                 max_update_norm=2,
                                 max_steps=1000,     
-                                inplace=False)
+                                inplace=False,
+                                zeros=np.tile(ZEROS, num_islands))
         if not ik_result.success:
             print('IK failed')
         else:
             # phy.d.ctrl[USEFUL_INDICES_ctrl] = ik_result.qpos[USEFUL_INDICES_pos]
+            useful_indices_ctrl = []
+            for idx in range(num_islands):
+                useful_indices_ctrl.append(USEFUL_INDICES_ctrl + idx * 16)
+            useful_indices_ctrl = np.concatenate(useful_indices_ctrl, axis=0)
 
-            vmin = phy.p.model.actuator_ctrlrange[USEFUL_INDICES_ctrl, 0]
-            vmax = phy.p.model.actuator_ctrlrange[USEFUL_INDICES_ctrl, 1]
+            vmin = phy.p.model.actuator_ctrlrange[useful_indices_ctrl, 0]
+            vmax = phy.p.model.actuator_ctrlrange[useful_indices_ctrl, 1]
 
             frac = np.linspace(1/(n_sub_time), 1, (n_sub_time))
-            qpos_list = [np.clip(cur_useful_qpos * (1-frac[i]) + frac[i] * ik_result.qpos[USEFUL_INDICES_pos], vmin, vmax) for i in range(len(frac))]
-            phy.d.ctrl[USEFUL_INDICES_ctrl] = qpos_list[-1]
+            qpos_list = [np.clip(cur_useful_qpos * (1-frac[i]) + frac[i] * ik_result.qpos[useful_indices_pos], vmin, vmax) for i in range(len(frac))]
+            phy.d.ctrl[useful_indices_ctrl] = qpos_list[-1]
             # phy.d.ctrl[USEFUL_INDICES_ctrl] = ik_result.qpos[USEFUL_INDICES_pos]
             # phy.p.data.qpos[USEFUL_INDICES_pos] = ik_result.qpos[USEFUL_INDICES_pos]
             for i in range(n_sub_time):
                 # phy.p.set_control(qpos_list[i])
-                phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[i]
+                phy.p.data.qpos[useful_indices_pos] = qpos_list[i]
 
                 if not hp['real']:
-                    phy.p.named.data.qpos['val/rightgripper'] = .3
-                    phy.p.named.data.qpos['val/rightgripper2'] = .3
-                    phy.p.named.data.qpos['val/leftgripper'] = .3
-                    phy.p.named.data.qpos['val/leftgripper2'] = .3
+                    for idx in range(num_islands):
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper'] = .3
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper2'] = .3
+                      phy.p.named.data.qpos[f'val_{idx}/leftgripper'] = .3
+                      phy.p.named.data.qpos[f'val_{idx}/leftgripper2'] = .3
                 else:
-                    phy.p.named.data.qpos['val/rightgripper'] = .5
-                    phy.p.named.data.qpos['val/rightgripper2'] = .5
+                    for idx in range(num_islands):
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper'] = .5
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper2'] = .5
                 if env is not None:
                    env.step(None)
                 else:
@@ -356,15 +377,17 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
                 #     err = qpos_list[i] - phy.p.data.qpos[USEFUL_INDICES_pos]
             for i in range(n_sub_time):
                 # phy.p.set_control(qpos_list[i])
-                phy.p.data.qpos[USEFUL_INDICES_pos] = qpos_list[-1]
+                phy.p.data.qpos[useful_indices_pos] = qpos_list[-1]
                 if not hp['real']:
-                    phy.p.named.data.qpos['val/rightgripper'] = .5
-                    phy.p.named.data.qpos['val/rightgripper2'] = .5
-                    phy.p.named.data.qpos['val/leftgripper'] = .5
-                    phy.p.named.data.qpos['val/leftgripper2'] = .5
+                    for idx in range(num_islands):
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper'] = .3
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper2'] = .3
+                      phy.p.named.data.qpos[f'val_{idx}/leftgripper'] = .3
+                      phy.p.named.data.qpos[f'val_{idx}/leftgripper2'] = .3
                 else:
-                    phy.p.named.data.qpos['val/rightgripper'] = .5
-                    phy.p.named.data.qpos['val/rightgripper2'] = .5
+                    for idx in range(num_islands):
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper'] = .5
+                      phy.p.named.data.qpos[f'val_{idx}/rightgripper2'] = .5
                 if env is not None:
                    env.step(None)
                 else:
