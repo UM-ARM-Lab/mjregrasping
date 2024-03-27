@@ -139,7 +139,6 @@ class RegraspMPPI:
             command = new_u_mu_square[:self.u_per_command].copy()
         return command, self.time_mu
 
-
 def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_samples, viz):
     u_samples_square = u_samples.reshape(num_samples, horizon, nu)
     # u_samples_square[..., [2, 5]] = .01
@@ -172,7 +171,6 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
     costs_by_term = np.stack(costs_by_term, axis=0)
 
     return results, costs, costs_by_term
-
 
 def rollout(phy, goal, u_sample, sub_time_s, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """

@@ -1,4 +1,4 @@
-from copy import deepcopy
+from copy import copy, deepcopy
 from typing import Optional
 
 import mujoco
@@ -41,7 +41,7 @@ class Physics:
         raise NotImplementedError("Use .copy_data() or .copy_all() to avoid ambiguity")
 
     def copy_data(self):
-        new_phy = Physics(deepcopy(self.p))
+        new_phy = Physics(self.p.copy(share_model=True))
         # contact state is not copied, so we need to run forward to update it
 
         new_phy.p.step()
@@ -49,7 +49,7 @@ class Physics:
 
     def copy_all(self):
         """ Much slower, since copying the model is slow """
-        new_phy = Physics(deepcopy(self.p))
+        new_phy = Physics(self.p.copy(share_model=True))
         # contact state is not copied, so we need to run forward to update it
         new_phy.p.step()
         return new_phy
