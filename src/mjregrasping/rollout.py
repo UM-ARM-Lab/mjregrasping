@@ -195,7 +195,7 @@ def qpos_from_site_pose(physics,
       site_xpos = [physics.named.data.site_xpos[site].copy() for site in site_name]
       site_xpos = np.concatenate(site_xpos, axis=0)
       err_pos[:] = target_pos - site_xpos
-      err_norm += np.linalg.norm(err_pos.reshape(-1, 2), axis=1).mean()
+      err_norm += np.linalg.norm(err_pos.reshape(-1, 3), axis=1).mean()
     if target_quat is not None:
       # Rotational error.
       mjlib.mju_mat2Quat(site_xquat, site_xmat)
