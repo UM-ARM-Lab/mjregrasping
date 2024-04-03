@@ -32,16 +32,23 @@ class Physics:
         # self.d = d
         # self.o = objects
         self.p = physics
-        self.d = physics.data
-        self.m = physics.model
         self.o = Objects()
         # self.o = MJObjects(self.m, 'obj1', )
 
+    @property
+    def d(self):
+        return self.p.data
+    
+    @property
+    def m(self):
+        return self.p.model
+    
     def __copy__(self):
         raise NotImplementedError("Use .copy_data() or .copy_all() to avoid ambiguity")
 
     def copy_data(self):
-        new_phy = Physics(self.p.copy(share_model=True))
+
+        new_phy = Physics(self.p.copy(share_model=False))
         # contact state is not copied, so we need to run forward to update it
 
         new_phy.p.step()
@@ -49,11 +56,43 @@ class Physics:
 
     def copy_all(self):
         """ Much slower, since copying the model is slow """
-        new_phy = Physics(self.p.copy(share_model=True))
+
+        new_phy = Physics(self.p.copy(share_model=False))
+        # new_phy.d.ctrl = deepcopy(self.d.ctrl)
+
         # contact state is not copied, so we need to run forward to update it
         new_phy.p.step()
         return new_phy
+    
+    def set_state(self, orig_phy):
+        #Copy state vector
+        self.d.time = orig_phy.d.time
+        self.d.qpos[:] = orig_phy.d.qpos
+        self.d.qvel[:] = orig_phy.d.qvel
+        self.d.act[:] = orig_phy.d.act
+        self.d.qacc_warmstart[:] = orig_phy.d.qacc_warmstart
 
+        #Copy control vector
+        self.d.ctrl[:] = orig_phy.d.ctrl
+        self.d.qfrc_applied[:] = orig_phy.d.qfrc_applied
+        self.d.xfrc_applied[:] = orig_phy.d.xfrc_applied
+
+        self.p.step()
+
+    def set_state(self, time, qpos, qvel, act, qacc_warmstart, ctrl, qfrc_applied, xfrc_applied):
+        self.d.time = time
+        self.d.qpos = qpos
+        self.d.qvel = qvel
+        self.d.act = act
+        self.d.qacc_warmstart = qacc_warmstart
+        self.d.ctrl = ctrl
+        self.d.qfrc_applied = qfrc_applied
+        self.d.xfrc_applied = xfrc_applied
+
+        self.p.step()
+
+    def get_state(self):
+        return self.d.time, self.d.qpos, self.d.qvel, self.d.act, self.d.qacc_warmstart, self.d.ctrl, self.d.qfrc_applied, self.d.xfrc_applied
 
 def get_contact_forces(phy: Physics):
     contact_geoms1 = phy.d.contact.geom1

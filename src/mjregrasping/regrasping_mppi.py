@@ -19,8 +19,8 @@ from mjregrasping.params import hp
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import control_step
 
-hp['min_sub_time_s'] = 0.08
-hp['max_sub_time_s'] = 0.08
+hp['min_sub_time_s'] = 0.04
+hp['max_sub_time_s'] = 0.04
 
 class RegraspMPPI:
 
@@ -139,11 +139,20 @@ class RegraspMPPI:
             command = new_u_mu_square[:self.u_per_command].copy()
         return command, self.time_mu
 
+parallel_phys = None
+
 def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_samples, viz):
     u_samples_square = u_samples.reshape(num_samples, horizon, nu)
     # u_samples_square[..., [2, 5]] = .01
     # We must also copy model here because EQs are going to be changing
-    args_sets = [(phy.copy_all(), goal, *args_i) for args_i in zip(u_samples_square, time_samples)]
+    num_serial = 1#int(num_samples/pool._max_workers)
+    num_submits = int(num_samples/num_serial)
+    global parallel_phys
+    if parallel_phys is None:
+        parallel_phys = [phy.copy_all() for _ in range(num_submits)]
+    args_sets = []
+    for i in range(num_submits):
+        args_sets.append((goal, parallel_phys[i], phy.get_state(), u_samples_square[i * num_serial: (i+1)* num_serial], time_samples[i * num_serial: (i+1)* num_serial]))
 
     if viz:
         results = []
@@ -161,10 +170,10 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
         costs_by_term = []
         for f in futures:
             results_i, cost_i, costs_i_by_term = f.result()
-            results.append(results_i)
-            costs.append(cost_i)
-            costs_by_term.append(costs_i_by_term)
-        del futures
+            results.extend(results_i)
+            costs.extend(cost_i)
+            costs_by_term.extend(costs_i_by_term)
+
     results = np.stack(results, dtype=object, axis=1)
     costs = np.stack(costs, axis=0)
 
@@ -172,37 +181,48 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
 
     return results, costs, costs_by_term
 
-def rollout(phy, goal, u_sample, sub_time_s, viz=None):
+def rollout(goal, parallel_phy, state, u_samples, sub_time_ss, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """
-    if viz:
-        viz.viz(phy, is_planning=True)
-
-    results_0 = goal.get_results(phy)
-    # Only do this at the beginning, since it's expensive and if it went in the loop, it could potentially cause
-    # rapid oscillations of grasping/not grasping which seems undesirable.
-    # do_grasp_dynamics(phy)
-    results = [results_0]
-    for t, u in enumerate(u_sample):
-        sim_crash = False
-        try:
-            control_step(phy, u, sub_time_s=sub_time_s)
-        except Exception as e:
-            sim_crash=True
+    all_results = []
+    all_costs = []
+    all_costs_by_term = []
+    for serial in range(len(u_samples)):
+        u_sample = u_samples[serial]
+        sub_time_s = sub_time_ss[serial]
+        parallel_phy.set_state(*state)
         if viz:
-            time.sleep(0.01)
-            viz.viz(phy, is_planning=True)
-        results_t = goal.get_results(phy, sim_crash)
+            viz.viz(parallel_phy, is_planning=True)
 
-        results.append(results_t)
-    if sim_crash:
-        print('Simulation crashed')
-    results = np.stack(results, dtype=object, axis=1)
+        results_0 = goal.get_results(parallel_phy)
+        # Only do this at the beginning, since it's expensive and if it went in the loop, it could potentially cause
+        # rapid oscillations of grasping/not grasping which seems undesirable.
+        # do_grasp_dynamics(phy)
+        results = [results_0]
+        for t, u in enumerate(u_sample):
+            sim_crash = False
+            try:
+                control_step(parallel_phy, u, sub_time_s=sub_time_s)
+            except Exception as e:
+                sim_crash=True
+            if viz:
+                time.sleep(0.01)
+                viz.viz(parallel_phy, is_planning=True)
+            results_t = goal.get_results(parallel_phy, sim_crash)
 
-    costs_by_term = goal.costs(results, u_sample)  # ignore cost of initial state, it doesn't matter for planning
+            results.append(results_t)
+        if sim_crash:
+            print('Simulation crashed')
+        results = np.stack(results, dtype=object, axis=1)
 
-    cost = sum(costs_by_term)
+        costs_by_term = goal.costs(results, u_sample)  # ignore cost of initial state, it doesn't matter for planning
 
-    return results, cost, costs_by_term
+        cost = sum(costs_by_term)
+
+        all_results.append(results)
+        all_costs.append(cost)
+        all_costs_by_term.append(costs_by_term)
+
+    return all_results, all_costs, all_costs_by_term
 
 
 def do_grasp_dynamics(phy: Physics, val_cmd = None):
