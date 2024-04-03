@@ -17,7 +17,6 @@ from mjregrasping.grasping import get_grasp_eqs, get_finger_qs, activate_grasp
 from mjregrasping.math import softmax
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics
-from mjregrasping.real_val import RealValCommander
 from mjregrasping.rollout import control_step
 
 hp['min_sub_time_s'] = 0.04
@@ -165,7 +164,6 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
             costs.append(cost_i)
             costs_by_term.append(costs_i_by_term)
     else:
-        # with ThreadPoolExecutor(multiprocessing.cpu_count() - 1) as pool:            
         futures = [pool.submit(rollout, *args) for args in args_sets]
         results = []
         costs = []
@@ -175,16 +173,13 @@ def parallel_rollout(pool, horizon, nu, phy, goal, u_samples, time_samples, num_
             results.extend(results_i)
             costs.extend(cost_i)
             costs_by_term.extend(costs_i_by_term)
-        # del futures
-            # pool.shutdown(wait=True)
-            # gc.collect()
+
     results = np.stack(results, dtype=object, axis=1)
     costs = np.stack(costs, axis=0)
 
     costs_by_term = np.stack(costs_by_term, axis=0)
 
     return results, costs, costs_by_term
-
 
 def rollout(goal, parallel_phy, state, u_samples, sub_time_ss, viz=None):
     """ Must be a free function, since it's used in a multiprocessing pool. All arguments must be picklable. """
@@ -230,7 +225,7 @@ def rollout(goal, parallel_phy, state, u_samples, sub_time_ss, viz=None):
     return all_results, all_costs, all_costs_by_term
 
 
-def do_grasp_dynamics(phy: Physics, val_cmd: Optional[RealValCommander] = None):
+def do_grasp_dynamics(phy: Physics, val_cmd = None):
     tools_pos = get_tool_points(phy)
     finger_qs = get_finger_qs(phy)
     # NOTE: this function must be VERY fast, since we run it inside rollout() in a tight loop

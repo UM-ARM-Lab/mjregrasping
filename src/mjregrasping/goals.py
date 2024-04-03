@@ -203,7 +203,7 @@ class SinglePointGoal(ObjectPointGoalBase):
         cur_state_homog = torch.cat((cur_state, torch.ones(cur_state.shape[0], 1, dtype=cur_state.dtype, device=cur_state.device)), dim=1)
         cam2world = torch.cat((self.cam2world_mat, self.cam_pos_in_world.reshape(3, 1)), dim=1)
         cam2world = torch.cat((cam2world, torch.tensor([[0, 0, 0, 1]], dtype=cur_state.dtype, device=cur_state.device)), dim=0)
-        cur_state_cam = (torch.inverse(cam2world) @ cur_state_homog.T).T[:, :3]
+        cur_state_cam = (torch.inverse(cam2world.double()) @ cur_state_homog.double().T).T[:, :3]
 
         image_space_vertices = (self.intrinsic @ cur_state_cam.T).T
         vert_depth = image_space_vertices[:, 2].clone()

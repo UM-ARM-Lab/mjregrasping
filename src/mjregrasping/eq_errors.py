@@ -6,10 +6,13 @@ from mjregrasping.physics import Physics
 
 def compute_total_eq_error(phy: Physics):
     eq_errs = []
-    for eq_name in ['grasp_r_w', 'grasp_r2_w']+ ['fix_']:
-        eq = phy.m.eq(eq_name)
-        eq_err = compute_eq_error(phy, eq)
-        eq_errs.append(eq_err)
+    for eq_name in ['grasp_r_w', 'grasp_r2_w']+ ['grasp_l', 'grasp_l2', 'grasp_r', 'grasp_r2'] + ['fix_']:
+        try:
+            eq = phy.m.eq(eq_name)
+            eq_err = compute_eq_error(phy, eq)
+            eq_errs.append(eq_err)
+        except:
+            pass
     return sum(eq_errs)
 
 
