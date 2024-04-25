@@ -13,6 +13,12 @@ from mjregrasping.params import hp
 from dm_control.mujoco.wrapper.mjbindings import mjlib
 
 import collections
+
+class IKResultWrapper:
+   def __init__(self, qpos):
+        self.qpos = qpos
+        self.success = True
+
 if hp['real']:
   USEFUL_INDICES_vel = [0, 1, 11, 12, 13, 14, 15, 16, 17]
   USEFUL_INDICES_pos = [0, 1, 11, 12, 13, 14, 15, 16, 17]
@@ -299,21 +305,23 @@ def control_step(phy: Physics, eef_delta_target, sub_time_s: float, mov: Optiona
         #     phy.p.step()
         
         cur_useful_qpos = phy.p.data.qpos[USEFUL_INDICES_pos].copy()
-
-        if hp['real']:
-            site = ['val/right_tool']
-            cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
+        if len(eef_delta_target) <= 6:
+          if hp['real']:
+              site = ['val/right_tool']
+              cur_eef_pos = phy.p.named.data.site_xpos['val/right_tool']
+          else:
+              site = ['val/left_tool', 'val/right_tool']
+              cur_eef_pos = np.concatenate((phy.p.named.data.site_xpos['val/left_tool'], phy.p.named.data.site_xpos['val/right_tool']), axis=0)
+          ik_result = qpos_from_site_pose(phy.p, site, target_pos=cur_eef_pos + eef_delta_target, 
+                                  joint_names=JOINT_NAMES, 
+                                  regularization_strength=0, 
+                                  regularization_threshold=0,
+                                  jnt_lim_avoidance=.003,
+                                  max_update_norm=2,
+                                  max_steps=1000,     
+                                  inplace=False)
         else:
-            site = ['val/left_tool', 'val/right_tool']
-            cur_eef_pos = np.concatenate((phy.p.named.data.site_xpos['val/left_tool'], phy.p.named.data.site_xpos['val/right_tool']), axis=0)
-        ik_result = qpos_from_site_pose(phy.p, site, target_pos=cur_eef_pos + eef_delta_target, 
-                                joint_names=JOINT_NAMES, 
-                                regularization_strength=0, 
-                                regularization_threshold=0,
-                                jnt_lim_avoidance=.003,
-                                max_update_norm=2,
-                                max_steps=1000,     
-                                inplace=False)
+           ik_result = IKResultWrapper(eef_delta_target)
         if not ik_result.success:
             print('IK failed')
         else:
