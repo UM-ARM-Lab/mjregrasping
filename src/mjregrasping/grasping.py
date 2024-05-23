@@ -12,7 +12,7 @@ class WrongEQType(Exception):
 
 def get_is_grasping(phy):
     eqs = get_grasp_eqs(phy)
-    is_grasping = np.array([phy.m.eq_active[eq.id] for eq in eqs])
+    is_grasping = np.array([phy.d.eq_active[eq.id] for eq in eqs])
     return is_grasping
 
 
@@ -30,7 +30,7 @@ def activate_grasp(phy: Physics, name, loc):
     offset_body = np.array([offset, 0, 0])
     grasp_eq = phy.m.eq(name)
     grasp_eq.obj2id = grasp_index
-    grasp_eq.active = 1
+    phy.d.eq_active[grasp_eq.id] = 1
 
     if grasp_eq.type == mujoco.mjtEq.mjEQ_CONNECT:
         grasp_eq.data[3:6] = offset_body
@@ -61,7 +61,7 @@ def get_grasp_locs(phy: Physics):
     rope_length = get_rope_length(phy)
     locs = []
     for eq in get_grasp_eqs(phy):
-        if eq.active:
+        if phy.d.eq_active[eq.id]:
             idx = int(eq.obj2id)
             offset = get_grasp_eq_offset(eq)
             loc = grasp_indices_to_locations(phy.o.rope.body_indices, idx) + (offset / rope_length)
@@ -83,7 +83,7 @@ def get_grasp_eq_offset(eq):
 def get_loc_idx_offset_xpos(phy: Physics):
     rope_length = get_rope_length(phy)
     for eq in get_grasp_eqs(phy):
-        if eq.active:
+        if phy.d.eq_active[eq.id]:
             idx = eq.obj2id
             offset = eq.data[3]
             xmat = phy.d.xmat[idx].reshape(3, 3)

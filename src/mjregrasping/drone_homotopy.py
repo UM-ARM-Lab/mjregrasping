@@ -1,7 +1,7 @@
 import numpy as np
 
-from mjregrasping.goal_funcs import get_rope_points
-from mjregrasping.homotopy_checker import get_full_h_signature, create_graph_nodes
+from mjregrasping.get_rope_points import get_rope_points
+from mjregrasping.homotopy_checker import get_full_gl_signature, create_graph_nodes
 from mjregrasping.mujoco_object import MjObject
 
 
@@ -34,9 +34,9 @@ def get_h_for_drones(phy, skeletons):
     drone3_rope = MjObject(phy.m, 'drone3_rope')
     drone3_points = np.concatenate((phy.d.xpos[drone3_rope.body_indices[::-1]], base_xpos), 0)
     arm_points = np.stack([drone1_points, drone2_points, drone3_points])
-    h, loops = get_full_h_signature(skeletons, graph, rope_points, arm_points,
-                                    collapse_empty_gripper_cycles=False,
-                                    gripper_ids_in_h_signature=False,
-                                    connect_via_floor=False)
+    h, loops = get_full_gl_signature(skeletons, graph, rope_points, arm_points,
+                                     collapse_empty_gripper_cycles=False,
+                                     gripper_ids_in_gl_signature=False,
+                                     connect_via_floor=False)
     print(f'dt: {perf_counter() - t0:.3f}')
     return graph, h, loops

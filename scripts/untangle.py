@@ -15,6 +15,7 @@ from mjregrasping.grasping import get_grasp_locs
 from mjregrasping.params import hp
 from mjregrasping.regrasping_mppi import do_grasp_dynamics, RegraspMPPI, mppi_viz
 from mjregrasping.rollout import control_step, get_speed_factor
+from mjregrasping.rope_gripper_collision import disable_rope_gripper_collisions
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import val_untangle, simple_goal_sig
 from mjregrasping.trap_detection import TrapDetection
@@ -55,10 +56,7 @@ def main():
         phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
     
         # disable collision only between rope and gripper geoms
-        from itertools import chain
-        for geom_name in list(chain(*phy.o.rd.gripper_geom_names)) + phy.o.rope.geom_names:
-            phy.m.geom(geom_name).contype = 1
-            phy.m.geom(geom_name).conaffinity = 2
+        disable_rope_gripper_collisions(phy)
 
         overall_t0 = perf_counter()
 

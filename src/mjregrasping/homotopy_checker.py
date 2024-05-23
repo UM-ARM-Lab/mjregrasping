@@ -11,7 +11,7 @@ import numpy as np
 import rerun as rr
 from multiset import Multiset
 
-from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.get_rope_points import get_rope_points
 from mjregrasping.grasp_conversions import grasp_indices_to_locations
 from mjregrasping.grasping import get_grasp_eq_offset, WrongEQType
 from mjregrasping.homotopy_utils import passes_through, floorify, from_to, check_new_cycle, NO_HOMOTOPY, pairwise, \
@@ -65,8 +65,8 @@ class CollisionChecker:
 
 
 def get_true_homotopy_different(skeletons: Dict, phy1: Physics, phy2: Physics, log_loops=False):
-    h1, loops1 = get_full_h_signature_from_phy(skeletons, phy1)
-    h2, loops2 = get_full_h_signature_from_phy(skeletons, phy2)
+    h1, loops1 = get_full_gl_signature_from_phy(skeletons, phy1)
+    h2, loops2 = get_full_gl_signature_from_phy(skeletons, phy2)
     true_homotopy_different = (h1 != h2)
 
     if log_loops:
@@ -84,16 +84,16 @@ DEFAULT_COLLAPSE_EMPTY_GRIPPER_CYCLES = True
 GRIPPER_IDS_IN_H_SIGNATURE = False
 
 
-def get_full_h_signature_from_phy(skeletons: Dict, phy: Physics,
-                                  collapse_empty_gripper_cycles=DEFAULT_COLLAPSE_EMPTY_GRIPPER_CYCLES,
-                                  gripper_ids_in_h_signature=GRIPPER_IDS_IN_H_SIGNATURE):
+def get_full_gl_signature_from_phy(skeletons: Dict, phy: Physics,
+                                   collapse_empty_gripper_cycles=DEFAULT_COLLAPSE_EMPTY_GRIPPER_CYCLES,
+                                   gripper_ids_in_h_signature=GRIPPER_IDS_IN_H_SIGNATURE):
     graph = create_graph_nodes(phy)
     rope_points = get_rope_points(phy)
     arm_points = get_arm_points(phy)
 
-    return get_full_h_signature(skeletons, graph, rope_points, arm_points,
-                                collapse_empty_gripper_cycles,
-                                gripper_ids_in_h_signature)
+    return get_full_gl_signature(skeletons, graph, rope_points, arm_points,
+                                 collapse_empty_gripper_cycles,
+                                 gripper_ids_in_h_signature)
 
 
 def get_loops_from_phy(phy):
@@ -133,7 +133,7 @@ def create_graph_nodes(phy: Physics):
     attach_i = 0
     for eq_idx in range(phy.m.neq):
         eq = phy.m.eq(eq_idx)
-        if eq.active:
+        if phy.d.eq_active[eq.id]:
             body_idx = int(eq.obj2id)
             try:
                 offset = get_grasp_eq_offset(eq)
@@ -220,8 +220,8 @@ def add_edges(graph, rope_points, arm_points, connect_via_floor=True):
                 graph.add_edge(i, j, edge_path=np.stack([i_xpos, *edge_rope_points, j_xpos]))
 
 
-def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
-                         collapse_empty_gripper_cycles, gripper_ids_in_h_signature, connect_via_floor: bool = True):
+def get_full_gl_signature(skeletons: Dict, graph, rope_points, arm_points,
+                          collapse_empty_gripper_cycles, gripper_ids_in_gl_signature, connect_via_floor: bool = True):
     """
     This function computes the full h-signature of the current state.
     Two states are homologous if and only if they have the same h-signature.
@@ -237,7 +237,7 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
         collapse_empty_gripper_cycles: If True, then if there is a cycle between two grippers and the h-signature of
             the cycle is 0, then we remove one of the grippers and re-run the algorithm. You probably want to set this
             to False if you are planning hand-over-hand motions.
-        gripper_ids_in_h_signature: If True, then the h-signature will include the ids of the grippers. You probably
+        gripper_ids_in_gl_signature: If True, then the GL-signature will include the ids of the grippers. You probably
             want to set this to True if you are planning hand-over-hand motions.
         connect_via_floor: If True, then the base of the robot will be connected to the other nodes via the floor.
             This only just things visually, and may be more intuitive. It does not matter for planning how you set this.
@@ -275,7 +275,7 @@ def get_full_h_signature(skeletons: Dict, graph, rope_points, arm_points,
                 continue
 
         h = [get_h_signature(loop, skeletons) for loop in loops]
-        if gripper_ids_in_h_signature:
+        if gripper_ids_in_gl_signature:
             # Add the gripper ids to the h-signature
             h = [(loop_id,) + h_i for loop_id, h_i in zip(loop_ids, h)]
         h = Multiset(h)
@@ -361,7 +361,7 @@ def compare_to_goal(skeletons: Dict, rope_points, goal_rope_points, tol=0.05):
 
 def through_skels(skeletons: Dict, goal_skel_names: List[str], phy: Physics):
     h_desired = make_h_desired(skeletons, goal_skel_names)
-    h, _ = get_full_h_signature_from_phy(skeletons, phy)
+    h, _ = get_full_gl_signature_from_phy(skeletons, phy)
     if h == NO_HOMOTOPY:
         return False
     return h_desired == h

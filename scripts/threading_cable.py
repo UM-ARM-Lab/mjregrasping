@@ -22,7 +22,7 @@ from mjregrasping.grasp_and_settle import deactivate_moving, grasp_and_settle, d
 from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy, through_skels
+from mjregrasping.homotopy_checker import get_full_gl_signature_from_phy, through_skels
 from mjregrasping.homotopy_regrasp_planner import HomotopyRegraspPlanner
 from mjregrasping.homotopy_utils import skeleton_field_dir, NO_HOMOTOPY, make_h_desired, h2array
 from mjregrasping.ik import BIG_PENALTY
@@ -32,6 +32,7 @@ from mjregrasping.physics import Physics, get_q
 from mjregrasping.regrasp_planner_utils import SimGraspInput, SimGraspCandidate, get_will_be_grasping
 from mjregrasping.regrasping_mppi import RegraspMPPI, mppi_viz, do_grasp_dynamics
 from mjregrasping.rollout import control_step
+from mjregrasping.rope_gripper_collision import disable_rope_gripper_collisions
 from mjregrasping.rrt import GraspRRT
 from mjregrasping.scenarios import threading_cable, Scenario
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
@@ -133,7 +134,7 @@ class HomotopyThreadingPlanner(HomotopyRegraspPlanner):
         costs = super().costs(sim_grasp)
 
         phy = sim_grasp.phy
-        h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
+        h, _ = get_full_gl_signature_from_phy(self.skeletons, phy)
         if hp['use_signature_cost']:
             if h == NO_HOMOTOPY:
                 threading_signature_cost = BIG_PENALTY
@@ -229,11 +230,7 @@ def main():
     for i in range(15, 25):
         logging.info(f"Loading trial {i}")
         phy, sdf, skeletons, mov = load_trial(i, gl_ctx, scenario, viz)
-        # disable collision only between rope and gripper geoms
-        from itertools import chain
-        for geom_name in list(chain(*phy.o.rd.gripper_geom_names)) + phy.o.rope.geom_names:
-            phy.m.geom(geom_name).contype = 1
-            phy.m.geom(geom_name).conaffinity = 2
+        disable_rope_gripper_collisions(phy)
 
         grasp_goal = GraspLocsGoal(get_grasp_locs(phy))
 

@@ -3,7 +3,6 @@ import numpy as np
 from numpy.linalg import norm
 
 from mjregrasping.geometry import point_to_line_segment
-from mjregrasping.grasp_conversions import grasp_locations_to_xpos
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.params import hp
 from mjregrasping.physics import Physics, get_qpos_for_actuators
@@ -72,13 +71,6 @@ def get_results_common(phy: Physics):
 def get_tool_points(phy):
     xpos = [phy.d.site(site_name).xpos for site_name in phy.o.rd.tool_sites]
     return np.stack(xpos, 0)
-
-
-def get_rope_points(phy):
-    rope_points = phy.d.xpos[phy.o.rope.body_indices]
-    end_point = grasp_locations_to_xpos(phy, np.ones(1))[0]
-    rope_points = np.concatenate([rope_points, [end_point]])
-    return rope_points
 
 
 def get_nearest_body_idx_and_offset(phy, body_indices, tool_pos):

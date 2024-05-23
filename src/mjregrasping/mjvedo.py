@@ -8,7 +8,7 @@ from vedo import Plotter, Video, Box, Cylinder, Sphere, load, Points
 
 from mjregrasping.mujoco_object import MjObject
 from mjregrasping.physics import Physics
-from mjregrasping.rviz import MujocoXmlExpander
+from mjregrasping.mjxml_expander import MujocoXmlExpander
 from mjregrasping.trials import load_phy_and_skeletons
 
 COLORS = ['r', 'b', 'g', 'c', 'm', 'y', 'k', 'w']

@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 import rospy
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_gl_signature_from_phy
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trials import load_trial
 from mjregrasping.viz import make_viz
@@ -28,7 +28,7 @@ def main():
         phy, _, skeletons, mov = load_trial(trial_idx, gl_ctx, scenario, viz)
         viz.viz(phy)
 
-        h, _ = get_full_h_signature_from_phy(skeletons, phy)
+        h, _ = get_full_gl_signature_from_phy(skeletons, phy)
         print(h)
 
         img = mov.r.render(phy.d)

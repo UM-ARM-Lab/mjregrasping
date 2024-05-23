@@ -1,46 +1,37 @@
-# MJRegrasping
+# mjregrasping
 
+This code can be used in two ways, with ROS or without ROS.
+The project was originally developed on top of ROS1 Noetic, and all experiments from the ICRA paper depend on that.
+The ROS stack depends on internal ARMLab packages like `hdt_description`, so unless you're trying to reproduce our experiments, you probably don't want to use this method.
 
-## Install
+For accesibility and ease of use, we also provide a non-ROS version of the code.
+This is the recommended way if all you want to do is compute the h-signature or GL-signature for your own system.
+It also provides a demo with a simple built-in robot described by MJCF (MuJoCo).
 
-Create a catkin workspace and clone the repository:
+## Installation
 
-```bash
-mkdir -p ~/catkin_ws/src
-cd ~/catkin_ws/src
-git clone git@github.com:UM-ARM-Lab/mjregrasping.git
-wstool init
-cp mjregrasping/mjregrasping.rosinstall .rosinstall
-wstool update
-```
-
-Install dependencies:
+Create a virtual environment and install the requirements:
 
 ```bash
-# ROS dependencies
-cd ~/catkin_ws
-rosdep install --from-paths src --ignore-src -r -y
-# Create a virtual environment with access to the system ROS packages
-cd ~/catkin_ws
-# you may need sudo apt install python3.8-venv
-python3 -m venv --system-site-packages venv
+python3 -m venv venv  # or however you prefer to create virtual environments
 source venv/bin/activate
-# Python dependencies
-cd ~/catkin_ws/src/mjregrasping
-pip install --upgrade pip
-pip install --ignore-installed -r requirements.txt  # use ignore-installed because we want to override things like numpy/scipy that may be installed system-wide
+pip install -r requirements.txt
 ```
 
-Build the workspace:
+## Demos
 
-```bash
-cd ~/catkin_ws
-catkin build
-source devel/setup.bash
-```
+### Simple Paths Demo
 
-## Running the demo
+Run `scripts/homotopy_demo.py`
 
-```bash
-roslaunch mjregrasping demo.launch
-```
+This uses hard-coded grasp and obstacle loops, and visualizes in [rerun](https://rerun.io/).
+It should look like this:
+
+![Simple Paths Demo](docs/homotopy_demo_rerun.png)
+
+### Robot Grasping Cable Demo
+
+Run `scripts/robot_grasping_cable_demo.py`
+
+This uses the state of the mujoco world, and also visualizes the grasp loops and obstacles loops in rerun.
+To see what it should look like in rerun, see the video: [robot_grasping_cable_demo.webm](docs/robot_grasping_cable_demo.webm)

@@ -12,7 +12,7 @@ import rospy
 from arc_utilities.listener import Listener
 from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import PointStamped
-from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.get_rope_points import get_rope_points
 from mjregrasping.grasping import activate_grasp, get_grasp_locs
 from mjregrasping.physics import Physics
 from sensor_msgs.msg import JointState

@@ -7,7 +7,7 @@ import numpy as np
 from vedo import Line, DashedLine
 
 from mjregrasping.grasping import activate_grasp
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_gl_signature_from_phy
 from mjregrasping.mjvedo import MjVedo, COLORS, load_frame_from_npy
 from mjregrasping.scenarios import threading_cable
 
@@ -28,7 +28,7 @@ def main():
     activate_grasp(phy, 'right', 0.94)
 
     t0 = perf_counter()
-    h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
+    h, loops = get_full_gl_signature_from_phy(skeletons, phy, False, False)
     print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
 
     mjvedo = MjVedo(scenario.xml_path)

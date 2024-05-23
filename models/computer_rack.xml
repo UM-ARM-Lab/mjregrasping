@@ -28,7 +28,7 @@
                     <geom name="rack2_post2" type="box" pos="-0.25 0.38 0.25" size="0.04 0.04 0.25" material="metal"/>
                     <geom name="rack2_post3" type="box" pos="0.25 -0.38 0.25" size="0.04 0.04 0.25" material="metal"/>
                     <geom name="rack2_post4" type="box" pos="0.25 0.38 0.25" size="0.04 0.04 0.25" material="metal"/>
-                    <geom name="box1" type="box" pos="-0.14 0.20 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1"/>
+                    <geom name="box1" type="box" pos="-0.14 0.0 0.1" size="0.04 0.14 0.1" rgba="1 0.4 0.4 1"/>
                 </body>
                 <body name="computer" pos="-0.12 0 1">
                     <geom name="case" type="box" pos="0 0 0.2" size="0.15 0.1 0.2" rgba="0.2 0.2 0.4 1"/>

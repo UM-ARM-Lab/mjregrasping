@@ -6,7 +6,7 @@ import numpy as np
 from vedo import Line
 
 import rospy
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_gl_signature_from_phy
 from mjregrasping.mjvedo import MjVedo, COLORS
 from mjregrasping.scenarios import val_untangle
 from mjregrasping.trials import load_trial, load_phy_and_skeletons
@@ -26,7 +26,7 @@ def main():
         phy, _, skeletons = load_phy_and_skeletons(trial_idx, scenario)
 
         t0 = perf_counter()
-        h, loops = get_full_h_signature_from_phy(skeletons, phy, False, False)
+        h, loops = get_full_gl_signature_from_phy(skeletons, phy, False, False)
         print(f'get_full_h_signature_from_phy took {perf_counter() - t0:.3f}s')
 
         mjvedo = MjVedo(scenario.xml_path)

@@ -6,8 +6,9 @@ from numpy.linalg import norm
 
 from mjregrasping.eq_errors import compute_total_eq_error
 from mjregrasping.geometry import pairwise_squared_distances
-from mjregrasping.goal_funcs import get_results_common, get_rope_points, get_keypoint, \
+from mjregrasping.goal_funcs import get_results_common, get_keypoint, \
     get_nongrasping_rope_contact_cost, get_regrasp_costs
+from mjregrasping.get_rope_points import get_rope_points
 from mjregrasping.grasp_conversions import grasp_locations_to_indices_and_offsets, grasp_locations_to_xpos
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_is_grasping, get_grasp_locs, get_finger_qs

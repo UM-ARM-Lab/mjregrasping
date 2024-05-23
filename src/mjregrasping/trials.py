@@ -5,7 +5,6 @@ import time
 from pathlib import Path
 
 import mujoco
-import pysdf_tools
 from mujoco import GLContext
 
 from mjregrasping.movie import MjMovieMaker
@@ -33,6 +32,7 @@ def load_trial(i: int, gl_ctx: GLContext, scenario: Scenario, viz):
     if viz:
         viz.viz(phy)
     if sdf_path:
+        import pysdf_tools
         sdf = pysdf_tools.SignedDistanceField.LoadFromFile(str(sdf_path))
         # viz_slices(sdf)
     else:

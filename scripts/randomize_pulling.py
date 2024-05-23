@@ -14,7 +14,7 @@ from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics, get_q
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
 from mjregrasping.rrt import GraspRRT
-from mjregrasping.rviz import MujocoXmlExpander
+from mjregrasping.mjxml_expander import MujocoXmlExpander
 from mjregrasping.scenarios import val_untangle, get_untangle_skeletons, val_pulling, get_pulling_skeletons
 from mjregrasping.teleport_to_plan import teleport_to_end_of_plan
 from mjregrasping.trials import save_trial

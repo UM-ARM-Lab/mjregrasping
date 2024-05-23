@@ -5,11 +5,12 @@ import numpy as np
 import rerun as rr
 from pymjregrasping_cpp import seedOmpl
 
-from mjregrasping.goal_funcs import get_rope_points, locs_eq
+from mjregrasping.goal_funcs import locs_eq
+from mjregrasping.get_rope_points import get_rope_points
 from mjregrasping.grasp_and_settle import deactivate_release_and_moving, grasp_and_settle
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import get_grasp_locs, get_is_grasping
-from mjregrasping.homotopy_checker import get_full_h_signature_from_phy
+from mjregrasping.homotopy_checker import get_full_gl_signature_from_phy
 from mjregrasping.homotopy_utils import NO_HOMOTOPY, h2array, make_h_desired
 from mjregrasping.ik import BIG_PENALTY
 from mjregrasping.params import hp
@@ -58,7 +59,7 @@ class HomotopyRegraspPlanner:
         seedOmpl(seed)
 
     def update_blocklists(self, phy):
-        current_true_h, _ = get_full_h_signature_from_phy(self.skeletons, phy)
+        current_true_h, _ = get_full_gl_signature_from_phy(self.skeletons, phy)
         new = True
         for blocklisted_true_h in self.true_h_blocklist:
             if current_true_h == blocklisted_true_h:
@@ -171,7 +172,7 @@ class HomotopyRegraspPlanner:
 
         homotopy_cost = 0
         if hp['use_signature_cost']:
-            h_plan, loops_plan = get_full_h_signature_from_phy(self.skeletons, phy_plan)
+            h_plan, loops_plan = get_full_gl_signature_from_phy(self.skeletons, phy_plan)
             for blocklisted_h in self.true_h_blocklist:
                 if h_plan == blocklisted_h:
                     homotopy_cost = BIG_PENALTY
@@ -189,7 +190,7 @@ class HomotopyRegraspPlanner:
         if self.goal_skel_names is None:
             goal_sig_cost = 0
         else:
-            h, _ = get_full_h_signature_from_phy(self.skeletons, phy_plan)
+            h, _ = get_full_gl_signature_from_phy(self.skeletons, phy_plan)
             if h == NO_HOMOTOPY:
                 goal_sig_cost = BIG_PENALTY
             else:

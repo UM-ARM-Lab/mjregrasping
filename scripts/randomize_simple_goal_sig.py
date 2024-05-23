@@ -13,7 +13,7 @@ from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects
 from mjregrasping.physics import Physics
 from mjregrasping.rollout import DEFAULT_SUB_TIME_S
-from mjregrasping.rviz import MujocoXmlExpander
+from mjregrasping.mjxml_expander import MujocoXmlExpander
 from mjregrasping.scenarios import threading_cable, get_threading_skeletons, dz, dy, simple_goal_sig
 from mjregrasping.settle import settle
 from mjregrasping.trials import save_trial

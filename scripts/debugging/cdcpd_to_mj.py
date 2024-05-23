@@ -11,7 +11,7 @@ from arc_utilities import ros_init
 from arc_utilities.listener import Listener
 from arc_utilities.tf2wrapper import TF2Wrapper
 from geometry_msgs.msg import PointStamped
-from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.get_rope_points import get_rope_points
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.move_to_joint_config import pid_to_joint_config
 from mjregrasping.mujoco_objects import MjObjects

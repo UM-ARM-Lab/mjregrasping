@@ -3,7 +3,7 @@ from typing import Optional
 
 import numpy as np
 
-from mjregrasping.goal_funcs import get_rope_points
+from mjregrasping.get_rope_points import get_rope_points
 from mjregrasping.grasp_strategies import Strategies
 from mjregrasping.grasping import activate_grasp
 from mjregrasping.movie import MjMovieMaker
