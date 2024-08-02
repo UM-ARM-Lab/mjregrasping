@@ -1,7 +1,7 @@
 from typing import Dict
 
 import numpy as np
-import pysdf_tools
+# import pysdf_tools
 import rerun as rr
 from matplotlib.colors import to_rgba
 
@@ -102,7 +102,7 @@ class Viz:
         if self.mjrr:
             self.mjrr.viz(phy, is_planning, detailed)
 
-    def sdf(self, sdf: pysdf_tools.SignedDistanceField, frame_id='world', idx=0):
+    def sdf(self, sdf, frame_id='world', idx=0):
         # NOTE: VERY SLOW!!! only use for debugging
         if self.mjrr:
             self.mjrr.sdf(sdf)

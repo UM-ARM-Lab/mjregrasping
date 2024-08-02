@@ -143,8 +143,9 @@ class GraspLocsGoal:
 
 class SinglePointGoal(ObjectPointGoalBase):
     def __init__(self, goal_point: np.array, goal_radius: float, loc: float, var_loc: float, occ_model, viz: Viz, config: Dict,
-                 depth, intrinsic, cam2world_mat, cam_pos_in_world):
+                depth, intrinsic, cam2world_mat, cam_pos_in_world, skip_visual_postprocessing):
         super().__init__(goal_point, loc, viz)
+        print('In Abhinav branch')
         self.var_loc = var_loc
         self.goal_radius = goal_radius
         self.occ_model = occ_model
@@ -157,6 +158,7 @@ class SinglePointGoal(ObjectPointGoalBase):
         self.intrinsic = intrinsic.cpu()
         self.cam2world_mat = torch.tensor(cam2world_mat)
         self.cam_pos_in_world = torch.tensor(cam_pos_in_world)
+        self.skip_visual_postprocessing = skip_visual_postprocessing
 
     def get_results(self, phy: Physics, sim_crash=False):
         cur_state = phy.p.named.data.geom_xpos[self.inds].copy()
@@ -235,8 +237,8 @@ class SinglePointGoal(ObjectPointGoalBase):
         visible = vert_depth < bg_depth
         visible = visible & mask
         
-        return visible.flatten()
-    
+        return visible.flatten() & (not self.skip_visual_postprocessing)
+
     def costs(self, results, u_sample):
         # Don't know what shapes I'm getting. Depending on that, will need to change the code
 
